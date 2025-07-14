@@ -187,4 +187,229 @@ export type MCPToolName =
   | 'calculate_compliance_payroll'
   | 'generate_payslip'
   | 'validate_labor_compliance'
-  | 'get_payroll_report';
+  | 'get_payroll_report'
+  | 'create_expense_from_receipt'
+  | 'create_expense_from_text'
+  | 'approve_expense'
+  | 'reject_expense'
+  | 'get_expense_analytics'
+  | 'export_accounting_data';
+
+// Expense Management Types - v1.3.0
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  parentCategoryId?: string;
+  taxDeductible: boolean;
+  approvalRequired: boolean;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+  validationRules: ValidationRules;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface ValidationRules {
+  receiptRequired?: boolean;
+  descriptionRequired?: boolean;
+  businessPurposeRequired?: boolean;
+  attendeesRequired?: boolean;
+  learningObjectiveRequired?: boolean;
+  meetingPurposeRequired?: boolean;
+  detailedDescriptionRequired?: boolean;
+}
+
+export interface ExpenseRequest {
+  id: string;
+  employeeId: string;
+  categoryId: string;
+  amount: number;
+  currency: string;
+  expenseDate: Date;
+  description: string;
+  purpose?: string;
+  receiptImageUrl?: string;
+  extractedData?: ExtractedReceiptData;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'reimbursed';
+  submittedAt?: Date;
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectionReason?: string;
+  aiConfidenceScore?: number;
+  taxDeductible: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ExtractedReceiptData {
+  vendor?: string;
+  date?: Date;
+  amount?: number;
+  items?: ReceiptItem[];
+  taxAmount?: number;
+  confidence: number;
+  ocrText?: string;
+}
+
+export interface ReceiptItem {
+  name: string;
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice: number;
+}
+
+export interface ApprovalWorkflow {
+  id: string;
+  name: string;
+  department?: string;
+  minAmount: number;
+  maxAmount?: number;
+  approvalSteps: ApprovalStep[];
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface ApprovalStep {
+  step: number;
+  role: string;
+  required: boolean;
+}
+
+export interface ReceiptImage {
+  id: string;
+  expenseRequestId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storagePath: string;
+  ocrStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  ocrResult?: OCRResult;
+  aiExtractedData?: ExtractedReceiptData;
+  confidenceScore?: number;
+  createdAt: Date;
+}
+
+export interface OCRResult {
+  text: string;
+  confidence: number;
+  words?: OCRWord[];
+  blocks?: OCRBlock[];
+}
+
+export interface OCRWord {
+  text: string;
+  confidence: number;
+  bbox: BoundingBox;
+}
+
+export interface OCRBlock {
+  text: string;
+  confidence: number;
+  bbox: BoundingBox;
+  words: OCRWord[];
+}
+
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AccountingEntry {
+  id: string;
+  expenseRequestId: string;
+  entryDate: Date;
+  description: string;
+  debitAccount: string;
+  creditAccount: string;
+  amount: number;
+  taxAmount: number;
+  reference?: string;
+  exported: boolean;
+  exportedAt?: Date;
+  createdAt: Date;
+}
+
+export interface ApprovalRiskAssessment {
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  anomalyFlags: AnomalyFlag[];
+  approvalProbability: number;
+  recommendations: string[];
+}
+
+export interface AnomalyFlag {
+  type: 'amount_unusual' | 'frequency_high' | 'category_inconsistent' | 'vendor_new' | 'timing_suspicious';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  value?: any;
+}
+
+export interface ParsedExpenseData {
+  amount?: number;
+  description?: string;
+  purpose?: string;
+  date?: Date;
+  category?: string;
+  vendor?: string;
+  confidence: number;
+}
+
+export interface StructuredReceiptData {
+  vendor: string;
+  date: Date;
+  total: number;
+  items: ReceiptItem[];
+  taxAmount?: number;
+  paymentMethod?: string;
+}
+
+export interface ExpenseAnalytics {
+  employeeId?: string;
+  department?: string;
+  period: {
+    startDate: Date;
+    endDate: Date;
+  };
+  totalAmount: number;
+  totalRequests: number;
+  averageAmount: number;
+  categoryBreakdown: CategoryExpense[];
+  monthlyTrend: MonthlyExpense[];
+  topVendors: VendorExpense[];
+  approvalStats: {
+    approved: number;
+    rejected: number;
+    pending: number;
+    averageApprovalTime: number; // in hours
+  };
+  complianceMetrics: {
+    receiptComplianceRate: number;
+    policyViolations: number;
+    riskScore: number;
+  };
+}
+
+export interface CategoryExpense {
+  categoryId: string;
+  categoryName: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
+export interface MonthlyExpense {
+  month: string; // YYYY-MM
+  amount: number;
+  count: number;
+}
+
+export interface VendorExpense {
+  vendor: string;
+  amount: number;
+  count: number;
+  averageAmount: number;
+}

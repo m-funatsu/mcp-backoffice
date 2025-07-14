@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { Employee, TimeRecord, PayrollCalculation, PayrollRules, AttendanceReport } from './types.js';
+import type { Employee, TimeRecord, PayrollCalculation, PayrollRules, AttendanceReport, ExpenseCategory, ExpenseRequest, ApprovalWorkflow, ReceiptImage, AccountingEntry, ExtractedReceiptData } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -147,19 +147,20 @@ class Database {
     });
   }
 
-  async clockOut(employeeId: string, clockOutTime: Date, breakMinutes: number = 0): Promise<boolean> {
+  async clockOut(employeeId: string, clockOutTime: Date, breakMinutes: number = 0, notes?: string): Promise<boolean> {
     const dateStr = clockOutTime.toISOString().split('T')[0];
     
     return new Promise((resolve, reject) => {
       const sql = `
         UPDATE time_records 
-        SET clock_out = ?, break_minutes = ?, updated_at = CURRENT_TIMESTAMP
+        SET clock_out = ?, break_minutes = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
         WHERE employee_id = ? AND date = ? AND clock_out IS NULL
       `;
       
       this.db.run(sql, [
         clockOutTime.toISOString(),
         breakMinutes,
+        notes || null,
         employeeId,
         dateStr
       ], function(err) {
@@ -330,6 +331,277 @@ class Database {
           reject(err);
         } else {
           resolve(row.count > 0);
+        }
+      });
+    });
+  }
+
+  // Expense Management Methods - v1.3.0
+  
+  async createExpenseRequest(request: Omit<ExpenseRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const id = `EXP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO expense_requests (
+          id, employee_id, category_id, amount, currency, expense_date, 
+          description, purpose, receipt_image_url, extracted_data, 
+          status, ai_confidence_score, tax_deductible
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        request.employeeId,
+        request.categoryId,
+        request.amount,
+        request.currency,
+        request.expenseDate.toISOString().split('T')[0],
+        request.description,
+        request.purpose || null,
+        request.receiptImageUrl || null,
+        request.extractedData ? JSON.stringify(request.extractedData) : null,
+        request.status,
+        request.aiConfidenceScore || null,
+        request.taxDeductible ? 1 : 0
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  async getExpenseRequest(id: string): Promise<ExpenseRequest | null> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM expense_requests WHERE id = ?`;
+      
+      this.db.get(sql, [id], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (!row) {
+          resolve(null);
+        } else {
+          resolve({
+            id: row.id,
+            employeeId: row.employee_id,
+            categoryId: row.category_id,
+            amount: row.amount,
+            currency: row.currency,
+            expenseDate: new Date(row.expense_date),
+            description: row.description,
+            purpose: row.purpose,
+            receiptImageUrl: row.receipt_image_url,
+            extractedData: row.extracted_data ? JSON.parse(row.extracted_data) : undefined,
+            status: row.status,
+            submittedAt: row.submitted_at ? new Date(row.submitted_at) : undefined,
+            approvedBy: row.approved_by,
+            approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
+            rejectionReason: row.rejection_reason,
+            aiConfidenceScore: row.ai_confidence_score,
+            taxDeductible: row.tax_deductible === 1,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at)
+          });
+        }
+      });
+    });
+  }
+
+  async getExpenseRequestsByEmployee(employeeId: string, startDate?: Date, endDate?: Date): Promise<ExpenseRequest[]> {
+    return new Promise((resolve, reject) => {
+      let sql = `SELECT * FROM expense_requests WHERE employee_id = ?`;
+      const params: any[] = [employeeId];
+      
+      if (startDate && endDate) {
+        sql += ` AND expense_date BETWEEN ? AND ?`;
+        params.push(startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+      }
+      
+      sql += ` ORDER BY expense_date DESC`;
+      
+      this.db.all(sql, params, (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          const requests = rows.map(row => ({
+            id: row.id,
+            employeeId: row.employee_id,
+            categoryId: row.category_id,
+            amount: row.amount,
+            currency: row.currency,
+            expenseDate: new Date(row.expense_date),
+            description: row.description,
+            purpose: row.purpose,
+            receiptImageUrl: row.receipt_image_url,
+            extractedData: row.extracted_data ? JSON.parse(row.extracted_data) : undefined,
+            status: row.status,
+            submittedAt: row.submitted_at ? new Date(row.submitted_at) : undefined,
+            approvedBy: row.approved_by,
+            approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
+            rejectionReason: row.rejection_reason,
+            aiConfidenceScore: row.ai_confidence_score,
+            taxDeductible: row.tax_deductible === 1,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at)
+          }));
+          resolve(requests);
+        }
+      });
+    });
+  }
+
+  async updateExpenseRequestStatus(
+    id: string, 
+    status: 'submitted' | 'approved' | 'rejected' | 'reimbursed',
+    approvedBy?: string,
+    rejectionReason?: string
+  ): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      let sql = `UPDATE expense_requests SET status = ?, updated_at = CURRENT_TIMESTAMP`;
+      const params: any[] = [status];
+      
+      if (status === 'submitted') {
+        sql += `, submitted_at = CURRENT_TIMESTAMP`;
+      } else if (status === 'approved' && approvedBy) {
+        sql += `, approved_by = ?, approved_at = CURRENT_TIMESTAMP`;
+        params.push(approvedBy);
+      } else if (status === 'rejected') {
+        sql += `, rejection_reason = ?`;
+        params.push(rejectionReason || 'No reason provided');
+      }
+      
+      sql += ` WHERE id = ?`;
+      params.push(id);
+      
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(this.changes > 0);
+        }
+      });
+    });
+  }
+
+  async getExpenseCategories(): Promise<ExpenseCategory[]> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM expense_categories WHERE is_active = 1 ORDER BY name`;
+      
+      this.db.all(sql, [], (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          const categories = rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            code: row.code,
+            description: row.description,
+            parentCategoryId: row.parent_category_id,
+            taxDeductible: row.tax_deductible === 1,
+            approvalRequired: row.approval_required === 1,
+            dailyLimit: row.daily_limit,
+            monthlyLimit: row.monthly_limit,
+            validationRules: row.validation_rules ? JSON.parse(row.validation_rules) : {},
+            isActive: row.is_active === 1,
+            createdAt: new Date(row.created_at)
+          }));
+          resolve(categories);
+        }
+      });
+    });
+  }
+
+  async getExpenseCategory(id: string): Promise<ExpenseCategory | null> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM expense_categories WHERE id = ?`;
+      
+      this.db.get(sql, [id], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (!row) {
+          resolve(null);
+        } else {
+          resolve({
+            id: row.id,
+            name: row.name,
+            code: row.code,
+            description: row.description,
+            parentCategoryId: row.parent_category_id,
+            taxDeductible: row.tax_deductible === 1,
+            approvalRequired: row.approval_required === 1,
+            dailyLimit: row.daily_limit,
+            monthlyLimit: row.monthly_limit,
+            validationRules: row.validation_rules ? JSON.parse(row.validation_rules) : {},
+            isActive: row.is_active === 1,
+            createdAt: new Date(row.created_at)
+          });
+        }
+      });
+    });
+  }
+
+  async saveReceiptImage(receiptImage: Omit<ReceiptImage, 'id' | 'createdAt'>): Promise<string> {
+    const id = `RCP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO receipt_images (
+          id, expense_request_id, file_name, file_size, mime_type, 
+          storage_path, ocr_status, ocr_result, ai_extracted_data, confidence_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        receiptImage.expenseRequestId,
+        receiptImage.fileName,
+        receiptImage.fileSize,
+        receiptImage.mimeType,
+        receiptImage.storagePath,
+        receiptImage.ocrStatus,
+        receiptImage.ocrResult ? JSON.stringify(receiptImage.ocrResult) : null,
+        receiptImage.aiExtractedData ? JSON.stringify(receiptImage.aiExtractedData) : null,
+        receiptImage.confidenceScore || null
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  async createAccountingEntry(entry: Omit<AccountingEntry, 'id' | 'createdAt'>): Promise<string> {
+    const id = `ACC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO accounting_entries (
+          id, expense_request_id, entry_date, description, debit_account, 
+          credit_account, amount, tax_amount, reference, exported
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        entry.expenseRequestId,
+        entry.entryDate.toISOString().split('T')[0],
+        entry.description,
+        entry.debitAccount,
+        entry.creditAccount,
+        entry.amount,
+        entry.taxAmount,
+        entry.reference || null,
+        entry.exported ? 1 : 0
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
         }
       });
     });

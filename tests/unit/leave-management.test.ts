@@ -13,14 +13,30 @@ describe('Leave Management System', () => {
     await db.initializeDatabase();
     leaveManagement = new LeaveManagement(db);
 
-    // Create test employee
+    // Create test employee (6+ months tenure for annual leave eligibility)
     testEmployeeId = await db.addEmployee({
       name: 'テスト太郎',
       department: 'テスト部',
       position: 'テスター',
       hourlyRate: 3000,
-      joinDate: new Date('2023-01-01'),
+      joinDate: new Date('2024-01-01'),
       isActive: true
+    });
+
+    // Initialize leave balances for testing
+    const currentYear = new Date().getFullYear();
+    await new Promise<void>((resolve, reject) => {
+      const sql = `
+        INSERT INTO leave_balances (employee_id, leave_type, year, granted_days, used_days, remaining_days)
+        VALUES 
+          (?, 'annual', ?, 20, 0, 20),
+          (?, 'sick', ?, 10, 0, 10),
+          (?, 'bereavement', ?, 7, 0, 7)
+      `;
+      db['db'].run(sql, [testEmployeeId, currentYear, testEmployeeId, currentYear, testEmployeeId, currentYear], function(err) {
+        if (err) reject(err);
+        else resolve();
+      });
     });
   });
 
@@ -30,7 +46,7 @@ describe('Leave Management System', () => {
 
   describe('Natural Language Processing', () => {
     it('should parse annual leave request correctly', async () => {
-      const requestText = '来週の月曜日から金曜日まで有給休暇を取りたいです。家族旅行のため。';
+      const requestText = '2025年8月21日から8月25日まで有給休暇を取りたいです。家族旅行のため。';
       
       const request = await leaveManagement.processNaturalLanguageRequest(testEmployeeId, requestText);
       
@@ -42,7 +58,7 @@ describe('Leave Management System', () => {
     });
 
     it('should parse sick leave request correctly', async () => {
-      const requestText = '明日は体調不良のため病気休暇を取りたいです。';
+      const requestText = '2025年7月16日は体調不良のため病気休暇を取りたいです。';
       
       const request = await leaveManagement.processNaturalLanguageRequest(testEmployeeId, requestText);
       
@@ -52,7 +68,7 @@ describe('Leave Management System', () => {
     });
 
     it('should parse half-day leave request correctly', async () => {
-      const requestText = '明日の午後は半日有給休暇を取りたいです。';
+      const requestText = '2025年8月15日の午後は半日有給休暇を取りたいです。';
       
       const request = await leaveManagement.processNaturalLanguageRequest(testEmployeeId, requestText);
       
@@ -62,7 +78,7 @@ describe('Leave Management System', () => {
     });
 
     it('should parse bereavement leave request correctly', async () => {
-      const requestText = '祖父の忌引きのため、来週火曜日から木曜日まで休暇を取りたいです。';
+      const requestText = '祖父の忌引きのため、2025年7月16日から7月18日まで休暇を取りたいです。';
       
       const request = await leaveManagement.processNaturalLanguageRequest(testEmployeeId, requestText);
       
@@ -72,7 +88,7 @@ describe('Leave Management System', () => {
     });
 
     it('should parse maternity leave request correctly', async () => {
-      const requestText = '産休を3か月間取得したいです。';
+      const requestText = '2025年9月1日から産休を3か月間取得したいです。';
       
       const request = await leaveManagement.processNaturalLanguageRequest(testEmployeeId, requestText);
       
@@ -170,7 +186,7 @@ describe('Leave Management System', () => {
     it('should auto-approve bereavement leave', async () => {
       const request = await leaveManagement.processNaturalLanguageRequest(
         testEmployeeId,
-        '祖母の忌引きのため2日間休暇を取りたいです。'
+        '祖母の忌引きのため2025年7月16日から2日間休暇を取りたいです。'
       );
       
       expect(request.status).toBe('approved');
@@ -181,7 +197,7 @@ describe('Leave Management System', () => {
     it('should auto-approve short sick leave', async () => {
       const request = await leaveManagement.processNaturalLanguageRequest(
         testEmployeeId,
-        '明日は体調不良のため病気休暇を取りたいです。'
+        '2025年7月16日は体調不良のため病気休暇を取りたいです。'
       );
       
       expect(request.status).toBe('approved');

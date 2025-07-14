@@ -282,3 +282,129 @@ INSERT INTO holidays (date, name, type) VALUES
 ('2025-10-13', 'スポーツの日', 'national'),
 ('2025-11-03', '文化の日', 'national'),
 ('2025-11-23', '勤労感謝の日', 'national');
+
+-- Expense Management System Tables (経費精算システム) - v1.3.0
+
+-- Expense categories table (経費カテゴリー)
+CREATE TABLE expense_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    description TEXT,
+    parent_category_id TEXT,
+    tax_deductible BOOLEAN DEFAULT FALSE,
+    approval_required BOOLEAN DEFAULT TRUE,
+    daily_limit DECIMAL(10,2),
+    monthly_limit DECIMAL(10,2),
+    validation_rules JSON,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_category_id) REFERENCES expense_categories(id)
+);
+
+-- Expense requests table (経費申請)
+CREATE TABLE expense_requests (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    currency TEXT DEFAULT 'JPY',
+    expense_date DATE NOT NULL,
+    description TEXT NOT NULL,
+    purpose TEXT,
+    receipt_image_url TEXT,
+    extracted_data JSON, -- OCR抽出データ
+    status TEXT CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'reimbursed')) DEFAULT 'draft',
+    submitted_at DATETIME,
+    approved_by TEXT,
+    approved_at DATETIME,
+    rejection_reason TEXT,
+    ai_confidence_score REAL, -- AI判定の信頼度
+    tax_deductible BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (category_id) REFERENCES expense_categories(id),
+    FOREIGN KEY (approved_by) REFERENCES employees(id)
+);
+
+-- Approval workflows table (承認ワークフロー)
+CREATE TABLE approval_workflows (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    department TEXT,
+    min_amount DECIMAL(10,2) DEFAULT 0,
+    max_amount DECIMAL(10,2),
+    approval_steps JSON NOT NULL, -- 承認ステップ定義
+    is_default BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Receipt images table (レシート画像)
+CREATE TABLE receipt_images (
+    id TEXT PRIMARY KEY,
+    expense_request_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    ocr_status TEXT CHECK (ocr_status IN ('pending', 'processing', 'completed', 'failed')) DEFAULT 'pending',
+    ocr_result JSON, -- OCR結果データ
+    ai_extracted_data JSON, -- AI抽出データ
+    confidence_score REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (expense_request_id) REFERENCES expense_requests(id)
+);
+
+-- Accounting entries table (会計仕訳)
+CREATE TABLE accounting_entries (
+    id TEXT PRIMARY KEY,
+    expense_request_id TEXT NOT NULL,
+    entry_date DATE NOT NULL,
+    description TEXT NOT NULL,
+    debit_account TEXT NOT NULL,
+    credit_account TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    reference TEXT,
+    exported BOOLEAN DEFAULT FALSE,
+    exported_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (expense_request_id) REFERENCES expense_requests(id)
+);
+
+-- Create indexes for expense management
+CREATE INDEX idx_expense_requests_employee ON expense_requests(employee_id);
+CREATE INDEX idx_expense_requests_status ON expense_requests(status);
+CREATE INDEX idx_expense_requests_date ON expense_requests(expense_date);
+CREATE INDEX idx_expense_requests_category ON expense_requests(category_id);
+CREATE INDEX idx_receipt_images_expense ON receipt_images(expense_request_id);
+CREATE INDEX idx_accounting_entries_expense ON accounting_entries(expense_request_id);
+CREATE INDEX idx_accounting_entries_exported ON accounting_entries(exported);
+
+-- Insert default expense categories
+INSERT INTO expense_categories (id, name, code, description, tax_deductible, approval_required, daily_limit, monthly_limit, validation_rules) VALUES
+('EXP_CAT_001', '交通費', 'TRANSPORT', '電車、バス、タクシー、ガソリン代など', TRUE, FALSE, 10000, 100000, '{"receipt_required": false, "description_required": true}'),
+('EXP_CAT_002', '宿泊費', 'ACCOMMODATION', 'ホテル、旅館などの宿泊費', TRUE, TRUE, 20000, 200000, '{"receipt_required": true, "business_purpose_required": true}'),
+('EXP_CAT_003', '食事・接待費', 'MEALS', '会議費、接待費、出張時の食事代', TRUE, TRUE, 5000, 50000, '{"receipt_required": true, "attendees_required": true}'),
+('EXP_CAT_004', '通信費', 'COMMUNICATION', '携帯電話、インターネット、郵送費など', TRUE, FALSE, 3000, 30000, '{"receipt_required": true}'),
+('EXP_CAT_005', '事務用品', 'OFFICE_SUPPLIES', '文房具、コピー用紙、プリンター用品など', TRUE, FALSE, 5000, 20000, '{"receipt_required": true}'),
+('EXP_CAT_006', '研修・セミナー', 'TRAINING', '研修費、セミナー参加費、書籍代など', TRUE, TRUE, 50000, 200000, '{"receipt_required": true, "learning_objective_required": true}'),
+('EXP_CAT_007', '会議費', 'MEETING', '会議室利用料、資料印刷費など', TRUE, FALSE, 10000, 50000, '{"receipt_required": true, "meeting_purpose_required": true}'),
+('EXP_CAT_008', 'その他', 'OTHER', 'その他の業務関連費用', TRUE, TRUE, NULL, NULL, '{"receipt_required": true, "detailed_description_required": true}');
+
+-- Insert default approval workflows
+INSERT INTO approval_workflows (id, name, department, min_amount, max_amount, approval_steps, is_default, is_active) VALUES
+('WORKFLOW_001', '標準承認フロー（〜10万円）', NULL, 0, 100000, 
+'[{"step": 1, "role": "manager", "required": true}, {"step": 2, "role": "finance", "required": false}]', 
+TRUE, TRUE),
+('WORKFLOW_002', '高額承認フロー（10万円〜）', NULL, 100000, NULL, 
+'[{"step": 1, "role": "manager", "required": true}, {"step": 2, "role": "finance", "required": true}, {"step": 3, "role": "director", "required": true}]', 
+FALSE, TRUE),
+('WORKFLOW_003', '開発部承認フロー', '開発部', 0, 50000, 
+'[{"step": 1, "role": "tech_lead", "required": true}, {"step": 2, "role": "manager", "required": true}]', 
+FALSE, TRUE),
+('WORKFLOW_004', '営業部承認フロー', '営業部', 0, 30000, 
+'[{"step": 1, "role": "sales_manager", "required": true}, {"step": 2, "role": "finance", "required": false}]', 
+FALSE, TRUE);
