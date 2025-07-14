@@ -7,6 +7,50 @@ export interface Employee {
   joinDate: Date;
   managerId?: string;
   isActive: boolean;
+  // Extended payroll fields
+  employeeNumber?: string;
+  socialInsuranceNumber?: string;
+  bankAccount?: BankAccount;
+  taxInfo?: TaxInfo;
+  contractType: 'full_time' | 'part_time' | 'contract' | 'temporary';
+  salaryType: 'hourly' | 'monthly' | 'annual';
+  baseSalary?: number; // For monthly/annual employees
+  allowances?: EmployeeAllowance[];
+  deductions?: EmployeeDeduction[];
+}
+
+export interface BankAccount {
+  bankName: string;
+  branchName: string;
+  accountType: 'checking' | 'savings';
+  accountNumber: string;
+  accountHolderName: string;
+}
+
+export interface TaxInfo {
+  dependents: number;
+  taxRate: number;
+  isDisabled: boolean;
+  isSingleParent: boolean;
+  hasSpouseDeduction: boolean;
+}
+
+export interface EmployeeAllowance {
+  type: 'transport' | 'housing' | 'family' | 'position' | 'qualification' | 'other';
+  description: string;
+  amount: number;
+  isFixed: boolean; // true for fixed allowances, false for calculated
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+}
+
+export interface EmployeeDeduction {
+  type: 'union_fees' | 'company_housing' | 'loan_repayment' | 'insurance' | 'other';
+  description: string;
+  amount: number;
+  isFixed: boolean;
+  effectiveFrom: Date;
+  effectiveTo?: Date;
 }
 
 export interface TimeRecord {
@@ -139,4 +183,8 @@ export type MCPToolName =
   | 'reject_leave'
   | 'get_leave_balance'
   | 'get_team_calendar'
-  | 'get_leave_analytics';
+  | 'get_leave_analytics'
+  | 'calculate_compliance_payroll'
+  | 'generate_payslip'
+  | 'validate_labor_compliance'
+  | 'get_payroll_report';

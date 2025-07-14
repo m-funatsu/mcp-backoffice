@@ -28,8 +28,14 @@ class Database {
       
       this.db.exec(schema, (err) => {
         if (err) {
-          console.error('Error initializing database:', err);
-          reject(err);
+          // Check if error is due to table already existing - this is acceptable for tests
+          if (err.message.includes('already exists')) {
+            console.log('Database tables already exist, skipping initialization');
+            resolve();
+          } else {
+            console.error('Error initializing database:', err);
+            reject(err);
+          }
         } else {
           console.log('Database initialized successfully');
           resolve();

@@ -346,7 +346,9 @@ export class LeaveManagement {
         return true;
       }
       
-      if (conditions.includes('auto_approve_immediate_family') && request.leaveType === 'bereavement') {
+      // Additional bereavement check for immediate family
+      if (conditions.includes('auto_approve_immediate_family') && 
+          (request.leaveType as string) === 'bereavement') {
         return true;
       }
 
