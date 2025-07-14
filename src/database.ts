@@ -26,7 +26,7 @@ class Database {
       const schemaPath = join(__dirname, '..', 'schema.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
-      this.db.exec(schema, (err) => {
+      this.db.exec(schema, async (err) => {
         if (err) {
           // Check if error is due to table already existing - this is acceptable for tests
           if (err.message.includes('already exists')) {
@@ -38,6 +38,280 @@ class Database {
           }
         } else {
           console.log('Database initialized successfully');
+          
+          // Create labor standards monitoring tables
+          try {
+            await this.createLaborStandardsMonitoringTables();
+            console.log('Labor standards monitoring tables created successfully');
+            
+            // Create HR extension tables for v1.5.0-v2.0.0
+            await this.createHRExtensionTables();
+            console.log('HR extension tables created successfully');
+            
+            resolve();
+          } catch (monitoringErr) {
+            console.error('Error creating additional tables:', monitoringErr);
+            reject(monitoringErr);
+          }
+        }
+      });
+    });
+  }
+
+  private async createLaborStandardsMonitoringTables(): Promise<void> {
+    // 36協定（時間外労働協定）管理テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS labor_agreements (
+        id TEXT PRIMARY KEY,
+        company_id TEXT DEFAULT 'DEFAULT_COMPANY',
+        agreement_type TEXT CHECK (agreement_type IN ('36_standard', '36_special', 'other')) DEFAULT '36_standard',
+        effective_from DATE NOT NULL,
+        effective_to DATE NOT NULL,
+        
+        -- 標準的な36協定の上限
+        monthly_overtime_limit REAL DEFAULT 45.0,      -- 月間時間外労働上限（時間）
+        yearly_overtime_limit REAL DEFAULT 360.0,      -- 年間時間外労働上限（時間）
+        
+        -- 特別条項付き36協定の上限
+        special_monthly_limit REAL DEFAULT 100.0,      -- 特別条項時の月間上限（時間）
+        special_yearly_limit REAL DEFAULT 720.0,       -- 特別条項時の年間上限（時間）
+        special_2month_avg_limit REAL DEFAULT 80.0,    -- 複数月平均上限（時間）
+        special_6month_avg_limit REAL DEFAULT 80.0,    -- 6ヶ月平均上限（時間）
+        special_monthly_count_limit INTEGER DEFAULT 6,  -- 特別条項適用可能月数
+        
+        -- 健康確保措置
+        health_measures TEXT,
+        notification_authority TEXT,    -- 届出労働基準監督署
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 36協定監視・アラート管理テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS compliance_alerts (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        alert_type TEXT CHECK (alert_type IN (
+          'monthly_overtime_approaching',   -- 月間上限接近
+          'monthly_overtime_exceeded',      -- 月間上限超過
+          'yearly_overtime_approaching',    -- 年間上限接近
+          'yearly_overtime_exceeded',       -- 年間上限超過
+          'special_limit_approaching',      -- 特別条項上限接近
+          'special_limit_exceeded',         -- 特別条項上限超過
+          'health_check_required',          -- 健康確保措置必要
+          'continuous_work_violation'       -- 連続勤務違反
+        )) NOT NULL,
+        
+        alert_level TEXT CHECK (alert_level IN ('info', 'warning', 'critical', 'emergency')) DEFAULT 'warning',
+        target_period TEXT NOT NULL,       -- 対象期間（YYYY-MM または YYYY）
+        current_hours REAL NOT NULL,       -- 現在の時間外労働時間
+        limit_hours REAL NOT NULL,         -- 上限時間
+        threshold_percentage REAL DEFAULT 80.0, -- アラート発動閾値（%）
+        
+        message TEXT NOT NULL,
+        auto_generated BOOLEAN DEFAULT TRUE,
+        acknowledged BOOLEAN DEFAULT FALSE,
+        acknowledged_by TEXT,
+        acknowledged_at DATETIME,
+        
+        resolved BOOLEAN DEFAULT FALSE,
+        resolved_at DATETIME,
+        resolution_notes TEXT,
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id),
+        FOREIGN KEY (acknowledged_by) REFERENCES employees(id)
+      )
+    `);
+
+    // 客観的記録システム（ICカード・PCログ対応）
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS objective_time_records (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        record_date DATE NOT NULL,
+        
+        -- ICカードデータ
+        ic_card_in DATETIME,
+        ic_card_out DATETIME,
+        ic_card_device_id TEXT,
+        ic_card_location TEXT,
+        
+        -- PCログデータ  
+        pc_login DATETIME,
+        pc_logout DATETIME,
+        pc_device_id TEXT,
+        pc_ip_address TEXT,
+        
+        -- 自己申告データ
+        self_reported_in DATETIME,
+        self_reported_out DATETIME,
+        self_report_reason TEXT,
+        
+        -- 乖離チェック結果
+        discrepancy_detected BOOLEAN DEFAULT FALSE,
+        discrepancy_minutes INTEGER DEFAULT 0,
+        discrepancy_explanation TEXT,
+        
+        -- 承認・確認
+        verified_in DATETIME,           -- 最終確定された出勤時刻
+        verified_out DATETIME,          -- 最終確定された退勤時刻
+        verified_by TEXT,               -- 確定者
+        verification_method TEXT CHECK (verification_method IN (
+          'ic_card', 'pc_log', 'manual_review', 'supervisor_approval'
+        )),
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id),
+        FOREIGN KEY (verified_by) REFERENCES employees(id),
+        UNIQUE(employee_id, record_date)
+      )
+    `);
+
+    // 労働時間計算詳細テーブル（36協定監視用）
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS detailed_work_hours (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        calculation_date DATE NOT NULL,
+        
+        -- 基本労働時間
+        regular_hours REAL DEFAULT 0,          -- 所定労働時間
+        actual_work_hours REAL DEFAULT 0,      -- 実労働時間
+        
+        -- 時間外労働の詳細分類
+        daily_overtime REAL DEFAULT 0,         -- 1日8時間超の時間外
+        weekly_overtime REAL DEFAULT 0,        -- 週40時間超の時間外
+        statutory_overtime REAL DEFAULT 0,     -- 法定時間外労働（36協定対象）
+        
+        -- 深夜・休日労働
+        late_night_hours REAL DEFAULT 0,       -- 深夜労働時間
+        holiday_work_hours REAL DEFAULT 0,     -- 休日労働時間
+        statutory_holiday_hours REAL DEFAULT 0, -- 法定休日労働時間
+        
+        -- 休憩時間
+        break_minutes INTEGER DEFAULT 0,
+        break_law_compliant BOOLEAN DEFAULT TRUE,
+        
+        -- 36協定遵守状況
+        agreement_compliant BOOLEAN DEFAULT TRUE,
+        compliance_notes TEXT,
+        
+        -- 計算基準
+        payroll_calculation_id TEXT,           -- 給与計算との紐づけ
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id),
+        FOREIGN KEY (payroll_calculation_id) REFERENCES payroll_calculations(id),
+        UNIQUE(employee_id, calculation_date)
+      )
+    `);
+
+    // 健康確保措置記録テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS health_check_records (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        check_date DATE NOT NULL,
+        check_type TEXT CHECK (check_type IN (
+          'medical_interview',      -- 医師の面接指導
+          'health_questionnaire',   -- 健康状態チェック
+          'stress_check',          -- ストレスチェック
+          'work_load_review'       -- 業務負荷見直し
+        )) NOT NULL,
+        
+        trigger_reason TEXT,                   -- 実施理由（80時間超、100時間超等）
+        overtime_hours REAL,                   -- 対象期間の時間外労働時間
+        
+        -- 面接指導結果
+        doctor_name TEXT,
+        health_status TEXT CHECK (health_status IN (
+          'good', 'caution', 'requires_attention', 'requires_treatment'
+        )),
+        recommendations TEXT,
+        work_restrictions TEXT,
+        follow_up_required BOOLEAN DEFAULT FALSE,
+        follow_up_date DATE,
+        
+        completed BOOLEAN DEFAULT FALSE,
+        completed_at DATETIME,
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+
+    // インデックス作成
+    await this.run('CREATE INDEX IF NOT EXISTS idx_labor_agreements_effective ON labor_agreements(effective_from, effective_to)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_compliance_alerts_employee_date ON compliance_alerts(employee_id, created_at)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_compliance_alerts_type_level ON compliance_alerts(alert_type, alert_level)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_objective_records_employee_date ON objective_time_records(employee_id, record_date)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_detailed_hours_employee_date ON detailed_work_hours(employee_id, calculation_date)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_health_checks_employee_date ON health_check_records(employee_id, check_date)');
+
+    // 初期データ挿入
+    await this.run(`
+      INSERT OR IGNORE INTO labor_agreements (
+        id,
+        agreement_type,
+        effective_from,
+        effective_to,
+        monthly_overtime_limit,
+        yearly_overtime_limit,
+        special_monthly_limit,
+        special_yearly_limit,
+        special_2month_avg_limit,
+        special_6month_avg_limit,
+        special_monthly_count_limit,
+        health_measures,
+        notification_authority
+      ) VALUES (
+        'DEFAULT_36_AGREEMENT_2024',
+        '36_special',
+        '2024-04-01',
+        '2025-03-31',
+        45.0,      -- 原則月45時間
+        360.0,     -- 原則年360時間
+        100.0,     -- 特別条項月100時間未満
+        720.0,     -- 特別条項年720時間
+        80.0,      -- 複数月平均80時間
+        80.0,      -- 6ヶ月平均80時間
+        6,         -- 特別条項適用は年6回まで
+        '月80時間超の場合は医師の面接指導を実施',
+        '○○労働基準監督署'
+      )
+    `);
+  }
+
+  private async createHRExtensionTables(): Promise<void> {
+    try {
+      // Read and execute HR extension schema
+      const schemaPath = join(__dirname, '..', 'schema-hr-extensions-v1.5.0-v2.0.0.sql');
+      const schema = readFileSync(schemaPath, 'utf8');
+      
+      // Split by semicolon and execute each statement
+      const statements = schema.split(';').filter(stmt => stmt.trim());
+      
+      for (const statement of statements) {
+        if (statement.trim()) {
+          await this.run(statement.trim());
+        }
+      }
+    } catch (error) {
+      console.error('Error creating HR extension tables:', error);
+      throw error;
+    }
+  }
+
+  private async run(sql: string, params?: any[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
           resolve();
         }
       });
@@ -1017,6 +1291,545 @@ class Database {
             }))
           };
           resolve(report);
+        }
+      });
+    });
+  }
+
+  // v2.0.0 Human Capital Disclosure System Methods
+  
+  /**
+   * 従業員ライフサイクル段階の管理
+   */
+  async createEmployeeLifecycleStage(stage: {
+    employeeId: string;
+    stage: 'pre_hire' | 'onboarding' | 'active' | 'performance_review' | 'transition' | 'offboarding';
+    startDate: Date;
+    endDate?: Date;
+    responsibleManager?: string;
+    checklistData?: any;
+    notes?: string;
+  }): Promise<string> {
+    const id = `LIFECYCLE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO employee_lifecycle_stages (
+          id, employee_id, stage, start_date, end_date, 
+          responsible_manager, checklist_data, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        stage.employeeId,
+        stage.stage,
+        stage.startDate.toISOString().split('T')[0],
+        stage.endDate?.toISOString().split('T')[0] || null,
+        stage.responsibleManager || null,
+        stage.checklistData ? JSON.stringify(stage.checklistData) : null,
+        stage.notes || null
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * オンボーディング計画の作成
+   */
+  async createOnboardingPlan(plan: {
+    employeeId: string;
+    planType: 'standard' | 'manager' | 'executive' | 'intern';
+    departmentSpecificItems?: any;
+    durationWeeks?: number;
+    mentorId?: string;
+    hrContactId?: string;
+  }): Promise<string> {
+    const id = `ONBOARD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO onboarding_plans (
+          id, employee_id, plan_type, department_specific_items,
+          duration_weeks, mentor_id, hr_contact_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        plan.employeeId,
+        plan.planType,
+        plan.departmentSpecificItems ? JSON.stringify(plan.departmentSpecificItems) : null,
+        plan.durationWeeks || 4,
+        plan.mentorId || null,
+        plan.hrContactId || null,
+        'active'
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 人事評価の作成
+   */
+  async createPerformanceEvaluation(evaluation: {
+    employeeId: string;
+    evaluatorId: string;
+    evaluationPeriod: string;
+    evaluationType: 'annual' | 'semi_annual' | 'quarterly' | 'probation' | 'special';
+    overallRating?: number;
+    performanceMetrics?: any;
+    strengths?: string;
+    areasForImprovement?: string;
+    developmentGoals?: string;
+    careerAdvancementRecommendation?: string;
+  }): Promise<string> {
+    const id = `EVAL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO performance_evaluations (
+          id, employee_id, evaluator_id, evaluation_period, evaluation_type,
+          overall_rating, performance_metrics, strengths, areas_for_improvement,
+          development_goals, career_advancement_recommendation, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        evaluation.employeeId,
+        evaluation.evaluatorId,
+        evaluation.evaluationPeriod,
+        evaluation.evaluationType,
+        evaluation.overallRating || null,
+        evaluation.performanceMetrics ? JSON.stringify(evaluation.performanceMetrics) : null,
+        evaluation.strengths || null,
+        evaluation.areasForImprovement || null,
+        evaluation.developmentGoals || null,
+        evaluation.careerAdvancementRecommendation || null,
+        'draft'
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 人材プロファイルの作成・更新
+   */
+  async upsertTalentProfile(profile: {
+    employeeId: string;
+    careerLevel: 'entry' | 'junior' | 'mid' | 'senior' | 'expert' | 'leadership';
+    coreCompetencies?: any;
+    technicalSkills?: any;
+    softSkills?: any;
+    careerAspirations?: string;
+    mobilityPreferences?: any;
+    performanceTrend?: 'improving' | 'stable' | 'declining';
+    potentialRating?: 'high' | 'medium' | 'low';
+    retentionRisk?: 'low' | 'medium' | 'high';
+    successionReadiness?: 'ready_now' | 'ready_1_year' | 'ready_2_years' | 'not_ready';
+  }): Promise<string> {
+    const id = `TALENT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT OR REPLACE INTO talent_profiles (
+          id, employee_id, career_level, core_competencies, technical_skills,
+          soft_skills, career_aspirations, mobility_preferences, performance_trend,
+          potential_rating, retention_risk, succession_readiness, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        profile.employeeId,
+        profile.careerLevel,
+        profile.coreCompetencies ? JSON.stringify(profile.coreCompetencies) : null,
+        profile.technicalSkills ? JSON.stringify(profile.technicalSkills) : null,
+        profile.softSkills ? JSON.stringify(profile.softSkills) : null,
+        profile.careerAspirations || null,
+        profile.mobilityPreferences ? JSON.stringify(profile.mobilityPreferences) : null,
+        profile.performanceTrend || 'stable',
+        profile.potentialRating || 'medium',
+        profile.retentionRisk || 'low',
+        profile.successionReadiness || 'not_ready'
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 研修コース受講登録
+   */
+  async enrollInCourse(enrollment: {
+    employeeId: string;
+    courseId: string;
+    enrollmentDate: Date;
+    targetCompletionDate?: Date;
+  }): Promise<string> {
+    const id = `ENROLL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO course_enrollments (
+          id, employee_id, course_id, enrollment_date, target_completion_date, status
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        enrollment.employeeId,
+        enrollment.courseId,
+        enrollment.enrollmentDate.toISOString().split('T')[0],
+        enrollment.targetCompletionDate?.toISOString().split('T')[0] || null,
+        'enrolled'
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 研修進捗の更新
+   */
+  async updateCourseProgress(enrollmentId: string, progress: {
+    status?: 'enrolled' | 'in_progress' | 'completed' | 'cancelled' | 'failed';
+    completionPercentage?: number;
+    finalScore?: number;
+    certificationEarned?: boolean;
+    actualCompletionDate?: Date;
+    feedback?: string;
+  }): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      let sql = `UPDATE course_enrollments SET updated_at = CURRENT_TIMESTAMP`;
+      const params: any[] = [];
+      
+      if (progress.status) {
+        sql += `, status = ?`;
+        params.push(progress.status);
+      }
+      
+      if (progress.completionPercentage !== undefined) {
+        sql += `, completion_percentage = ?`;
+        params.push(progress.completionPercentage);
+      }
+      
+      if (progress.finalScore !== undefined) {
+        sql += `, final_score = ?`;
+        params.push(progress.finalScore);
+      }
+      
+      if (progress.certificationEarned !== undefined) {
+        sql += `, certification_earned = ?`;
+        params.push(progress.certificationEarned ? 1 : 0);
+      }
+      
+      if (progress.actualCompletionDate) {
+        sql += `, actual_completion_date = ?`;
+        params.push(progress.actualCompletionDate.toISOString().split('T')[0]);
+      }
+      
+      if (progress.feedback) {
+        sql += `, feedback = ?`;
+        params.push(progress.feedback);
+      }
+      
+      sql += ` WHERE id = ?`;
+      params.push(enrollmentId);
+      
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(this.changes > 0);
+        }
+      });
+    });
+  }
+
+  /**
+   * スキルアセスメントの記録
+   */
+  async recordSkillsAssessment(assessment: {
+    employeeId: string;
+    assessmentType: 'self_assessment' | 'manager_assessment' | 'peer_assessment' | 'external_assessment';
+    skillCategory: 'technical' | 'leadership' | 'communication' | 'problem_solving' | 'teamwork';
+    skillItems: any;
+    overallScore: number;
+    assessmentDate: Date;
+    assessorId?: string;
+    notes?: string;
+  }): Promise<string> {
+    const id = `SKILL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO skills_assessments (
+          id, employee_id, assessment_type, skill_category, skill_items,
+          overall_score, assessment_date, assessor_id, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        assessment.employeeId,
+        assessment.assessmentType,
+        assessment.skillCategory,
+        JSON.stringify(assessment.skillItems),
+        assessment.overallScore,
+        assessment.assessmentDate.toISOString().split('T')[0],
+        assessment.assessorId || null,
+        assessment.notes || null
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 従業員エンゲージメント調査の回答記録
+   */
+  async recordSurveyResponse(response: {
+    surveyId: string;
+    employeeId: string;
+    responses: any;
+    responseDate: Date;
+    overallSatisfaction: number;
+  }): Promise<string> {
+    const id = `RESPONSE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO survey_responses (
+          id, survey_id, employee_id, responses, response_date, overall_satisfaction
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        response.surveyId,
+        response.employeeId,
+        JSON.stringify(response.responses),
+        response.responseDate.toISOString().split('T')[0],
+        response.overallSatisfaction
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 人的資本指標の記録
+   */
+  async recordHumanCapitalMetric(metric: {
+    metricName: string;
+    metricCategory: 'workforce' | 'costs' | 'productivity' | 'engagement' | 'diversity' | 'skills' | 'recruitment' | 'retention';
+    metricValue: number;
+    metricUnit: string;
+    calculationMethod: string;
+    reportingPeriod: string;
+    benchmarkValue?: number;
+    isIso30414Compliant?: boolean;
+  }): Promise<string> {
+    const id = `METRIC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO human_capital_metrics (
+          id, metric_name, metric_category, metric_value, metric_unit,
+          calculation_method, reporting_period, benchmark_value, is_iso30414_compliant
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        metric.metricName,
+        metric.metricCategory,
+        metric.metricValue,
+        metric.metricUnit,
+        metric.calculationMethod,
+        metric.reportingPeriod,
+        metric.benchmarkValue || null,
+        metric.isIso30414Compliant ? 1 : 0
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 多様性指標の記録
+   */
+  async recordDiversityMetric(metric: {
+    metricType: 'gender' | 'age' | 'nationality' | 'disability' | 'education' | 'tenure';
+    categoryBreakdown: any;
+    leadershipRepresentation: any;
+    payEquityMetrics: any;
+    reportingPeriod: string;
+  }): Promise<string> {
+    const id = `DIVERSITY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO diversity_metrics (
+          id, metric_type, category_breakdown, leadership_representation,
+          pay_equity_metrics, reporting_period
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        metric.metricType,
+        JSON.stringify(metric.categoryBreakdown),
+        JSON.stringify(metric.leadershipRepresentation),
+        JSON.stringify(metric.payEquityMetrics),
+        metric.reportingPeriod
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 人的資本指標の取得
+   */
+  async getHumanCapitalMetrics(reportingPeriod: string): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT * FROM human_capital_metrics 
+        WHERE reporting_period = ?
+        ORDER BY metric_category, metric_name
+      `;
+      
+      this.db.all(sql, [reportingPeriod], (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          const metrics = rows.map(row => ({
+            id: row.id,
+            metricName: row.metric_name,
+            metricCategory: row.metric_category,
+            metricValue: row.metric_value,
+            metricUnit: row.metric_unit,
+            calculationMethod: row.calculation_method,
+            reportingPeriod: row.reporting_period,
+            benchmarkValue: row.benchmark_value,
+            isIso30414Compliant: row.is_iso30414_compliant === 1,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at)
+          }));
+          resolve(metrics);
+        }
+      });
+    });
+  }
+
+  /**
+   * 従業員の包括的プロファイル取得
+   */
+  async getEmployeeComprehensiveProfile(employeeId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          e.*,
+          tp.career_level,
+          tp.core_competencies,
+          tp.technical_skills,
+          tp.soft_skills,
+          tp.performance_trend,
+          tp.potential_rating,
+          tp.retention_risk,
+          tp.succession_readiness,
+          COUNT(DISTINCT ce.id) as total_courses,
+          COUNT(DISTINCT CASE WHEN ce.status = 'completed' THEN ce.id END) as completed_courses,
+          AVG(CASE WHEN pe.overall_rating IS NOT NULL THEN pe.overall_rating END) as avg_performance_rating,
+          AVG(CASE WHEN sr.overall_satisfaction IS NOT NULL THEN sr.overall_satisfaction END) as avg_engagement_score
+        FROM employees e
+        LEFT JOIN talent_profiles tp ON e.id = tp.employee_id
+        LEFT JOIN course_enrollments ce ON e.id = ce.employee_id
+        LEFT JOIN performance_evaluations pe ON e.id = pe.employee_id
+        LEFT JOIN survey_responses sr ON e.id = sr.employee_id
+        WHERE e.id = ?
+        GROUP BY e.id
+      `;
+      
+      this.db.get(sql, [employeeId], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (!row) {
+          resolve(null);
+        } else {
+          resolve({
+            employee: {
+              id: row.id,
+              name: row.name,
+              department: row.department,
+              position: row.position,
+              hourlyRate: row.hourly_rate,
+              joinDate: new Date(row.join_date),
+              managerId: row.manager_id,
+              isActive: row.is_active === 1
+            },
+            talentProfile: {
+              careerLevel: row.career_level,
+              coreCompetencies: row.core_competencies ? JSON.parse(row.core_competencies) : null,
+              technicalSkills: row.technical_skills ? JSON.parse(row.technical_skills) : null,
+              softSkills: row.soft_skills ? JSON.parse(row.soft_skills) : null,
+              performanceTrend: row.performance_trend,
+              potentialRating: row.potential_rating,
+              retentionRisk: row.retention_risk,
+              successionReadiness: row.succession_readiness
+            },
+            trainingMetrics: {
+              totalCourses: row.total_courses || 0,
+              completedCourses: row.completed_courses || 0,
+              completionRate: row.total_courses > 0 ? (row.completed_courses / row.total_courses) * 100 : 0
+            },
+            performanceMetrics: {
+              averageRating: row.avg_performance_rating || null,
+              averageEngagementScore: row.avg_engagement_score || null
+            }
+          });
         }
       });
     });
