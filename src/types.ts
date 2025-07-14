@@ -12,8 +12,8 @@ export interface Employee {
   socialInsuranceNumber?: string;
   bankAccount?: BankAccount;
   taxInfo?: TaxInfo;
-  contractType: 'full_time' | 'part_time' | 'contract' | 'temporary';
-  salaryType: 'hourly' | 'monthly' | 'annual';
+  contractType?: 'full_time' | 'part_time' | 'contract' | 'temporary';
+  salaryType?: 'hourly' | 'monthly' | 'annual';
   baseSalary?: number; // For monthly/annual employees
   allowances?: EmployeeAllowance[];
   deductions?: EmployeeDeduction[];

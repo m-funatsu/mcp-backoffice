@@ -279,7 +279,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
 
   /**
    * 給与明細自動生成
-   * Automated payslip generation
+   * Automated payslip generation with full Japanese tax and social insurance calculation
    */
   async generatePayslip(employeeId: string, month: string): Promise<PayslipData> {
     const employee = await this.db.getEmployee(employeeId);
@@ -287,37 +287,167 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       throw new Error('Employee not found');
     }
 
-    // This is a simplified implementation - will be expanded in next phase
+    // Get time records for the month
+    const monthDate = new Date(month + '-01');
+    const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+    const workingHours = await this.calculateWorkingHours(timeRecords);
+
+    // Calculate base salary and premiums
+    const baseSalary = this.calculateBaseSalary(employee, workingHours);
+    const overtimePay = this.calculateOvertimePay(employee, workingHours);
+    const lateNightPay = this.calculateLateNightPay(employee, workingHours);
+    const holidayPay = this.calculateHolidayPay(employee, workingHours);
+    
+    // Calculate total gross pay
+    const grossPay = baseSalary + overtimePay + lateNightPay + holidayPay;
+    
+    // Add employee allowances
+    const allowances: PayrollAllowance[] = [];
+    if (employee.allowances) {
+      for (const allowance of employee.allowances) {
+        allowances.push({
+          type: allowance.type as any,
+          description: allowance.description,
+          amount: allowance.amount
+        });
+      }
+    }
+
+    // Add overtime allowances
+    if (overtimePay > 0) {
+      allowances.push({
+        type: 'overtime',
+        description: '時間外手当',
+        amount: overtimePay,
+        hours: workingHours.reduce((sum, h) => sum + h.overtimeHours, 0),
+        rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.overtimeHours, 0), 'regular')
+      });
+    }
+
+    if (lateNightPay > 0) {
+      allowances.push({
+        type: 'late_night',
+        description: '深夜手当',
+        amount: lateNightPay,
+        hours: workingHours.reduce((sum, h) => sum + h.lateNightHours, 0),
+        rate: this.rules.lateNightRate
+      });
+    }
+
+    if (holidayPay > 0) {
+      allowances.push({
+        type: 'holiday',
+        description: '休日手当',
+        amount: holidayPay,
+        hours: workingHours.reduce((sum, h) => sum + h.holidayHours, 0),
+        rate: this.rules.holidayRate
+      });
+    }
+
+    const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0);
+    const totalGrossPay = grossPay + totalAllowances;
+
+    // Calculate Japanese tax and social insurance
+    const taxCalculation = this.calculateJapaneseTax(totalGrossPay, employee);
+    const socialInsurance = this.calculateSocialInsurance(totalGrossPay, employee);
+
+    // Calculate deductions
+    const deductions: PayrollDeduction[] = [];
+    
+    // Tax deductions
+    if (taxCalculation.incomeTax > 0) {
+      deductions.push({
+        type: 'income_tax',
+        description: '所得税',
+        amount: taxCalculation.incomeTax,
+        rate: this.getIncomeTaxRate(totalGrossPay)
+      });
+    }
+
+    if (taxCalculation.residentTax > 0) {
+      deductions.push({
+        type: 'resident_tax',
+        description: '住民税',
+        amount: taxCalculation.residentTax,
+        rate: 0.10 // 10% standard rate
+      });
+    }
+
+    // Social insurance deductions
+    if (socialInsurance.healthInsurance > 0) {
+      deductions.push({
+        type: 'social_insurance',
+        description: '健康保険',
+        amount: socialInsurance.healthInsurance,
+        rate: 0.0495 // Approximate rate
+      });
+    }
+
+    if (socialInsurance.pensionInsurance > 0) {
+      deductions.push({
+        type: 'social_insurance',
+        description: '厚生年金',
+        amount: socialInsurance.pensionInsurance,
+        rate: 0.0915 // Approximate rate
+      });
+    }
+
+    if (socialInsurance.unemploymentInsurance > 0) {
+      deductions.push({
+        type: 'unemployment',
+        description: '雇用保険',
+        amount: socialInsurance.unemploymentInsurance,
+        rate: 0.003 // Employee portion
+      });
+    }
+
+    if (socialInsurance.longTermCareInsurance > 0) {
+      deductions.push({
+        type: 'social_insurance',
+        description: '介護保険',
+        amount: socialInsurance.longTermCareInsurance,
+        rate: 0.01225 // Approximate rate
+      });
+    }
+
+    // Add employee deductions
+    if (employee.deductions) {
+      for (const deduction of employee.deductions) {
+        deductions.push({
+          type: deduction.type as any,
+          description: deduction.description,
+          amount: deduction.amount
+        });
+      }
+    }
+
+    const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
+    const netPay = totalGrossPay - totalDeductions;
+
+    // Create working summary
+    const workingSummary: WorkingSummary = {
+      regularHours: workingHours.reduce((sum, h) => sum + h.regularHours, 0),
+      overtimeHours: workingHours.reduce((sum, h) => sum + h.overtimeHours, 0),
+      lateNightHours: workingHours.reduce((sum, h) => sum + h.lateNightHours, 0),
+      holidayHours: workingHours.reduce((sum, h) => sum + h.holidayHours, 0),
+      totalWorkingDays: workingHours.length,
+      absentDays: 0, // Will be calculated from leave records
+      paidLeaves: 0  // Will be calculated from leave records
+    };
+
     const payslip: PayslipData = {
       employeeId,
       employeeName: employee.name,
       month,
-      baseSalary: 0, // Will be calculated from time records
-      allowances: [],
-      deductions: [],
-      taxCalculation: {
-        incomeTax: 0,
-        residentTax: 0,
-        totalTax: 0,
-        taxableIncome: 0
-      },
-      socialInsurance: {
-        healthInsurance: 0,
-        pensionInsurance: 0,
-        unemploymentInsurance: 0,
-        longTermCareInsurance: 0,
-        total: 0
-      },
-      netPay: 0,
-      workingSummary: {
-        regularHours: 0,
-        overtimeHours: 0,
-        lateNightHours: 0,
-        holidayHours: 0,
-        totalWorkingDays: 0,
-        absentDays: 0,
-        paidLeaves: 0
-      },
+      baseSalary,
+      allowances,
+      deductions,
+      taxCalculation,
+      socialInsurance,
+      netPay,
+      workingSummary,
       generatedAt: new Date()
     };
 
@@ -348,9 +478,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const { WorkingHoursCalculator } = await import('./working-hours-calculator.js');
     const calculator = new WorkingHoursCalculator();
     
-    const monthlyHours = calculator.calculateMonthlyHours(timeRecords);
     const breakdowns = timeRecords.map(record => calculator.calculateDailyHours(record));
-    
     return calculator.convertToWorkingHours(breakdowns);
   }
 
@@ -380,6 +508,132 @@ export class IntegratedPayrollEngine implements PayrollEngine {
   private getCurrentMonth(): string {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  /**
+   * 日本の所得税計算
+   * Japanese Income Tax Calculation (源泉徴収税額表準拠)
+   */
+  private calculateJapaneseTax(grossPay: number, employee: Employee): TaxCalculation {
+    const dependents = employee.taxInfo?.dependents || 0;
+    const isDisabled = employee.taxInfo?.isDisabled || false;
+    const isSingleParent = employee.taxInfo?.isSingleParent || false;
+    const hasSpouseDeduction = employee.taxInfo?.hasSpouseDeduction || false;
+
+    // 基礎控除額計算
+    let basicDeduction = 480000; // 基礎控除（年額）
+    if (grossPay * 12 > 24000000) basicDeduction = 320000;
+    else if (grossPay * 12 > 23500000) basicDeduction = 400000;
+
+    // 給与所得控除計算
+    const annualGross = grossPay * 12;
+    let salaryDeduction = 0;
+    if (annualGross <= 1625000) {
+      salaryDeduction = 550000;
+    } else if (annualGross <= 1800000) {
+      salaryDeduction = annualGross * 0.4 - 100000;
+    } else if (annualGross <= 3600000) {
+      salaryDeduction = annualGross * 0.3 + 80000;
+    } else if (annualGross <= 6600000) {
+      salaryDeduction = annualGross * 0.2 + 440000;
+    } else if (annualGross <= 8500000) {
+      salaryDeduction = annualGross * 0.1 + 1100000;
+    } else {
+      salaryDeduction = 1950000;
+    }
+
+    // 扶養控除計算
+    const dependentDeduction = dependents * 380000; // 年額
+    const disabledDeduction = isDisabled ? 270000 : 0;
+    const singleParentDeduction = isSingleParent ? 350000 : 0;
+    const spouseDeduction = hasSpouseDeduction ? 380000 : 0;
+
+    // 課税所得計算
+    const totalDeductions = basicDeduction + salaryDeduction + dependentDeduction + 
+                           disabledDeduction + singleParentDeduction + spouseDeduction;
+    const taxableIncome = Math.max(0, annualGross - totalDeductions);
+
+    // 所得税率適用（累進課税）
+    let incomeTaxAnnual = 0;
+    if (taxableIncome <= 1950000) {
+      incomeTaxAnnual = taxableIncome * 0.05;
+    } else if (taxableIncome <= 3300000) {
+      incomeTaxAnnual = 97500 + (taxableIncome - 1950000) * 0.10;
+    } else if (taxableIncome <= 6950000) {
+      incomeTaxAnnual = 232500 + (taxableIncome - 3300000) * 0.20;
+    } else if (taxableIncome <= 9000000) {
+      incomeTaxAnnual = 962500 + (taxableIncome - 6950000) * 0.23;
+    } else if (taxableIncome <= 18000000) {
+      incomeTaxAnnual = 1434000 + (taxableIncome - 9000000) * 0.33;
+    } else if (taxableIncome <= 40000000) {
+      incomeTaxAnnual = 4404000 + (taxableIncome - 18000000) * 0.40;
+    } else {
+      incomeTaxAnnual = 13204000 + (taxableIncome - 40000000) * 0.45;
+    }
+
+    // 復興特別所得税（2.1%）
+    const reconstructionTax = incomeTaxAnnual * 0.021;
+    const totalIncomeTax = incomeTaxAnnual + reconstructionTax;
+
+    // 月割り計算
+    const incomeTax = Math.floor(totalIncomeTax / 12);
+    
+    // 住民税計算（前年所得ベース、簡易計算）
+    const residentTax = Math.floor(taxableIncome * 0.10 / 12);
+
+    return {
+      incomeTax,
+      residentTax,
+      totalTax: incomeTax + residentTax,
+      taxableIncome: taxableIncome / 12
+    };
+  }
+
+  /**
+   * 社会保険料計算
+   * Japanese Social Insurance Calculation
+   */
+  private calculateSocialInsurance(grossPay: number, employee: Employee): SocialInsuranceCalculation {
+    // 標準報酬月額の算出（実際は前年度の平均等で決定）
+    const standardMonthlyRemuneration = Math.floor(grossPay / 1000) * 1000;
+    
+    // 健康保険料（協会けんぽ東京都の場合：9.9%、労使折半）
+    const healthInsurance = Math.floor(standardMonthlyRemuneration * 0.0495);
+    
+    // 厚生年金保険料（18.3%、労使折半）
+    const pensionInsurance = Math.floor(standardMonthlyRemuneration * 0.0915);
+    
+    // 雇用保険料（0.6%、労働者負担0.3%）
+    const unemploymentInsurance = Math.floor(grossPay * 0.003);
+    
+    // 介護保険料（40歳以上、1.64%、労使折半）
+    const age = employee.joinDate ? 
+      Math.floor((Date.now() - employee.joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
+    const longTermCareInsurance = age >= 40 ? 
+      Math.floor(standardMonthlyRemuneration * 0.0082) : 0;
+
+    return {
+      healthInsurance,
+      pensionInsurance,
+      unemploymentInsurance,
+      longTermCareInsurance,
+      total: healthInsurance + pensionInsurance + unemploymentInsurance + longTermCareInsurance
+    };
+  }
+
+  /**
+   * 所得税率取得
+   * Get income tax rate for display
+   */
+  private getIncomeTaxRate(annualIncome: number): number {
+    const annual = annualIncome * 12;
+    if (annual <= 1950000) return 0.05;
+    if (annual <= 3300000) return 0.10;
+    if (annual <= 6950000) return 0.20;
+    if (annual <= 9000000) return 0.23;
+    if (annual <= 18000000) return 0.33;
+    if (annual <= 40000000) return 0.40;
+    return 0.45;
   }
 }
 

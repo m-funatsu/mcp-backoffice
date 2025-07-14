@@ -15,6 +15,7 @@ import Database from './database.js';
 import PayrollCalculator from './payroll.js';
 import DataExporter from './export.js';
 import { LeaveManagement } from './leave-management.js';
+import { IntegratedPayrollEngine } from './payroll-engine.js';
 import type { MCPToolName } from './types.js';
 
 /**
@@ -26,6 +27,7 @@ class AttendanceServer {
   private server: Server;
   public db: Database;
   private payrollCalculator: PayrollCalculator | null = null;
+  private payrollEngine: IntegratedPayrollEngine;
   private dataExporter: DataExporter;
   private leaveManagement: LeaveManagement;
 
@@ -43,6 +45,7 @@ class AttendanceServer {
     );
     
     this.db = new Database();
+    this.payrollEngine = new IntegratedPayrollEngine(this.db);
     this.dataExporter = new DataExporter(this.db as any);
     this.leaveManagement = new LeaveManagement(this.db);
     this.setupToolHandlers();
@@ -419,6 +422,74 @@ class AttendanceServer {
               required: ['startDate', 'endDate'],
             },
           },
+          {
+            name: 'calculate_compliance_payroll',
+            description: 'Calculate payroll with full Japanese Labor Standards Act compliance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                month: {
+                  type: 'string',
+                  description: 'Month in YYYY-MM format',
+                },
+              },
+              required: ['employeeId', 'month'],
+            },
+          },
+          {
+            name: 'generate_payslip',
+            description: 'Generate detailed payslip with tax and social insurance calculations',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                month: {
+                  type: 'string',
+                  description: 'Month in YYYY-MM format',
+                },
+              },
+              required: ['employeeId', 'month'],
+            },
+          },
+          {
+            name: 'validate_labor_compliance',
+            description: 'Validate employee working hours against Japanese Labor Standards Act',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                month: {
+                  type: 'string',
+                  description: 'Month in YYYY-MM format',
+                },
+              },
+              required: ['employeeId', 'month'],
+            },
+          },
+          {
+            name: 'get_payroll_report',
+            description: 'Generate comprehensive payroll report for all employees',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                month: {
+                  type: 'string',
+                  description: 'Month in YYYY-MM format',
+                },
+              },
+              required: ['month'],
+            },
+          },
         ],
       };
     });
@@ -462,6 +533,14 @@ class AttendanceServer {
             return await this.handleGetTeamCalendar(args);
           case 'get_leave_analytics':
             return await this.handleGetLeaveAnalytics(args);
+          case 'calculate_compliance_payroll':
+            return await this.handleCalculateCompliancePayroll(args);
+          case 'generate_payslip':
+            return await this.handleGeneratePayslip(args);
+          case 'validate_labor_compliance':
+            return await this.handleValidateLaborCompliance(args);
+          case 'get_payroll_report':
+            return await this.handleGetPayrollReport(args);
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
@@ -983,6 +1062,212 @@ class AttendanceServer {
       };
     } catch (error) {
       throw new Error(`Get leave analytics failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleCalculateCompliancePayroll(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      month: z.string(),
+    });
+
+    const { employeeId, month } = schema.parse(args);
+    
+    try {
+      const employee = await this.db.getEmployee(employeeId);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      const monthDate = new Date(month + '-01');
+      const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+
+      const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
+      
+      const violationsText = result.compliance.violations.length > 0 ? 
+        result.compliance.violations.map(v => `⚠️ ${v.description}`).join('\\n') : 
+        '✅ 労働基準法準拠';
+
+      const warningsText = result.warnings.length > 0 ? 
+        result.warnings.map(w => `⚠️ ${w.message}`).join('\\n') : 
+        'なし';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `💰 統合給与計算結果\\n` +
+                  `従業員: ${employee.name} (${employeeId})\\n` +
+                  `対象月: ${month}\\n\\n` +
+                  `🕒 労働時間:\\n` +
+                  `通常時間: ${result.calculation.regularHours.toFixed(1)}時間\\n` +
+                  `残業時間: ${result.calculation.overtimeHours.toFixed(1)}時間\\n` +
+                  `深夜時間: ${result.calculation.lateNightHours.toFixed(1)}時間\\n` +
+                  `休日時間: ${result.calculation.holidayHours.toFixed(1)}時間\\n\\n` +
+                  `💴 給与詳細:\\n` +
+                  `基本給: ¥${result.calculation.regularPay.toLocaleString()}\\n` +
+                  `残業代: ¥${result.calculation.overtimePay.toLocaleString()}\\n` +
+                  `深夜手当: ¥${result.calculation.lateNightPay.toLocaleString()}\\n` +
+                  `休日手当: ¥${result.calculation.holidayPay.toLocaleString()}\\n` +
+                  `合計支給額: ¥${result.calculation.totalPay.toLocaleString()}\\n\\n` +
+                  `⚖️ 労働基準法準拠状況:\\n` +
+                  `リスクレベル: ${result.compliance.riskLevel}\\n` +
+                  `違反事項:\\n${violationsText}\\n\\n` +
+                  `⚠️ 警告:\\n${warningsText}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Compliance payroll calculation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleGeneratePayslip(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      month: z.string(),
+    });
+
+    const { employeeId, month } = schema.parse(args);
+    
+    try {
+      const payslip = await this.payrollEngine.generatePayslip(employeeId, month);
+      
+      const allowancesText = payslip.allowances.length > 0 ? 
+        payslip.allowances.map(a => `${a.description}: ¥${a.amount.toLocaleString()}`).join('\\n') : 
+        'なし';
+
+      const deductionsText = payslip.deductions.length > 0 ? 
+        payslip.deductions.map(d => `${d.description}: ¥${d.amount.toLocaleString()}`).join('\\n') : 
+        'なし';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📄 給与明細書\\n` +
+                  `従業員: ${payslip.employeeName} (${payslip.employeeId})\\n` +
+                  `対象月: ${payslip.month}\\n` +
+                  `発行日: ${format(payslip.generatedAt, 'yyyy-MM-dd HH:mm')}\\n\\n` +
+                  `💰 支給項目:\\n` +
+                  `基本給: ¥${payslip.baseSalary.toLocaleString()}\\n` +
+                  `各種手当:\\n${allowancesText}\\n\\n` +
+                  `📉 控除項目:\\n` +
+                  `${deductionsText}\\n\\n` +
+                  `💴 税金・社会保険:\\n` +
+                  `所得税: ¥${payslip.taxCalculation.incomeTax.toLocaleString()}\\n` +
+                  `住民税: ¥${payslip.taxCalculation.residentTax.toLocaleString()}\\n` +
+                  `健康保険: ¥${payslip.socialInsurance.healthInsurance.toLocaleString()}\\n` +
+                  `厚生年金: ¥${payslip.socialInsurance.pensionInsurance.toLocaleString()}\\n` +
+                  `雇用保険: ¥${payslip.socialInsurance.unemploymentInsurance.toLocaleString()}\\n` +
+                  `介護保険: ¥${payslip.socialInsurance.longTermCareInsurance.toLocaleString()}\\n\\n` +
+                  `🧾 勤怠サマリー:\\n` +
+                  `出勤日数: ${payslip.workingSummary.totalWorkingDays}日\\n` +
+                  `通常時間: ${payslip.workingSummary.regularHours.toFixed(1)}時間\\n` +
+                  `残業時間: ${payslip.workingSummary.overtimeHours.toFixed(1)}時間\\n` +
+                  `深夜時間: ${payslip.workingSummary.lateNightHours.toFixed(1)}時間\\n` +
+                  `休日時間: ${payslip.workingSummary.holidayHours.toFixed(1)}時間\\n\\n` +
+                  `💸 差引支給額: ¥${payslip.netPay.toLocaleString()}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Payslip generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleValidateLaborCompliance(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      month: z.string(),
+    });
+
+    const { employeeId, month } = schema.parse(args);
+    
+    try {
+      const employee = await this.db.getEmployee(employeeId);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      const monthDate = new Date(month + '-01');
+      const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+
+      const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
+      const compliance = result.compliance;
+      
+      const violationsText = compliance.violations.length > 0 ? 
+        compliance.violations.map(v => 
+          `⚠️ ${v.type} (${v.severity}): ${v.description}\\n` +
+          `   値: ${v.value} / 上限: ${v.limit}\\n` +
+          `   法的根拠: ${v.lawReference}`
+        ).join('\\n\\n') : 
+        '✅ 労働基準法違反なし';
+
+      const recommendationsText = compliance.recommendations.length > 0 ? 
+        compliance.recommendations.map(r => `• ${r}`).join('\\n') : 
+        'なし';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚖️ 労働基準法準拠チェック\\n` +
+                  `従業員: ${employee.name} (${employeeId})\\n` +
+                  `対象月: ${month}\\n\\n` +
+                  `📊 準拠状況:\\n` +
+                  `準拠: ${compliance.isCompliant ? '✅ 適合' : '❌ 違反あり'}\\n` +
+                  `リスクレベル: ${compliance.riskLevel}\\n\\n` +
+                  `⚠️ 違反事項:\\n` +
+                  `${violationsText}\\n\\n` +
+                  `💡 改善提案:\\n` +
+                  `${recommendationsText}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Labor compliance validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleGetPayrollReport(args: any) {
+    const schema = z.object({
+      month: z.string(),
+    });
+
+    const { month } = schema.parse(args);
+    
+    try {
+      const summary = await this.payrollEngine.calculateMonthlyPayroll(month);
+      
+      const violationsText = summary.violations.length > 0 ? 
+        summary.violations.map(v => `⚠️ ${v.employeeId}: ${v.violation}`).join('\\n') : 
+        '✅ 労働基準法違反なし';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📊 月次給与レポート\\n` +
+                  `対象月: ${summary.month}\\n\\n` +
+                  `👥 従業員数: ${summary.totalEmployees}名\\n\\n` +
+                  `💰 給与総額:\\n` +
+                  `基本給合計: ¥${summary.totalRegularPay.toLocaleString()}\\n` +
+                  `残業代合計: ¥${summary.totalOvertimePay.toLocaleString()}\\n` +
+                  `深夜手当合計: ¥${summary.totalLateNightPay.toLocaleString()}\\n` +
+                  `休日手当合計: ¥${summary.totalHolidayPay.toLocaleString()}\\n` +
+                  `総支給額: ¥${summary.totalPay.toLocaleString()}\\n\\n` +
+                  `⚖️ 労働基準法準拠状況:\\n` +
+                  `${violationsText}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Payroll report generation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
