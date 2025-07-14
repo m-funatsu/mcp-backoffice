@@ -1,0 +1,74 @@
+{
+  "reportId": "HCR_1752530781711_0ph3fho0i",
+  "companyName": "デモ株式会社",
+  "reportingPeriod": {
+    "startDate": "2024-01-01T00:00:00.000Z",
+    "endDate": "2024-12-31T00:00:00.000Z"
+  },
+  "generatedAt": "2025-07-14T22:06:21.711Z",
+  "keyMetrics": {
+    "totalWorkforce": 15,
+    "totalRemunerationCost": 94400000,
+    "employeeEngagementScore": 4.2,
+    "turnoverRate": 12.5,
+    "diversityInclusionScore": 3.8,
+    "overallComplianceScore": 92.7
+  },
+  "recommendations": [
+    {
+      "id": "REC_TRAINING_001",
+      "category": "Learning & Development",
+      "priority": "medium",
+      "title": "Enhance Training Program Effectiveness",
+      "description": "Redesign training programs to improve completion rates and effectiveness",
+      "expectedImpact": "Increase completion rate by 15%",
+      "implementationCost": 3000000,
+      "timeToImplement": 4,
+      "requiredResources": [
+        "L&D Team",
+        "Technology",
+        "Content Development"
+      ],
+      "kpiTarget": "Achieve >95% completion rate",
+      "riskLevel": "low"
+    }
+  ],
+  "executiveSummary": {
+    "keyFindings": [
+      "Employee engagement scores improved by 8.2% year-over-year",
+      "Diversity and inclusion initiatives showing positive impact",
+      "Training completion rates need improvement",
+      "Turnover rate slightly above industry average"
+    ],
+    "performanceHighlights": [
+      "High compliance with Japanese labor standards (96.8%)",
+      "Strong safety record with 2.1 incidents per 1000 employees",
+      "Effective leadership development program",
+      "High employee satisfaction with work-life balance initiatives"
+    ],
+    "majorConcerns": [
+      "Skills gap in emerging technologies",
+      "Gender pay gap persists despite improvement efforts",
+      "Mental health support utilization below target",
+      "Remote work policies need refinement"
+    ],
+    "strategicRecommendations": [
+      "Invest in predictive analytics for talent management",
+      "Accelerate digital skills training programs",
+      "Enhance diversity and inclusion initiatives",
+      "Implement comprehensive wellness programs"
+    ],
+    "investmentPriorities": [
+      "Technology infrastructure for HR analytics",
+      "Leadership development programs",
+      "Employee wellness and mental health support",
+      "Diversity and inclusion training"
+    ],
+    "nextSteps": [
+      "Conduct quarterly talent review meetings",
+      "Implement recommended retention strategies",
+      "Enhance data collection and analytics capabilities",
+      "Develop 3-year human capital strategic plan"
+    ]
+  }
+}
