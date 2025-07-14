@@ -31,28 +31,28 @@ class Database {
           // Check if error is due to table already existing - this is acceptable for tests
           if (err.message.includes('already exists')) {
             console.log('Database tables already exist, skipping initialization');
-            resolve();
           } else {
             console.error('Error initializing database:', err);
             reject(err);
+            return;
           }
         } else {
           console.log('Database initialized successfully');
+        }
+        
+        // Always try to create additional tables (labor standards monitoring and HR extension)
+        try {
+          await this.createLaborStandardsMonitoringTables();
+          console.log('Labor standards monitoring tables created successfully');
           
-          // Create labor standards monitoring tables
-          try {
-            await this.createLaborStandardsMonitoringTables();
-            console.log('Labor standards monitoring tables created successfully');
-            
-            // Create HR extension tables for v1.5.0-v2.0.0
-            await this.createHRExtensionTables();
-            console.log('HR extension tables created successfully');
-            
-            resolve();
-          } catch (monitoringErr) {
-            console.error('Error creating additional tables:', monitoringErr);
-            reject(monitoringErr);
-          }
+          // Create HR extension tables for v1.5.0-v2.0.0
+          await this.createHRExtensionTables();
+          console.log('HR extension tables created successfully');
+          
+          resolve();
+        } catch (monitoringErr) {
+          console.error('Error creating additional tables:', monitoringErr);
+          reject(monitoringErr);
         }
       });
     });
