@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { Employee, TimeRecord, PayrollCalculation, PayrollRules, AttendanceReport, ExpenseCategory, ExpenseRequest, ApprovalWorkflow, ReceiptImage, AccountingEntry, ExtractedReceiptData } from './types.js';
+import type { Employee, TimeRecord, PayrollCalculation, PayrollRules, AttendanceReport, ExpenseCategory, ExpenseRequest, ApprovalWorkflow, ReceiptImage, AccountingEntry, ExtractedReceiptData, LeaveBalance, LeaveType } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -617,6 +617,442 @@ class Database {
         }
       });
     });
+  }
+
+  // v1.3.0 Compliance Enhancement Methods
+
+  /**
+   * 36協定遵守状況の監視
+   */
+  async monitor36Compliance(employeeId: string, targetMonth?: string): Promise<any> {
+    const month = targetMonth || new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          e.id,
+          e.name,
+          e.department,
+          COALESCE(SUM(
+            CASE 
+              WHEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 - (tr.break_minutes / 60.0) > 8 
+              THEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 - (tr.break_minutes / 60.0) - 8
+              ELSE 0 
+            END
+          ), 0) as monthly_overtime_hours,
+          COUNT(tr.id) as work_days
+        FROM employees e
+        LEFT JOIN time_records tr ON e.id = tr.employee_id 
+          AND strftime('%Y-%m', tr.date) = ?
+          AND tr.clock_out IS NOT NULL
+        WHERE e.id = ? AND e.is_active = 1
+        GROUP BY e.id, e.name, e.department
+      `;
+      
+      this.db.get(sql, [month, employeeId], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          const result = {
+            employeeId: row?.id || employeeId,
+            name: row?.name || 'Unknown',
+            department: row?.department || 'Unknown',
+            month,
+            monthlyOvertimeHours: row?.monthly_overtime_hours || 0,
+            workDays: row?.work_days || 0,
+            monthlyLimit: 45.0, // 標準的な36協定上限
+            complianceStatus: (row?.monthly_overtime_hours || 0) <= 45.0 ? 'compliant' : 'exceeded',
+            warningLevel: this.calculateWarningLevel(row?.monthly_overtime_hours || 0)
+          };
+          resolve(result);
+        }
+      });
+    });
+  }
+
+  /**
+   * 客観的記録の保存（ICカード・PCログ）
+   */
+  async saveObjectiveRecord(record: {
+    employeeId: string;
+    date: Date;
+    icCardIn?: Date;
+    icCardOut?: Date;
+    icCardDeviceId?: string;
+    pcLogin?: Date;
+    pcLogout?: Date;
+    pcDeviceId?: string;
+    selfReportedIn?: Date;
+    selfReportedOut?: Date;
+  }): Promise<string> {
+    const id = `OBJ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT OR REPLACE INTO objective_time_records (
+          id, employee_id, record_date,
+          ic_card_in, ic_card_out, ic_card_device_id,
+          pc_login, pc_logout, pc_device_id,
+          self_reported_in, self_reported_out,
+          discrepancy_detected, discrepancy_minutes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      // 乖離チェック
+      const discrepancy = this.checkTimeDiscrepancy(record);
+      
+      this.db.run(sql, [
+        id,
+        record.employeeId,
+        record.date.toISOString().split('T')[0],
+        record.icCardIn?.toISOString(),
+        record.icCardOut?.toISOString(),
+        record.icCardDeviceId,
+        record.pcLogin?.toISOString(),
+        record.pcLogout?.toISOString(),
+        record.pcDeviceId,
+        record.selfReportedIn?.toISOString(),
+        record.selfReportedOut?.toISOString(),
+        discrepancy.detected ? 1 : 0,
+        discrepancy.minutes
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 法定休憩時間の自動計算
+   */
+  calculateRequiredBreak(workHours: number): number {
+    if (workHours > 8) {
+      return 60; // 8時間超は1時間以上
+    } else if (workHours > 6) {
+      return 45; // 6時間超は45分以上
+    }
+    return 0;
+  }
+
+  /**
+   * 複雑な割増率計算（重複適用対応）
+   */
+  calculateComprehensivePremiums(workTime: {
+    regularHours: number;
+    overtimeHours: number;
+    lateNightHours: number;
+    holidayHours: number;
+    isStatutoryHoliday: boolean;
+    monthlyOvertimeTotal: number;
+  }): {
+    regularPay: number;
+    overtimePremium: number;
+    lateNightPremium: number;
+    holidayPremium: number;
+    highOvertimePremium: number;
+    totalPremiumRate: number;
+  } {
+    const baseRate = 1.0;
+    let overtimePremium = 0;
+    let lateNightPremium = 0;
+    let holidayPremium = 0;
+    let highOvertimePremium = 0;
+
+    // 基本時間外労働（25%増）
+    if (workTime.overtimeHours > 0) {
+      overtimePremium = workTime.overtimeHours * 0.25;
+    }
+
+    // 月60時間超の高割増（50%増）
+    if (workTime.monthlyOvertimeTotal > 60) {
+      const highOvertimeHours = Math.min(workTime.overtimeHours, workTime.monthlyOvertimeTotal - 60);
+      highOvertimePremium = highOvertimeHours * 0.25; // 25% → 50%への差額
+    }
+
+    // 深夜労働（25%増）
+    if (workTime.lateNightHours > 0) {
+      lateNightPremium = workTime.lateNightHours * 0.25;
+    }
+
+    // 休日労働（35%増）
+    if (workTime.holidayHours > 0) {
+      if (workTime.isStatutoryHoliday) {
+        holidayPremium = workTime.holidayHours * 0.35; // 法定休日
+      } else {
+        holidayPremium = workTime.holidayHours * 0.25; // 所定休日（時間外扱い）
+      }
+    }
+
+    // 重複適用の計算
+    // 深夜 + 時間外 = 50%増 (25% + 25%)
+    // 深夜 + 休日 = 60%増 (25% + 35%)
+    const totalPremiumRate = baseRate + overtimePremium + lateNightPremium + holidayPremium + highOvertimePremium;
+
+    return {
+      regularPay: workTime.regularHours * baseRate,
+      overtimePremium,
+      lateNightPremium,
+      holidayPremium,
+      highOvertimePremium,
+      totalPremiumRate
+    };
+  }
+
+  /**
+   * 36協定アラート生成
+   */
+  async generateComplianceAlert(alert: {
+    employeeId: string;
+    alertType: string;
+    alertLevel: 'info' | 'warning' | 'critical' | 'emergency';
+    message: string;
+    currentHours: number;
+    limitHours: number;
+  }): Promise<string> {
+    const id = `ALERT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO compliance_alerts (
+          id, employee_id, alert_type, alert_level, target_period,
+          current_hours, limit_hours, message, auto_generated
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      
+      this.db.run(sql, [
+        id,
+        alert.employeeId,
+        alert.alertType,
+        alert.alertLevel,
+        currentMonth,
+        alert.currentHours,
+        alert.limitHours,
+        alert.message,
+        1
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 有給休暇残高取得
+   */
+  async getLeaveBalance(employeeId: string, leaveType: string): Promise<LeaveBalance> {
+    const currentYear = new Date().getFullYear();
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT * FROM leave_balances 
+        WHERE employee_id = ? AND leave_type = ? AND year = ?
+      `;
+
+      this.db.get(sql, [employeeId, leaveType, currentYear], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (!row) {
+          // デフォルト残高を返す
+          resolve({
+            id: 0,
+            employeeId,
+            leaveType: leaveType as LeaveType,
+            year: currentYear,
+            grantedDays: 0,
+            usedDays: 0,
+            remainingDays: 0,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        } else {
+          resolve({
+            id: row.id,
+            employeeId: row.employee_id,
+            leaveType: row.leave_type as LeaveType,
+            year: row.year,
+            grantedDays: row.granted_days,
+            usedDays: row.used_days,
+            remainingDays: row.remaining_days,
+            expiryDate: row.expiry_date ? new Date(row.expiry_date) : undefined,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at)
+          });
+        }
+      });
+    });
+  }
+
+  /**
+   * 健康確保措置の記録
+   */
+  async recordHealthCheckMeasure(record: {
+    employeeId: string;
+    checkType: 'medical_interview' | 'health_questionnaire' | 'stress_check' | 'work_load_review';
+    overtimeHours: number;
+    doctorName?: string;
+    healthStatus?: 'good' | 'caution' | 'requires_attention' | 'requires_treatment';
+    recommendations?: string;
+  }): Promise<string> {
+    const id = `HEALTH_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT INTO health_check_records (
+          id, employee_id, check_date, check_type, trigger_reason,
+          overtime_hours, doctor_name, health_status, recommendations
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      const triggerReason = record.overtimeHours >= 100 ? '月100時間超' : '月80時間超';
+      
+      this.db.run(sql, [
+        id,
+        record.employeeId,
+        new Date().toISOString().split('T')[0],
+        record.checkType,
+        triggerReason,
+        record.overtimeHours,
+        record.doctorName,
+        record.healthStatus,
+        record.recommendations
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * コンプライアンスレポート生成
+   */
+  async generateComplianceReport(params: {
+    startDate: Date;
+    endDate: Date;
+    department?: string;
+  }): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          e.id,
+          e.name,
+          e.department,
+          COUNT(DISTINCT tr.date) as work_days,
+          COALESCE(SUM(
+            CASE 
+              WHEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 - (tr.break_minutes / 60.0) > 8 
+              THEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 - (tr.break_minutes / 60.0) - 8
+              ELSE 0 
+            END
+          ), 0) as total_overtime_hours,
+          COALESCE(SUM(
+            CASE 
+              WHEN tr.break_minutes < CASE 
+                WHEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 > 8 THEN 60
+                WHEN (julianday(tr.clock_out) - julianday(tr.clock_in)) * 24 > 6 THEN 45
+                ELSE 0
+              END
+              THEN 1 ELSE 0
+            END
+          ), 0) as break_violations,
+          COUNT(ca.id) as total_alerts
+        FROM employees e
+        LEFT JOIN time_records tr ON e.id = tr.employee_id 
+          AND tr.date BETWEEN ? AND ?
+          AND tr.clock_out IS NOT NULL
+        LEFT JOIN compliance_alerts ca ON e.id = ca.employee_id
+          AND DATE(ca.created_at) BETWEEN ? AND ?
+        WHERE e.is_active = 1
+        ${params.department ? 'AND e.department = ?' : ''}
+        GROUP BY e.id, e.name, e.department
+        ORDER BY total_overtime_hours DESC
+      `;
+      
+      const queryParams = [
+        params.startDate.toISOString().split('T')[0],
+        params.endDate.toISOString().split('T')[0],
+        params.startDate.toISOString().split('T')[0],
+        params.endDate.toISOString().split('T')[0]
+      ];
+      
+      if (params.department) {
+        queryParams.push(params.department);
+      }
+      
+      this.db.all(sql, queryParams, (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          const report = {
+            reportPeriod: {
+              startDate: params.startDate,
+              endDate: params.endDate,
+              department: params.department
+            },
+            summary: {
+              totalEmployees: rows.length,
+              complianceViolations: rows.filter(r => r.total_overtime_hours > 45).length,
+              breakViolations: rows.reduce((sum, r) => sum + r.break_violations, 0),
+              totalAlerts: rows.reduce((sum, r) => sum + r.total_alerts, 0)
+            },
+            employeeDetails: rows.map(row => ({
+              employeeId: row.id,
+              name: row.name,
+              department: row.department,
+              workDays: row.work_days,
+              overtimeHours: row.total_overtime_hours,
+              complianceStatus: row.total_overtime_hours <= 45 ? 'compliant' : 'exceeded',
+              breakViolations: row.break_violations,
+              alertsCount: row.total_alerts
+            }))
+          };
+          resolve(report);
+        }
+      });
+    });
+  }
+
+  // プライベートヘルパーメソッド
+
+  private calculateWarningLevel(overtimeHours: number): 'safe' | 'caution' | 'warning' | 'critical' {
+    if (overtimeHours >= 45) return 'critical';
+    if (overtimeHours >= 36) return 'warning';  // 80%
+    if (overtimeHours >= 27) return 'caution';  // 60%
+    return 'safe';
+  }
+
+  private checkTimeDiscrepancy(record: any): {detected: boolean, minutes: number} {
+    let maxDiscrepancy = 0;
+    
+    // ICカードと自己申告の比較
+    if (record.icCardIn && record.selfReportedIn) {
+      const diffIn = Math.abs(
+        (record.icCardIn.getTime() - record.selfReportedIn.getTime()) / (1000 * 60)
+      );
+      maxDiscrepancy = Math.max(maxDiscrepancy, diffIn);
+    }
+    
+    if (record.icCardOut && record.selfReportedOut) {
+      const diffOut = Math.abs(
+        (record.icCardOut.getTime() - record.selfReportedOut.getTime()) / (1000 * 60)
+      );
+      maxDiscrepancy = Math.max(maxDiscrepancy, diffOut);
+    }
+    
+    return {
+      detected: maxDiscrepancy > 15, // 15分以上の乖離で検知
+      minutes: Math.round(maxDiscrepancy)
+    };
   }
 }
 

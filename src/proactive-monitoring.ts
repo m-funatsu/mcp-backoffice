@@ -327,7 +327,7 @@ export class ProactiveMonitoringSystem {
 
       const annualLeaveDaysUsed = leaveRequests
         .filter(req => req.leaveType === 'annual')
-        .reduce((total, req) => total + req.leaveDays, 0);
+        .reduce((total, req) => total + req.daysRequested, 0);
 
       if (annualLeaveDaysUsed < 5) {
         const severity = currentDate.getMonth() >= 9 ? 'critical' : 'warning'; // Critical if past October

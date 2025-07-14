@@ -644,6 +644,133 @@ class AttendanceServer {
               required: ['format', 'startDate', 'endDate'],
             },
           },
+          // v1.3.0 Compliance Enhancement Tools
+          {
+            name: 'monitor_36_compliance',
+            description: 'Monitor 36 Agreement (overtime work) compliance for an employee',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                targetMonth: {
+                  type: 'string',
+                  description: 'Target month in YYYY-MM format (optional, defaults to current month)',
+                },
+              },
+              required: ['employeeId'],
+            },
+          },
+          {
+            name: 'record_objective_time',
+            description: 'Record objective time data (IC card, PC log) for compliance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                date: {
+                  type: 'string',
+                  description: 'Date in YYYY-MM-DD format',
+                },
+                icCardIn: {
+                  type: 'string',
+                  description: 'IC card clock-in time in ISO format (optional)',
+                },
+                icCardOut: {
+                  type: 'string',
+                  description: 'IC card clock-out time in ISO format (optional)',
+                },
+                icCardDeviceId: {
+                  type: 'string',
+                  description: 'IC card device ID (optional)',
+                },
+                pcLogin: {
+                  type: 'string',
+                  description: 'PC login time in ISO format (optional)',
+                },
+                pcLogout: {
+                  type: 'string',
+                  description: 'PC logout time in ISO format (optional)',
+                },
+                pcDeviceId: {
+                  type: 'string',
+                  description: 'PC device ID (optional)',
+                },
+                selfReportedIn: {
+                  type: 'string',
+                  description: 'Self-reported clock-in time in ISO format (optional)',
+                },
+                selfReportedOut: {
+                  type: 'string',
+                  description: 'Self-reported clock-out time in ISO format (optional)',
+                },
+              },
+              required: ['employeeId', 'date'],
+            },
+          },
+          {
+            name: 'generate_compliance_report',
+            description: 'Generate comprehensive compliance report for Japanese Labor Standards Act',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                startDate: {
+                  type: 'string',
+                  description: 'Start date in YYYY-MM-DD format',
+                },
+                endDate: {
+                  type: 'string',
+                  description: 'End date in YYYY-MM-DD format',
+                },
+                department: {
+                  type: 'string',
+                  description: 'Department filter (optional)',
+                },
+              },
+              required: ['startDate', 'endDate'],
+            },
+          },
+          {
+            name: 'record_health_check',
+            description: 'Record health check measures for high overtime employees (80+ hours)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                  description: 'Employee ID',
+                },
+                checkType: {
+                  type: 'string',
+                  enum: ['medical_interview', 'health_questionnaire', 'stress_check', 'work_load_review'],
+                  description: 'Type of health check',
+                },
+                overtimeHours: {
+                  type: 'number',
+                  description: 'Overtime hours that triggered the health check',
+                },
+                doctorName: {
+                  type: 'string',
+                  description: 'Doctor name (for medical interviews, optional)',
+                },
+                healthStatus: {
+                  type: 'string',
+                  enum: ['good', 'caution', 'requires_attention', 'requires_treatment'],
+                  description: 'Health assessment result (optional)',
+                },
+                recommendations: {
+                  type: 'string',
+                  description: 'Doctor recommendations (optional)',
+                },
+              },
+              required: ['employeeId', 'checkType', 'overtimeHours'],
+            },
+          },
         ],
       };
     });
@@ -708,6 +835,15 @@ class AttendanceServer {
             return await this.handleGetExpenseAnalytics(args);
           case 'export_accounting_data':
             return await this.handleExportAccountingData(args);
+          // v1.3.0 Compliance Enhancement Tools
+          case 'monitor_36_compliance':
+            return await this.handleMonitor36Compliance(args);
+          case 'record_objective_time':
+            return await this.handleRecordObjectiveTime(args);
+          case 'generate_compliance_report':
+            return await this.handleGenerateComplianceReport(args);
+          case 'record_health_check':
+            return await this.handleRecordHealthCheck(args);
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
@@ -1676,6 +1812,273 @@ class AttendanceServer {
     } catch (error) {
       throw new Error(`Data export failed: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  // v1.3.0 Compliance Enhancement Handlers
+
+  private async handleMonitor36Compliance(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      targetMonth: z.string().optional(),
+    });
+
+    const { employeeId, targetMonth } = schema.parse(args);
+    
+    try {
+      const complianceStatus = await this.db.monitor36Compliance(employeeId, targetMonth);
+      
+      const alertLevel = complianceStatus.warningLevel;
+      const statusEmoji = alertLevel === 'safe' ? '✅' : 
+                         alertLevel === 'caution' ? '⚠️' : 
+                         alertLevel === 'warning' ? '🔶' : '🚨';
+      
+      const complianceRate = (complianceStatus.monthlyOvertimeHours / complianceStatus.monthlyLimit) * 100;
+      const progressBar = '█'.repeat(Math.min(10, Math.round(complianceRate / 10))) + 
+                         '░'.repeat(Math.max(0, 10 - Math.round(complianceRate / 10)));
+      
+      // アラート生成（80%以上で警告）
+      if (complianceRate >= 80) {
+        await this.db.generateComplianceAlert({
+          employeeId,
+          alertType: complianceRate >= 100 ? 'monthly_overtime_exceeded' : 'monthly_overtime_approaching',
+          alertLevel: complianceRate >= 100 ? 'critical' : 'warning',
+          message: `月間時間外労働が${complianceRate.toFixed(1)}%に達しました`,
+          currentHours: complianceStatus.monthlyOvertimeHours,
+          limitHours: complianceStatus.monthlyLimit
+        });
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${statusEmoji} 36協定遵守状況\\n` +
+                  `従業員: ${complianceStatus.name} (${employeeId})\\n` +
+                  `部署: ${complianceStatus.department}\\n` +
+                  `対象月: ${complianceStatus.month}\\n\\n` +
+                  `📊 時間外労働状況:\\n` +
+                  `現在時間: ${complianceStatus.monthlyOvertimeHours.toFixed(1)}時間\\n` +
+                  `上限時間: ${complianceStatus.monthlyLimit}時間\\n` +
+                  `遵守率: ${complianceRate.toFixed(1)}%\\n` +
+                  `進捗: [${progressBar}] ${complianceRate.toFixed(1)}%\\n\\n` +
+                  `📈 労働日数: ${complianceStatus.workDays}日\\n` +
+                  `⚖️ 遵守状況: ${complianceStatus.complianceStatus === 'compliant' ? '✅ 適合' : '❌ 上限超過'}\\n` +
+                  `🚨 警告レベル: ${alertLevel.toUpperCase()}\\n\\n` +
+                  `${complianceRate >= 80 ? '⚠️ 注意: 上限の80%に達しています。残業時間の調整を検討してください。' : ''}` +
+                  `${complianceStatus.monthlyOvertimeHours >= 80 ? '\\n🏥 健康確保措置: 医師の面接指導が必要です。' : ''}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`36 Agreement monitoring failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleRecordObjectiveTime(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      date: z.string(),
+      icCardIn: z.string().optional(),
+      icCardOut: z.string().optional(),
+      icCardDeviceId: z.string().optional(),
+      pcLogin: z.string().optional(),
+      pcLogout: z.string().optional(),
+      pcDeviceId: z.string().optional(),
+      selfReportedIn: z.string().optional(),
+      selfReportedOut: z.string().optional(),
+    });
+
+    const parsed = schema.parse(args);
+    
+    try {
+      const record = {
+        employeeId: parsed.employeeId,
+        date: new Date(parsed.date),
+        icCardIn: parsed.icCardIn ? new Date(parsed.icCardIn) : undefined,
+        icCardOut: parsed.icCardOut ? new Date(parsed.icCardOut) : undefined,
+        icCardDeviceId: parsed.icCardDeviceId,
+        pcLogin: parsed.pcLogin ? new Date(parsed.pcLogin) : undefined,
+        pcLogout: parsed.pcLogout ? new Date(parsed.pcLogout) : undefined,
+        pcDeviceId: parsed.pcDeviceId,
+        selfReportedIn: parsed.selfReportedIn ? new Date(parsed.selfReportedIn) : undefined,
+        selfReportedOut: parsed.selfReportedOut ? new Date(parsed.selfReportedOut) : undefined,
+      };
+
+      const recordId = await this.db.saveObjectiveRecord(record);
+      
+      // 乖離チェック結果の表示
+      const discrepancyInfo = this.calculateDiscrepancyInfo(record);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📋 客観的記録を保存しました\\n` +
+                  `記録ID: ${recordId}\\n` +
+                  `従業員: ${record.employeeId}\\n` +
+                  `日付: ${record.date.toISOString().split('T')[0]}\\n\\n` +
+                  `🏢 ICカード記録:\\n` +
+                  `入退館: ${record.icCardIn ? record.icCardIn.toLocaleTimeString() : '未記録'} - ` +
+                  `${record.icCardOut ? record.icCardOut.toLocaleTimeString() : '未記録'}\\n` +
+                  `デバイス: ${record.icCardDeviceId || '未記録'}\\n\\n` +
+                  `💻 PC記録:\\n` +
+                  `ログイン/アウト: ${record.pcLogin ? record.pcLogin.toLocaleTimeString() : '未記録'} - ` +
+                  `${record.pcLogout ? record.pcLogout.toLocaleTimeString() : '未記録'}\\n` +
+                  `デバイス: ${record.pcDeviceId || '未記録'}\\n\\n` +
+                  `📝 自己申告:\\n` +
+                  `出退勤: ${record.selfReportedIn ? record.selfReportedIn.toLocaleTimeString() : '未記録'} - ` +
+                  `${record.selfReportedOut ? record.selfReportedOut.toLocaleTimeString() : '未記録'}\\n\\n` +
+                  `${discrepancyInfo.detected ? 
+                    `⚠️ 乖離検知: ${discrepancyInfo.minutes}分の差異があります\\n${discrepancyInfo.explanation}` : 
+                    '✅ 記録間に大きな乖離はありません'}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Objective time recording failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleGenerateComplianceReport(args: any) {
+    const schema = z.object({
+      startDate: z.string(),
+      endDate: z.string(),
+      department: z.string().optional(),
+    });
+
+    const { startDate, endDate, department } = schema.parse(args);
+    
+    try {
+      const report = await this.db.generateComplianceReport({
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        department,
+      });
+      
+      const violationRate = (report.summary.complianceViolations / report.summary.totalEmployees) * 100;
+      const riskLevel = violationRate >= 20 ? '🚨 高リスク' : 
+                       violationRate >= 10 ? '⚠️ 中リスク' : 
+                       violationRate >= 5 ? '🔶 低リスク' : '✅ 安全';
+
+      const topViolators = report.employeeDetails
+        .filter((emp: any) => emp.complianceStatus === 'exceeded')
+        .sort((a: any, b: any) => b.overtimeHours - a.overtimeHours)
+        .slice(0, 5)
+        .map((emp: any) => `• ${emp.name} (${emp.department}): ${emp.overtimeHours.toFixed(1)}時間`)
+        .join('\\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📊 労働基準法準拠レポート\\n` +
+                  `期間: ${startDate} 〜 ${endDate}\\n` +
+                  `${department ? `部署: ${department}\\n` : ''}\\n` +
+                  `📈 サマリー:\\n` +
+                  `対象従業員数: ${report.summary.totalEmployees}名\\n` +
+                  `36協定違反者: ${report.summary.complianceViolations}名 (${violationRate.toFixed(1)}%)\\n` +
+                  `休憩時間違反: ${report.summary.breakViolations}件\\n` +
+                  `総アラート数: ${report.summary.totalAlerts}件\\n` +
+                  `リスクレベル: ${riskLevel}\\n\\n` +
+                  `🚨 主な違反者:\\n` +
+                  `${topViolators || 'なし'}\\n\\n` +
+                  `💡 改善提案:\\n` +
+                  `${violationRate >= 10 ? '• 業務負荷の見直しと人員配置の再検討\\n' : ''}` +
+                  `${report.summary.breakViolations > 0 ? '• 休憩時間取得の徹底指導\\n' : ''}` +
+                  `${report.summary.totalAlerts >= 10 ? '• アラート対応プロセスの見直し\\n' : ''}` +
+                  `• 定期的な労働時間監視の継続`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Compliance report generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async handleRecordHealthCheck(args: any) {
+    const schema = z.object({
+      employeeId: z.string(),
+      checkType: z.enum(['medical_interview', 'health_questionnaire', 'stress_check', 'work_load_review']),
+      overtimeHours: z.number(),
+      doctorName: z.string().optional(),
+      healthStatus: z.enum(['good', 'caution', 'requires_attention', 'requires_treatment']).optional(),
+      recommendations: z.string().optional(),
+    });
+
+    const parsed = schema.parse(args);
+    
+    try {
+      const recordId = await this.db.recordHealthCheckMeasure(parsed);
+      
+      const checkTypeNames = {
+        medical_interview: '医師の面接指導',
+        health_questionnaire: '健康状態チェック',
+        stress_check: 'ストレスチェック',
+        work_load_review: '業務負荷見直し'
+      };
+
+      const healthStatusNames = {
+        good: '良好',
+        caution: '注意',
+        requires_attention: '要観察',
+        requires_treatment: '要治療'
+      };
+
+      const triggerReason = parsed.overtimeHours >= 100 ? '月100時間超過' : '月80時間超過';
+      const riskLevel = parsed.overtimeHours >= 100 ? '🚨 高リスク' : '⚠️ 中リスク';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🏥 健康確保措置を記録しました\\n` +
+                  `記録ID: ${recordId}\\n` +
+                  `従業員: ${parsed.employeeId}\\n\\n` +
+                  `📋 実施内容:\\n` +
+                  `種別: ${checkTypeNames[parsed.checkType]}\\n` +
+                  `実施理由: ${triggerReason}\\n` +
+                  `対象残業時間: ${parsed.overtimeHours}時間 ${riskLevel}\\n` +
+                  `${parsed.doctorName ? `担当医師: ${parsed.doctorName}\\n` : ''}\\n` +
+                  `${parsed.healthStatus ? `健康状態: ${healthStatusNames[parsed.healthStatus]}\\n` : ''}` +
+                  `${parsed.recommendations ? `医師所見:\\n${parsed.recommendations}\\n` : ''}\\n` +
+                  `📅 記録日時: ${new Date().toLocaleString()}\\n\\n` +
+                  `${parsed.overtimeHours >= 100 ? 
+                    '⚠️ 重要: 月100時間を超える時間外労働が確認されました。継続的な健康管理と業務負荷軽減が必要です。' : 
+                    '💡 推奨: 継続的な健康状態の観察と、必要に応じた業務調整を行ってください。'}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Health check recording failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private calculateDiscrepancyInfo(record: any): {detected: boolean, minutes: number, explanation: string} {
+    let maxDiscrepancy = 0;
+    let explanation = '';
+    
+    // ICカードと自己申告の比較
+    if (record.icCardIn && record.selfReportedIn) {
+      const diffIn = Math.abs((record.icCardIn.getTime() - record.selfReportedIn.getTime()) / (1000 * 60));
+      if (diffIn > 15) {
+        maxDiscrepancy = Math.max(maxDiscrepancy, diffIn);
+        explanation += `出勤時刻の乖離: ${diffIn.toFixed(0)}分; `;
+      }
+    }
+    
+    if (record.icCardOut && record.selfReportedOut) {
+      const diffOut = Math.abs((record.icCardOut.getTime() - record.selfReportedOut.getTime()) / (1000 * 60));
+      if (diffOut > 15) {
+        maxDiscrepancy = Math.max(maxDiscrepancy, diffOut);
+        explanation += `退勤時刻の乖離: ${diffOut.toFixed(0)}分; `;
+      }
+    }
+    
+    return {
+      detected: maxDiscrepancy > 15,
+      minutes: Math.round(maxDiscrepancy),
+      explanation: explanation.trim()
+    };
   }
 
   async run(): Promise<void> {

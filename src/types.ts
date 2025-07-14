@@ -53,6 +53,58 @@ export interface EmployeeDeduction {
   effectiveTo?: Date;
 }
 
+export interface LeaveBalance {
+  id: number;
+  employeeId: string;
+  leaveType: LeaveType;
+  year: number;
+  grantedDays: number;
+  usedDays: number;
+  remainingDays: number;
+  expiryDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  leaveType: LeaveType;
+  startDate: Date;
+  endDate: Date;
+  daysRequested: number;
+  halfDay: boolean;
+  reason?: string;
+  status: RequestStatus;
+  requestedAt: Date;
+  approvedBy?: string;
+  approvedAt?: Date;
+  approvalNotes?: string;
+  autoApproved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LeavePolicy {
+  id: number;
+  leaveType: LeaveType;
+  tenureMonths: number;
+  grantedDays: number;
+  maxConsecutiveDays?: number;
+  advanceNoticeDays: number;
+  requiresApproval: boolean;
+  autoApprovalConditions?: string;
+  carryoverAllowed: boolean;
+  carryoverLimitDays?: number;
+  expiryMonths?: number;
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+  createdAt: Date;
+}
+
+export type LeaveType = 'annual' | 'sick' | 'special' | 'maternity' | 'paternity' | 'bereavement' | 'personal';
+export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
 export interface TimeRecord {
   id: string;
   employeeId: string;
@@ -131,38 +183,7 @@ export interface PayrollSummary {
   violations: { employeeId: string; violation: string }[];
 }
 
-// Leave Management Types
-export type LeaveType = 'annual' | 'sick' | 'special' | 'maternity' | 'paternity' | 'bereavement';
-
-export interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  leaveType: LeaveType;
-  startDate: Date;
-  endDate: Date;
-  leaveDays: number;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
-  isHalfDay: boolean;
-  submittedAt: Date;
-  approvedBy?: string;
-  approvedAt?: Date;
-  managerId?: string;
-  comments?: string;
-}
-
-export interface LeaveBalance {
-  employeeId: string;
-  year: number;
-  annualLeaveDays: number;
-  annualLeaveUsed: number;
-  sickLeaveDays: number;
-  sickLeaveUsed: number;
-  specialLeaveUsed: number;
-  carryOverDays: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Leave Management Types are defined above
 
 export type MCPToolName = 
   | 'clock_in'
@@ -193,7 +214,11 @@ export type MCPToolName =
   | 'approve_expense'
   | 'reject_expense'
   | 'get_expense_analytics'
-  | 'export_accounting_data';
+  | 'export_accounting_data'
+  | 'monitor_36_compliance'
+  | 'record_objective_time'
+  | 'generate_compliance_report'
+  | 'record_health_check';
 
 // Expense Management Types - v1.3.0
 export interface ExpenseCategory {
