@@ -1,0 +1,26 @@
+{
+  "exportInfo": {
+    "exportDate": "2025-07-10T05:42:14.384Z",
+    "format": "json",
+    "totalEmployees": 1,
+    "totalRecords": 0,
+    "dateRange": {
+      "startDate": "2024-01-01T00:00:00.000Z",
+      "endDate": "2024-12-31T00:00:00.000Z"
+    }
+  },
+  "contents": {
+    "employees": "1 employees",
+    "timeRecords": "0 time records",
+    "payrollCalculations": "0 payroll calculations",
+    "files": "Check files/ directory for exported media and documents"
+  },
+  "importInstructions": {
+    "description": "This export can be re-imported using the import functionality",
+    "steps": [
+      "1. Extract the archive to a temporary directory",
+      "2. Use the import command with the path to this directory",
+      "3. The system will restore all data and files"
+    ]
+  }
+}

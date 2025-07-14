@@ -1,0 +1,50 @@
+{
+  "name": "mcp-attendance-management",
+  "version": "1.0.0",
+  "description": "MCP-based attendance management system compliant with Japanese Labor Standards Act",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "client": "tsx src/client.ts",
+    "cli": "tsx src/cli.ts",
+    "init-db": "node -e \"import('./dist/database.js').then(m => m.initializeDatabase())\"",
+    "init-pg": "node -e \"import('./dist/database_postgresql.js').then(m => m.initializeDatabase())\"",
+    "migrate": "tsx src/migrate.ts",
+    "test-data": "tsx src/test-data.ts",
+    "test": "vitest",
+    "test:unit": "vitest tests/unit",
+    "test:integration": "vitest tests/integration",
+    "test:security": "vitest tests/security",
+    "test:e2e": "vitest tests/e2e",
+    "test:coverage": "vitest --coverage"
+  },
+  "keywords": [
+    "mcp",
+    "attendance",
+    "payroll",
+    "japanese-labor-law",
+    "ai-agent"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@types/pg": "^8.15.4",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.1.3",
+    "pg": "^8.16.3",
+    "sqlite3": "^5.1.7",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/sqlite3": "^3.1.11",
+    "@vitest/coverage-v8": "^1.6.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
+  }
+}

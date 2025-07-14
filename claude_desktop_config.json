@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "postgresql": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres:fntmss1992@localhost:5432/attendance_db"],
+      "env": {}
+    },
+    "attendance-system": {
+      "command": "node",
+      "args": ["dist/server.js"],
+      "cwd": "C:/Users/m_fun/MCP_勤怠",
+      "env": {
+        "NODE_ENV": "production",
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_NAME": "attendance_db",
+        "DB_USER": "postgres",
+        "DB_PASSWORD": "fntmss1992"
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "exportDate": "2025-07-10T05:42:14.384Z",
+    "format": "json",
+    "totalEmployees": 1,
+    "totalRecords": 0,
+    "dateRange": {
+      "startDate": "2024-01-01T00:00:00.000Z",
+      "endDate": "2024-12-31T00:00:00.000Z"
+    }
+  },
+  "employees": [
+    {
+      "id": "EMP_1752072922987_bvibzwun1",
+      "name": "テスト太郎",
+      "department": "テスト部",
+      "position": "テストエンジニア",
+      "hourlyRate": 3000,
+      "joinDate": "2024-01-01T00:00:00.000Z",
+      "managerId": null,
+      "isActive": true
+    }
+  ],
+  "timeRecords": [],
+  "payrollCalculations": [],
+  "attendanceReports": []
+}

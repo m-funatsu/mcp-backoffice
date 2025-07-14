@@ -1,0 +1,6 @@
+list-employees
+employee EMP_1752072922987_bvibzwun1
+time-records EMP_1752072922987_bvibzwun1 2024-01-01 2024-12-31
+payroll EMP_1752072922987_bvibzwun1 2024-07
+attendance-report EMP_1752072922987_bvibzwun1 2024-07
+exit
