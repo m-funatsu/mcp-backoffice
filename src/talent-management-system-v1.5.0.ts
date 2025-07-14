@@ -356,7 +356,7 @@ export class TalentManagementSystem {
       performanceRating: 'meets', // Default, to be assessed
       competencies: await this.initializeCompetencyAssessments(employee.position),
       careerAspiration: await this.initializeCareerAspiration(employeeId),
-      developmentPlan: await this.createDevelopmentPlan(employeeId),
+      developmentPlan: await this.createInitialDevelopmentPlan(employeeId),
       successorCandidates: [],
       flightRisk: {
         riskLevel: 'low',
@@ -404,9 +404,55 @@ export class TalentManagementSystem {
       throw new Error('Talent profile not found');
     }
 
+    return this.createDevelopmentPlanFromProfile(profile);
+  }
+
+  /**
+   * Create initial development plan during profile creation
+   */
+  private async createInitialDevelopmentPlan(employeeId: string): Promise<DevelopmentPlan> {
+    // Use default competencies for initial development plan
+    const defaultCompetencies = await this.initializeCompetencyAssessments('default');
+    
     const plan: DevelopmentPlan = {
       id: `DP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       employeeId,
+      planPeriod: {
+        startDate: new Date(),
+        endDate: addYears(new Date(), 1)
+      },
+      developmentObjectives: this.generateDevelopmentObjectives(defaultCompetencies),
+      learningActivities: this.recommendLearningActivities(defaultCompetencies),
+      mentorshipAssignments: [],
+      experienceAssignments: [],
+      progressReviews: [],
+      budget: {
+        totalAllocated: 200000,
+        spentToDate: 0,
+        remainingBudget: 200000,
+        budgetBreakdown: [
+          { category: 'training', allocated: 100000, spent: 0, remaining: 100000 },
+          { category: 'certification', allocated: 50000, spent: 0, remaining: 50000 },
+          { category: 'conference', allocated: 30000, spent: 0, remaining: 30000 },
+          { category: 'materials', allocated: 20000, spent: 0, remaining: 20000 }
+        ]
+      },
+      status: 'draft',
+      createdBy: 'SYSTEM',
+      lastUpdated: new Date()
+    };
+
+    await this.saveDevelopmentPlan(plan);
+    return plan;
+  }
+
+  /**
+   * Create development plan from existing profile
+   */
+  private async createDevelopmentPlanFromProfile(profile: TalentProfile): Promise<DevelopmentPlan> {
+    const plan: DevelopmentPlan = {
+      id: `DP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      employeeId: profile.employeeId,
       planPeriod: {
         startDate: new Date(),
         endDate: addYears(new Date(), 1)

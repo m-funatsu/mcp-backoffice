@@ -516,7 +516,9 @@ export class HumanCapitalDisclosureEngine {
 
   private async calculateCostMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<CostMetrics> {
     const totalEmployees = employees.length;
-    const averageSalary = employees.reduce((sum, emp) => sum + (emp.baseSalary || emp.hourlyRate * 2000), 0) / totalEmployees;
+    const averageSalary = totalEmployees > 0 
+      ? employees.reduce((sum, emp) => sum + (emp.baseSalary || emp.hourlyRate * 2000), 0) / totalEmployees
+      : 0;
     
     return {
       totalRemunerationCost: averageSalary * totalEmployees,
@@ -722,15 +724,19 @@ export class HumanCapitalDisclosureEngine {
 
   private async calculateWorkforceMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<WorkforceMetrics> {
     const totalWorkforce = employees.length;
-    const averageAge = employees.reduce((sum, emp) => {
-      const age = differenceInDays(new Date(), emp.joinDate) / 365.25;
-      return sum + age;
-    }, 0) / totalWorkforce;
+    const averageAge = totalWorkforce > 0 
+      ? employees.reduce((sum, emp) => {
+          const age = differenceInDays(new Date(), emp.joinDate) / 365.25;
+          return sum + age;
+        }, 0) / totalWorkforce
+      : 0;
 
-    const averageTenure = employees.reduce((sum, emp) => {
-      const tenure = differenceInMonths(new Date(), emp.joinDate) / 12;
-      return sum + tenure;
-    }, 0) / totalWorkforce;
+    const averageTenure = totalWorkforce > 0 
+      ? employees.reduce((sum, emp) => {
+          const tenure = differenceInMonths(new Date(), emp.joinDate) / 12;
+          return sum + tenure;
+        }, 0) / totalWorkforce
+      : 0;
 
     return {
       totalWorkforce,
