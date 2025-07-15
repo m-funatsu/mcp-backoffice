@@ -27,14 +27,14 @@ export class PayrollDatabaseExtensions {
         if (err) {
           // Check if error is due to column already existing
           if (err.message.includes('duplicate column name') || err.message.includes('already exists')) {
-            console.log('Payroll schema extensions already exist, skipping initialization');
+            console.error('Payroll schema extensions already exist, skipping initialization');
             resolve();
           } else {
             console.error('Error initializing payroll schema:', err);
             reject(err);
           }
         } else {
-          console.log('Payroll schema extensions initialized successfully');
+          console.error('Payroll schema extensions initialized successfully');
           resolve();
         }
       });

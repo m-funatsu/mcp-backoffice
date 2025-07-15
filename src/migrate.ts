@@ -20,14 +20,14 @@ const pgClient = new Client({
 
 async function migrateData() {
   try {
-    console.log('Starting data migration from SQLite to PostgreSQL...');
+    console.error('Starting data migration from SQLite to PostgreSQL...');
     
     // Connect to PostgreSQL
     await pgClient.connect();
-    console.log('Connected to PostgreSQL');
+    console.error('Connected to PostgreSQL');
     
     // Migrate employees
-    console.log('Migrating employees...');
+    console.error('Migrating employees...');
     const employees = await sqliteAll('SELECT * FROM employees') as any[];
     
     for (const emp of employees) {
@@ -48,10 +48,10 @@ async function migrateData() {
         emp.updated_at
       ]);
     }
-    console.log(`Migrated ${employees.length} employees`);
+    console.error(`Migrated ${employees.length} employees`);
     
     // Migrate time records
-    console.log('Migrating time records...');
+    console.error('Migrating time records...');
     const timeRecords = await sqliteAll('SELECT * FROM time_records') as any[];
     
     for (const record of timeRecords) {
@@ -74,10 +74,10 @@ async function migrateData() {
         record.updated_at
       ]);
     }
-    console.log(`Migrated ${timeRecords.length} time records`);
+    console.error(`Migrated ${timeRecords.length} time records`);
     
     // Migrate payroll calculations
-    console.log('Migrating payroll calculations...');
+    console.error('Migrating payroll calculations...');
     const payrollCalculations = await sqliteAll('SELECT * FROM payroll_calculations') as any[];
     
     for (const calc of payrollCalculations) {
@@ -112,10 +112,10 @@ async function migrateData() {
         calc.created_at
       ]);
     }
-    console.log(`Migrated ${payrollCalculations.length} payroll calculations`);
+    console.error(`Migrated ${payrollCalculations.length} payroll calculations`);
     
     // Migrate attendance violations
-    console.log('Migrating attendance violations...');
+    console.error('Migrating attendance violations...');
     const violations = await sqliteAll('SELECT * FROM attendance_violations') as any[];
     
     for (const violation of violations) {
@@ -135,9 +135,9 @@ async function migrateData() {
         violation.created_at
       ]);
     }
-    console.log(`Migrated ${violations.length} attendance violations`);
+    console.error(`Migrated ${violations.length} attendance violations`);
     
-    console.log('Data migration completed successfully!');
+    console.error('Data migration completed successfully!');
     
   } catch (error) {
     console.error('Migration failed:', error);

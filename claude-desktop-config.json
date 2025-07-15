@@ -3,7 +3,7 @@
     "attendance-management": {
       "command": "node",
       "args": ["dist/server.js"],
-      "cwd": "/mnt/c/Users/m_fun/MCP_勤怠",
+      "cwd": "C:\\Users\\m_fun\\MCP_勤怠",
       "env": {
         "NODE_ENV": "production",
         "DB_PATH": "attendance.db"

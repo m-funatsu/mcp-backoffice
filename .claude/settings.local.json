@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test-data:*)",
+      "Bash(ls:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run init-db:*)",
+      "Bash(npm run start:*)",
+      "Bash(npm run cli:*)",
+      "Bash(rm:*)",
+      "WebFetch(domain:dev.classmethod.jp)",
+      "Bash(npm install:*)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(timeout 30 npm test:*)",
+      "Bash(timeout 60 npm test:*)",
+      "Bash(timeout 120 npm test)",
+      "Bash(npm run test:unit:*)",
+      "Bash(tsx:*)",
+      "Bash(npm run test:integration:*)",
+      "Bash(npm run test:security:*)",
+      "Bash(npm run test:*)",
+      "Bash(timeout 10s npm run start)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 30s npm test:*)",
+      "Bash(sqlite3:*)"
+    ],
+    "deny": []
+  }
+}

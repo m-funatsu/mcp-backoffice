@@ -24,7 +24,7 @@ class DatabasePostgreSQL {
   async connect(): Promise<void> {
     try {
       await this.client.connect();
-      console.log('Connected to PostgreSQL database');
+      console.error('Connected to PostgreSQL database');
     } catch (err) {
       console.error('Error connecting to database:', err);
       throw err;
@@ -37,7 +37,7 @@ class DatabasePostgreSQL {
       const schema = readFileSync(schemaPath, 'utf8');
       
       await this.client.query(schema);
-      console.log('Database initialized successfully');
+      console.error('Database initialized successfully');
     } catch (err) {
       console.error('Error initializing database:', err);
       throw err;

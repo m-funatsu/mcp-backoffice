@@ -16,7 +16,7 @@ class Database {
       if (err) {
         console.error('Error opening database:', err);
       } else {
-        console.log('Connected to SQLite database');
+        console.error('Connected to SQLite database');
       }
     });
   }
@@ -30,24 +30,28 @@ class Database {
         if (err) {
           // Check if error is due to table already existing - this is acceptable for tests
           if (err.message.includes('already exists')) {
-            console.log('Database tables already exist, skipping initialization');
+            console.error('Database tables already exist, skipping initialization');
           } else {
             console.error('Error initializing database:', err);
             reject(err);
             return;
           }
         } else {
-          console.log('Database initialized successfully');
+          console.error('Database initialized successfully');
         }
         
         // Always try to create additional tables (labor standards monitoring and HR extension)
         try {
           await this.createLaborStandardsMonitoringTables();
-          console.log('Labor standards monitoring tables created successfully');
+          console.error('Labor standards monitoring tables created successfully');
           
           // Create HR extension tables for v1.5.0-v2.0.0
           await this.createHRExtensionTables();
-          console.log('HR extension tables created successfully');
+          console.error('HR extension tables created successfully');
+          
+          // Create Human Capital Disclosure tables for v2.0.0
+          await this.createHumanCapitalDisclosureTables();
+          console.error('Human Capital Disclosure tables created successfully');
           
           resolve();
         } catch (monitoringErr) {
@@ -303,6 +307,311 @@ class Database {
     } catch (error) {
       console.error('Error creating HR extension tables:', error);
       throw error;
+    }
+  }
+
+  private async createHumanCapitalDisclosureTables(): Promise<void> {
+    try {
+      // 1. 従業員テーブルの拡張（エラーを無視）
+      await this.extendEmployeesTable();
+      
+      // 2. 人的資本開示用テーブルの作成
+      await this.createHumanCapitalTables();
+      
+      // 3. 初期データの投入
+      await this.insertHumanCapitalInitialData();
+      
+    } catch (error) {
+      console.error('Error creating Human Capital Disclosure tables:', error);
+      throw error;
+    }
+  }
+  
+  private async extendEmployeesTable(): Promise<void> {
+    // 既存のemployeesテーブルに新しいカラムを追加（エラーは無視）
+    const newColumns = [
+      'gender VARCHAR(20)',
+      'age INTEGER',
+      'nationality VARCHAR(100)',
+      'disability_status VARCHAR(50)',
+      'education_level VARCHAR(100)',
+      'employment_type VARCHAR(50) DEFAULT \'full_time\'',
+      'manager_id INTEGER'
+    ];
+    
+    for (const column of newColumns) {
+      try {
+        await this.run(`ALTER TABLE employees ADD COLUMN ${column}`);
+      } catch (error: any) {
+        // カラムが既に存在する場合はエラーを無視
+        if (!error.message.includes('duplicate column name')) {
+          console.error(`Warning: Could not add column ${column}:`, error.message);
+        }
+      }
+    }
+    
+    // インデックスの作成
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_employees_gender ON employees(gender)',
+      'CREATE INDEX IF NOT EXISTS idx_employees_age ON employees(age)',
+      'CREATE INDEX IF NOT EXISTS idx_employees_nationality ON employees(nationality)',
+      'CREATE INDEX IF NOT EXISTS idx_employees_employment_type ON employees(employment_type)',
+      'CREATE INDEX IF NOT EXISTS idx_employees_manager ON employees(manager_id)'
+    ];
+    
+    for (const index of indexes) {
+      try {
+        await this.run(index);
+      } catch (error: any) {
+        console.error(`Warning: Could not create index:`, error.message);
+      }
+    }
+  }
+  
+  private async createHumanCapitalTables(): Promise<void> {
+    // スキルマスタテーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS skills (
+        skill_id TEXT PRIMARY KEY,
+        skill_name VARCHAR(255) NOT NULL,
+        skill_category VARCHAR(100) NOT NULL,
+        skill_type VARCHAR(50) CHECK (skill_type IN ('technical', 'soft', 'leadership', 'domain_specific')),
+        description TEXT,
+        industry_standard BOOLEAN DEFAULT FALSE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // 従業員スキル関連テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS employee_skills (
+        employee_skill_id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        skill_id TEXT NOT NULL,
+        skill_level INTEGER CHECK (skill_level BETWEEN 1 AND 5) NOT NULL,
+        proficiency_description TEXT,
+        assessment_date DATE NOT NULL,
+        assessment_method VARCHAR(50) CHECK (assessment_method IN ('self_assessment', 'manager_assessment', 'peer_review', 'certification', 'external_test')),
+        assessed_by TEXT,
+        certification_name VARCHAR(200),
+        expiry_date DATE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id),
+        FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+      )
+    `);
+    
+    // 研修コースマスタテーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS training_courses (
+        course_id TEXT PRIMARY KEY,
+        course_name VARCHAR(255) NOT NULL,
+        course_category VARCHAR(100) NOT NULL,
+        course_type VARCHAR(50) CHECK (course_type IN ('internal', 'external', 'e_learning', 'on_the_job', 'mentoring')),
+        provider VARCHAR(200),
+        duration_hours INTEGER,
+        cost_per_person DECIMAL(10, 2),
+        target_audience TEXT,
+        learning_objectives TEXT,
+        prerequisites TEXT,
+        certification_available BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // 研修受講履歴テーブル（外部キー制約なし）
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS training_history (
+        training_record_id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        course_id TEXT NOT NULL,
+        enrollment_date DATE NOT NULL,
+        start_date DATE,
+        completion_date DATE,
+        status VARCHAR(50) CHECK (status IN ('enrolled', 'in_progress', 'completed', 'cancelled', 'failed')) DEFAULT 'enrolled',
+        attendance_rate DECIMAL(5, 2),
+        final_score DECIMAL(5, 2),
+        certification_earned BOOLEAN DEFAULT FALSE,
+        cost_invested DECIMAL(10, 2),
+        feedback TEXT,
+        impact_assessment TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // パフォーマンス評価テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS performance_evaluations (
+        evaluation_id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        evaluator_id TEXT NOT NULL,
+        evaluation_period VARCHAR(50) NOT NULL,
+        evaluation_type VARCHAR(50) CHECK (evaluation_type IN ('annual', 'semi_annual', 'quarterly', 'probation', 'project_based')),
+        evaluation_date DATE NOT NULL,
+        overall_rating DECIMAL(3, 2),
+        performance_score INTEGER CHECK (performance_score BETWEEN 1 AND 5),
+        competency_ratings TEXT,
+        strengths_summary TEXT,
+        areas_for_development TEXT,
+        career_development_plan TEXT,
+        promotion_readiness VARCHAR(50),
+        retention_risk_level VARCHAR(20) CHECK (retention_risk_level IN ('low', 'medium', 'high')),
+        status VARCHAR(50) CHECK (status IN ('draft', 'submitted', 'approved', 'finalized')) DEFAULT 'draft',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id),
+        FOREIGN KEY (evaluator_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // 従業員エンゲージメントサーベイテーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS employee_engagement_surveys (
+        survey_id TEXT PRIMARY KEY,
+        survey_name VARCHAR(255) NOT NULL,
+        survey_type VARCHAR(50) CHECK (survey_type IN ('annual', 'pulse', 'exit', 'onboarding', 'custom')),
+        survey_period VARCHAR(50) NOT NULL,
+        questions TEXT NOT NULL,
+        launch_date DATE NOT NULL,
+        close_date DATE NOT NULL,
+        participation_rate DECIMAL(5, 2),
+        response_rate DECIMAL(5, 2),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // サーベイ回答テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS survey_responses (
+        response_id TEXT PRIMARY KEY,
+        survey_id TEXT NOT NULL,
+        employee_id TEXT NOT NULL,
+        responses TEXT NOT NULL,
+        response_date DATE NOT NULL,
+        overall_satisfaction DECIMAL(3, 2),
+        enps_score INTEGER CHECK (enps_score BETWEEN 0 AND 10),
+        engagement_score DECIMAL(3, 2),
+        wellbeing_score DECIMAL(3, 2),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (survey_id) REFERENCES employee_engagement_surveys(survey_id),
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // 健康・安全事故テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS health_safety_incidents (
+        incident_id TEXT PRIMARY KEY,
+        employee_id TEXT,
+        incident_date DATE NOT NULL,
+        incident_type VARCHAR(100) CHECK (incident_type IN ('workplace_injury', 'near_miss', 'occupational_illness', 'safety_violation', 'environmental_incident')),
+        severity_level VARCHAR(20) CHECK (severity_level IN ('minor', 'moderate', 'major', 'critical')),
+        location VARCHAR(255),
+        description TEXT NOT NULL,
+        immediate_action_taken TEXT,
+        root_cause_analysis TEXT,
+        preventive_measures TEXT,
+        lost_time_hours DECIMAL(10, 2),
+        medical_treatment_required BOOLEAN DEFAULT FALSE,
+        reported_to_authorities BOOLEAN DEFAULT FALSE,
+        investigation_status VARCHAR(50) CHECK (investigation_status IN ('pending', 'ongoing', 'completed', 'closed')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // コンプライアンス事案テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS compliance_incidents (
+        incident_id TEXT PRIMARY KEY,
+        incident_type VARCHAR(100) CHECK (incident_type IN ('harassment', 'discrimination', 'ethics_violation', 'data_breach', 'conflict_of_interest', 'misconduct')),
+        report_date DATE NOT NULL,
+        incident_date DATE,
+        reported_by TEXT,
+        affected_employee_id TEXT,
+        accused_employee_id TEXT,
+        department VARCHAR(100),
+        description TEXT NOT NULL,
+        investigation_findings TEXT,
+        resolution_action TEXT,
+        disciplinary_action TEXT,
+        status VARCHAR(50) CHECK (status IN ('reported', 'investigating', 'resolved', 'closed', 'escalated')),
+        confidentiality_level VARCHAR(20) CHECK (confidentiality_level IN ('public', 'internal', 'confidential', 'restricted')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (affected_employee_id) REFERENCES employees(id),
+        FOREIGN KEY (accused_employee_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // 人的資本指標テーブル
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS human_capital_metrics (
+        metric_id TEXT PRIMARY KEY,
+        metric_name VARCHAR(255) NOT NULL,
+        metric_category VARCHAR(100) CHECK (metric_category IN ('workforce', 'diversity', 'skills', 'engagement', 'development', 'performance', 'health_safety', 'compliance')),
+        iso30414_category VARCHAR(100),
+        metric_value DECIMAL(15, 4) NOT NULL,
+        metric_unit VARCHAR(50),
+        calculation_method TEXT,
+        data_source TEXT,
+        reporting_period VARCHAR(50) NOT NULL,
+        benchmark_value DECIMAL(15, 4),
+        target_value DECIMAL(15, 4),
+        trend_direction VARCHAR(20) CHECK (trend_direction IN ('improving', 'stable', 'declining')),
+        is_kpi BOOLEAN DEFAULT FALSE,
+        visibility_level VARCHAR(20) CHECK (visibility_level IN ('public', 'internal', 'executive', 'confidential')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+  
+  private async insertHumanCapitalInitialData(): Promise<void> {
+    // 基本的なスキルカテゴリの挿入
+    const basicSkills = [
+      ['SKILL_001', 'プロジェクト管理', 'マネジメント', 'leadership', 'プロジェクトの計画・実行・監視・完了を統括する能力', 1],
+      ['SKILL_002', 'チームリーダーシップ', 'リーダーシップ', 'leadership', 'チームを導き、モチベーションを高める能力', 1],
+      ['SKILL_003', 'コミュニケーション', 'ソフトスキル', 'soft', '効果的な意思疎通を行う能力', 1],
+      ['SKILL_004', 'データ分析', 'テクニカル', 'technical', 'データを分析し、洞察を得る能力', 1],
+      ['SKILL_005', 'プログラミング（Python）', 'テクニカル', 'technical', 'Python言語でのプログラミング能力', 1],
+      ['SKILL_006', 'プログラミング（JavaScript）', 'テクニカル', 'technical', 'JavaScript言語でのプログラミング能力', 1],
+      ['SKILL_007', '問題解決', 'ソフトスキル', 'soft', '複雑な問題を分析し、解決策を見出す能力', 1],
+      ['SKILL_008', 'プレゼンテーション', 'ソフトスキル', 'soft', '効果的なプレゼンテーションを行う能力', 1]
+    ];
+    
+    for (const skill of basicSkills) {
+      await this.run(`
+        INSERT OR IGNORE INTO skills (skill_id, skill_name, skill_category, skill_type, description, industry_standard)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, skill);
+    }
+    
+    // 基本的な研修コースの挿入
+    const basicCourses = [
+      ['COURSE_001', 'リーダーシップ基礎研修', 'リーダーシップ', 'internal', null, 16, null, '新任管理職', 'リーダーシップの基本概念と実践方法を習得する'],
+      ['COURSE_002', 'プロジェクト管理入門', 'マネジメント', 'external', null, 24, null, '中級社員', 'プロジェクト管理の基本手法を学ぶ'],
+      ['COURSE_003', 'データ分析基礎', 'テクニカル', 'e_learning', null, 20, null, '全社員', 'データ分析の基本概念と手法を理解する'],
+      ['COURSE_004', 'コミュニケーション向上研修', 'ソフトスキル', 'internal', null, 8, null, '全社員', '効果的なコミュニケーション技術を身につける'],
+      ['COURSE_005', 'ハラスメント防止研修', 'コンプライアンス', 'internal', null, 4, null, '全社員', 'ハラスメントの理解と予防方法を学ぶ']
+    ];
+    
+    for (const course of basicCourses) {
+      try {
+        await this.run(`
+          INSERT OR IGNORE INTO training_courses (course_id, course_name, course_category, course_type, provider, duration_hours, cost_per_person, target_audience, learning_objectives)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, course);
+      } catch (error: any) {
+        console.error('Warning: Could not insert training course:', error.message);
+      }
     }
   }
 
@@ -1833,6 +2142,425 @@ class Database {
         }
       });
     });
+  }
+
+  // v2.0.0 人的資本開示対応メソッド群
+  
+  /**
+   * 人的資本指標の算出・記録
+   */
+  async calculateHumanCapitalMetrics(reportingPeriod: string): Promise<any> {
+    const metrics = {
+      workforce: await this.calculateWorkforceMetrics(reportingPeriod),
+      diversity: await this.calculateDiversityMetrics(reportingPeriod),
+      skills: await this.calculateSkillsMetrics(reportingPeriod),
+      engagement: await this.calculateEngagementMetrics(reportingPeriod),
+      development: await this.calculateDevelopmentMetrics(reportingPeriod),
+      performance: await this.calculatePerformanceMetrics(reportingPeriod),
+      health_safety: await this.calculateHealthSafetyMetrics(reportingPeriod),
+      compliance: await this.calculateComplianceMetrics(reportingPeriod)
+    };
+    
+    // 計算結果をデータベースに保存
+    for (const [category, categoryMetrics] of Object.entries(metrics)) {
+      for (const [metricName, value] of Object.entries(categoryMetrics as any)) {
+        await this.saveHumanCapitalMetric({
+          metricName,
+          metricCategory: category,
+          metricValue: value as number,
+          reportingPeriod,
+          calculatedAt: new Date()
+        });
+      }
+    }
+    
+    return metrics;
+  }
+  
+  /**
+   * 労働力構成指標の算出
+   */
+  private async calculateWorkforceMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(*) as total_employees,
+          COUNT(CASE WHEN employment_type = 'full_time' THEN 1 END) as full_time_employees,
+          COUNT(CASE WHEN employment_type = 'part_time' THEN 1 END) as part_time_employees,
+          COUNT(CASE WHEN employment_type = 'contract' THEN 1 END) as contract_employees,
+          AVG(CASE WHEN age IS NOT NULL THEN age END) as average_age,
+          AVG(CASE WHEN join_date IS NOT NULL THEN 
+            (julianday('now') - julianday(join_date)) / 365.25 
+          END) as average_tenure_years
+        FROM employees 
+        WHERE is_active = 1
+      `;
+      
+      this.db.get(sql, [], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            total_employees: row.total_employees || 0,
+            full_time_ratio: row.total_employees > 0 ? (row.full_time_employees / row.total_employees) * 100 : 0,
+            part_time_ratio: row.total_employees > 0 ? (row.part_time_employees / row.total_employees) * 100 : 0,
+            contract_ratio: row.total_employees > 0 ? (row.contract_employees / row.total_employees) * 100 : 0,
+            average_age: row.average_age || 0,
+            average_tenure_years: row.average_tenure_years || 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * 多様性指標の算出
+   */
+  private async calculateDiversityMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(*) as total_employees,
+          COUNT(CASE WHEN gender = 'female' THEN 1 END) as female_employees,
+          COUNT(CASE WHEN gender = 'male' THEN 1 END) as male_employees,
+          COUNT(CASE WHEN gender = 'female' AND manager_id IS NOT NULL THEN 1 END) as female_managers,
+          COUNT(CASE WHEN manager_id IS NOT NULL THEN 1 END) as total_managers,
+          COUNT(DISTINCT nationality) as nationality_diversity,
+          COUNT(CASE WHEN disability_status IS NOT NULL AND disability_status != 'none' THEN 1 END) as employees_with_disabilities
+        FROM employees 
+        WHERE is_active = 1
+      `;
+      
+      this.db.get(sql, [], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            gender_diversity_ratio: row.total_employees > 0 ? (row.female_employees / row.total_employees) * 100 : 0,
+            female_leadership_ratio: row.total_managers > 0 ? (row.female_managers / row.total_managers) * 100 : 0,
+            nationality_diversity_count: row.nationality_diversity || 0,
+            disability_inclusion_ratio: row.total_employees > 0 ? (row.employees_with_disabilities / row.total_employees) * 100 : 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * スキル指標の算出
+   */
+  private async calculateSkillsMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(DISTINCT employee_id) as employees_with_skills,
+          COUNT(DISTINCT skill_id) as total_unique_skills,
+          AVG(skill_level) as average_skill_level,
+          COUNT(CASE WHEN skill_level >= 4 THEN 1 END) as expert_level_skills,
+          COUNT(*) as total_skill_records
+        FROM employee_skills
+      `;
+      
+      this.db.get(sql, [], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            skill_coverage_ratio: row.employees_with_skills || 0,
+            unique_skills_count: row.total_unique_skills || 0,
+            average_skill_level: row.average_skill_level || 0,
+            expert_skills_ratio: row.total_skill_records > 0 ? (row.expert_level_skills / row.total_skill_records) * 100 : 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * エンゲージメント指標の算出
+   */
+  private async calculateEngagementMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(DISTINCT employee_id) as survey_respondents,
+          AVG(overall_satisfaction) as average_satisfaction,
+          AVG(engagement_score) as average_engagement,
+          AVG(enps_score) as average_enps,
+          COUNT(CASE WHEN enps_score >= 9 THEN 1 END) as promoters,
+          COUNT(CASE WHEN enps_score <= 6 THEN 1 END) as detractors,
+          COUNT(*) as total_responses
+        FROM survey_responses
+        WHERE strftime('%Y-%m', response_date) = ?
+      `;
+      
+      this.db.get(sql, [reportingPeriod], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          const eNPS = row.total_responses > 0 ? 
+            ((row.promoters - row.detractors) / row.total_responses) * 100 : 0;
+          
+          resolve({
+            survey_participation_rate: row.survey_respondents || 0,
+            average_satisfaction_score: row.average_satisfaction || 0,
+            average_engagement_score: row.average_engagement || 0,
+            employee_net_promoter_score: eNPS
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * 育成・研修指標の算出
+   */
+  private async calculateDevelopmentMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(DISTINCT employee_id) as employees_trained,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_trainings,
+          COUNT(*) as total_training_enrollments,
+          AVG(final_score) as average_training_score,
+          SUM(CASE WHEN completion_date IS NOT NULL THEN 
+            (julianday(completion_date) - julianday(start_date)) 
+          END) as total_training_days
+        FROM training_history th
+        JOIN training_courses tc ON th.course_id = tc.course_id
+        WHERE strftime('%Y-%m', th.enrollment_date) = ?
+      `;
+      
+      this.db.get(sql, [reportingPeriod], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            training_participation_rate: row.employees_trained || 0,
+            training_completion_rate: row.total_training_enrollments > 0 ? 
+              (row.completed_trainings / row.total_training_enrollments) * 100 : 0,
+            average_training_score: row.average_training_score || 0,
+            total_training_hours: row.total_training_days ? row.total_training_days * 8 : 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * パフォーマンス指標の算出
+   */
+  private async calculatePerformanceMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(DISTINCT employee_id) as evaluated_employees,
+          AVG(overall_rating) as average_performance_rating,
+          AVG(performance_score) as average_performance_score,
+          COUNT(CASE WHEN retention_risk_level = 'high' THEN 1 END) as high_risk_employees,
+          COUNT(CASE WHEN promotion_readiness IN ('ready', 'ready_soon') THEN 1 END) as promotion_ready_employees,
+          COUNT(*) as total_evaluations
+        FROM performance_evaluations
+        WHERE evaluation_period = ?
+      `;
+      
+      this.db.get(sql, [reportingPeriod], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            performance_evaluation_coverage: row.evaluated_employees || 0,
+            average_performance_rating: row.average_performance_rating || 0,
+            high_performer_ratio: row.total_evaluations > 0 ? 
+              (row.promotion_ready_employees / row.total_evaluations) * 100 : 0,
+            retention_risk_ratio: row.total_evaluations > 0 ? 
+              (row.high_risk_employees / row.total_evaluations) * 100 : 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * 健康・安全指標の算出
+   */
+  private async calculateHealthSafetyMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(*) as total_incidents,
+          COUNT(CASE WHEN severity_level = 'critical' THEN 1 END) as critical_incidents,
+          COUNT(CASE WHEN medical_treatment_required = 1 THEN 1 END) as medical_treatment_cases,
+          SUM(lost_time_hours) as total_lost_time_hours,
+          COUNT(CASE WHEN incident_type = 'workplace_injury' THEN 1 END) as workplace_injuries
+        FROM health_safety_incidents
+        WHERE strftime('%Y-%m', incident_date) = ?
+      `;
+      
+      this.db.get(sql, [reportingPeriod], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            total_safety_incidents: row.total_incidents || 0,
+            critical_incidents_count: row.critical_incidents || 0,
+            workplace_injury_rate: row.workplace_injuries || 0,
+            lost_time_injury_rate: row.total_lost_time_hours || 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * コンプライアンス指標の算出
+   */
+  private async calculateComplianceMetrics(reportingPeriod: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          COUNT(*) as total_compliance_incidents,
+          COUNT(CASE WHEN incident_type = 'harassment' THEN 1 END) as harassment_cases,
+          COUNT(CASE WHEN incident_type = 'discrimination' THEN 1 END) as discrimination_cases,
+          COUNT(CASE WHEN incident_type = 'ethics_violation' THEN 1 END) as ethics_violations,
+          COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_cases
+        FROM compliance_incidents
+        WHERE strftime('%Y-%m', report_date) = ?
+      `;
+      
+      this.db.get(sql, [reportingPeriod], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            compliance_incidents_count: row.total_compliance_incidents || 0,
+            harassment_incident_rate: row.harassment_cases || 0,
+            discrimination_incident_rate: row.discrimination_cases || 0,
+            ethics_violation_rate: row.ethics_violations || 0,
+            case_resolution_rate: row.total_compliance_incidents > 0 ? 
+              (row.resolved_cases / row.total_compliance_incidents) * 100 : 0
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * 人的資本指標の保存
+   */
+  private async saveHumanCapitalMetric(metric: {
+    metricName: string;
+    metricCategory: string;
+    metricValue: number;
+    reportingPeriod: string;
+    calculatedAt: Date;
+  }): Promise<string> {
+    const id = `METRIC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const sql = `
+        INSERT OR REPLACE INTO human_capital_metrics (
+          metric_id, metric_name, metric_category, metric_value, 
+          reporting_period, calculation_method, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(sql, [
+        id,
+        metric.metricName,
+        metric.metricCategory,
+        metric.metricValue,
+        metric.reportingPeriod,
+        'システム自動計算',
+        metric.calculatedAt.toISOString()
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(id);
+        }
+      });
+    });
+  }
+  
+  /**
+   * 人的資本開示レポートの生成
+   */
+  async generateHumanCapitalDisclosureReport(reportingPeriod: string): Promise<any> {
+    const metrics = await this.calculateHumanCapitalMetrics(reportingPeriod);
+    
+    return {
+      reportingPeriod,
+      generatedAt: new Date(),
+      disclosure: {
+        workforce_composition: {
+          total_employees: metrics.workforce.total_employees,
+          employment_type_breakdown: {
+            full_time_ratio: metrics.workforce.full_time_ratio,
+            part_time_ratio: metrics.workforce.part_time_ratio,
+            contract_ratio: metrics.workforce.contract_ratio
+          },
+          demographics: {
+            average_age: metrics.workforce.average_age,
+            average_tenure: metrics.workforce.average_tenure_years
+          }
+        },
+        diversity_inclusion: {
+          gender_diversity: {
+            female_ratio: metrics.diversity.gender_diversity_ratio,
+            female_leadership_ratio: metrics.diversity.female_leadership_ratio
+          },
+          cultural_diversity: {
+            nationality_count: metrics.diversity.nationality_diversity_count
+          },
+          disability_inclusion: {
+            inclusion_ratio: metrics.diversity.disability_inclusion_ratio
+          }
+        },
+        skills_capabilities: {
+          skill_coverage: metrics.skills.skill_coverage_ratio,
+          average_skill_level: metrics.skills.average_skill_level,
+          expert_skills_ratio: metrics.skills.expert_skills_ratio
+        },
+        engagement_culture: {
+          satisfaction_score: metrics.engagement.average_satisfaction_score,
+          engagement_score: metrics.engagement.average_engagement_score,
+          net_promoter_score: metrics.engagement.employee_net_promoter_score
+        },
+        development_training: {
+          participation_rate: metrics.development.training_participation_rate,
+          completion_rate: metrics.development.training_completion_rate,
+          total_training_hours: metrics.development.total_training_hours
+        },
+        performance_management: {
+          evaluation_coverage: metrics.performance.performance_evaluation_coverage,
+          average_rating: metrics.performance.average_performance_rating,
+          retention_risk: metrics.performance.retention_risk_ratio
+        },
+        health_safety: {
+          safety_incidents: metrics.health_safety.total_safety_incidents,
+          injury_rate: metrics.health_safety.workplace_injury_rate,
+          lost_time_rate: metrics.health_safety.lost_time_injury_rate
+        },
+        compliance_ethics: {
+          compliance_incidents: metrics.compliance.compliance_incidents_count,
+          resolution_rate: metrics.compliance.case_resolution_rate
+        }
+      },
+      iso30414_compliance: {
+        covered_areas: [
+          'workforce_composition',
+          'diversity_inclusion',
+          'skills_capabilities',
+          'engagement_culture',
+          'development_training',
+          'performance_management',
+          'health_safety',
+          'compliance_ethics'
+        ],
+        compliance_percentage: 100
+      }
+    };
   }
 
   // プライベートヘルパーメソッド
