@@ -33,11 +33,11 @@ class DatabasePostgreSQL {
 
   async initializeDatabase(): Promise<void> {
     try {
-      const schemaPath = join(__dirname, '..', 'schema_postgresql.sql');
+      const schemaPath = join(__dirname, '..', 'schema-postgresql.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
       await this.client.query(schema);
-      console.error('Database initialized successfully');
+      console.log('Database initialized successfully');
     } catch (err) {
       console.error('Error initializing database:', err);
       throw err;
@@ -295,8 +295,70 @@ class DatabasePostgreSQL {
   async close(): Promise<void> {
     await this.client.end();
   }
+
+  async disconnect(): Promise<void> {
+    await this.close();
+  }
+
+  // Generic query methods for compatibility
+  async query(sql: string, params: any[] = []): Promise<any> {
+    const result = await this.client.query(sql, params);
+    return result.rows;
+  }
+
+  async get(sql: string, params: any[] = []): Promise<any> {
+    const result = await this.client.query(sql, params);
+    return result.rows[0] || null;
+  }
+
+  async all(sql: string, params: any[] = []): Promise<any[]> {
+    const result = await this.client.query(sql, params);
+    return result.rows;
+  }
+
+  async run(sql: string, params: any[] = []): Promise<any> {
+    const result = await this.client.query(sql, params);
+    return result;
+  }
+
+  // Additional methods needed by the application
+  async getAttendanceReport(employeeId: string, startDate: Date, endDate: Date): Promise<AttendanceReport> {
+    const timeRecords = await this.getTimeRecords(employeeId, startDate, endDate);
+    const employee = await this.getEmployee(employeeId);
+    
+    if (!employee) {
+      throw new Error(`Employee not found: ${employeeId}`);
+    }
+
+    const totalHours = timeRecords.reduce((sum, record) => {
+      if (record.clockOut) {
+        const hours = (record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60);
+        return sum + hours - (record.breakDuration || 0) / 60;
+      }
+      return sum;
+    }, 0);
+
+    const overtimeHours = Math.max(0, totalHours - 8 * timeRecords.length);
+
+    return {
+      employeeId,
+      employeeName: employee.name,
+      startDate,
+      endDate,
+      totalHours,
+      regularHours: totalHours - overtimeHours,
+      overtimeHours,
+      lateNightHours: 0, // TODO: Calculate late night hours
+      holidayHours: 0, // TODO: Calculate holiday hours
+      daysWorked: timeRecords.length,
+      daysAbsent: 0, // TODO: Calculate absent days
+      tardyCount: 0, // TODO: Calculate tardy count
+      earlyLeaveCount: 0 // TODO: Calculate early leave count
+    };
+  }
 }
 
+export { DatabasePostgreSQL };
 export default DatabasePostgreSQL;
 
 // Export for initialization

@@ -164,14 +164,25 @@ export interface PayrollRules {
 export interface AttendanceReport {
   employeeId: string;
   employeeName: string;
-  month: string;
-  totalWorkingDays: number;
-  totalRegularHours: number;
-  totalOvertimeHours: number;
-  totalLateNightHours: number;
-  totalHolidayHours: number;
-  violations: string[];
-  calculatedPay: PayrollCalculation;
+  startDate: Date;
+  endDate: Date;
+  month?: string;
+  totalWorkingDays?: number;
+  totalRegularHours?: number;
+  totalOvertimeHours?: number;
+  totalLateNightHours?: number;
+  totalHolidayHours?: number;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  lateNightHours: number;
+  holidayHours: number;
+  daysWorked: number;
+  daysAbsent: number;
+  tardyCount: number;
+  earlyLeaveCount: number;
+  violations?: string[];
+  calculatedPay?: PayrollCalculation;
 }
 
 export interface PayrollSummary {
@@ -921,4 +932,269 @@ export interface HumanCapitalMetrics {
     turnoverRisk: { critical: number; high: number; medium: number; low: number };
     skillGap: { technical: number; leadership: number; soft: number };
   };
+}
+
+// v2.2.0: Talent Management Foundation Types
+// タレントマネジメント基盤型定義
+
+export interface TalentSkill {
+  id: string;
+  name: string;
+  category: 'technical' | 'soft' | 'leadership' | 'domain';
+  description?: string;
+  competencyLevels: number; // 1-5段階評価
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmployeeSkill {
+  id: string;
+  employeeId: string;
+  skillId: string;
+  proficiencyLevel: number; // 1-5段階
+  selfAssessedLevel?: number; // 自己評価
+  managerAssessedLevel?: number; // 上長評価
+  assessmentDate?: Date;
+  lastUpdated: Date;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TrainingRecord {
+  id: string;
+  employeeId: string;
+  trainingName: string;
+  trainingType: 'internal' | 'external' | 'elearning' | 'ojt' | 'mentoring';
+  provider?: string;
+  startDate: Date;
+  endDate?: Date;
+  durationHours: number;
+  cost: number;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  completionRate?: number; // 完了率（%）
+  evaluationScore?: number; // 評価スコア（1-5）
+  kirkpatrickLevel?: number; // カークパトリック評価レベル（1-4）
+  relatedSkills?: string[]; // 関連スキルID配列
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PerformanceEvaluationV2 {
+  id: string;
+  employeeId: string;
+  evaluatorId: string;
+  evaluationPeriod: 'annual' | 'semi_annual' | 'quarterly' | 'probation' | 'project';
+  evaluationDate: Date;
+  overallRating: number; // 全体評価（1-5）
+  competencyRatings: Record<string, number>; // コンピテンシー別評価
+  goalsAchievement?: number; // 目標達成率（%）
+  strengths?: string;
+  areasForImprovement?: string;
+  developmentPlans?: string;
+  promotionReadiness: 'ready' | 'developing' | 'not_ready';
+  successionPotential: 'high' | 'medium' | 'low';
+  retentionRisk: 'high' | 'medium' | 'low';
+  feedback360?: Record<string, any>; // 360度フィードバック
+  comments?: string;
+  status: 'draft' | 'submitted' | 'approved' | 'final';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface GoalOKR {
+  id: string;
+  employeeId: string;
+  goalType: 'mbo' | 'okr' | 'development' | 'project';
+  title: string;
+  description?: string;
+  category: 'performance' | 'development' | 'behavioral' | 'strategic';
+  targetValue?: number; // 目標値
+  currentValue: number; // 現在値
+  unit?: string; // 単位
+  weight: number; // 重み付け（%）
+  priority: 'high' | 'medium' | 'low';
+  startDate: Date;
+  dueDate: Date;
+  status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
+  achievementRate: number; // 達成率（%）
+  evaluationRating?: number; // 評価点（1-5）
+  keyResults?: KeyResult[]; // OKRのキーリザルト
+  milestones?: Milestone[]; // マイルストーン
+  parentGoalId?: string; // 上位目標ID
+  relatedSkills?: string[]; // 関連スキルID配列
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KeyResult {
+  id: string;
+  title: string;
+  description?: string;
+  targetValue: number;
+  currentValue: number;
+  unit?: string;
+  weight: number;
+  status: 'not_started' | 'in_progress' | 'completed';
+  achievementRate: number;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  description?: string;
+  dueDate: Date;
+  status: 'pending' | 'completed';
+  completionDate?: Date;
+  notes?: string;
+}
+
+export interface SkillMap {
+  employeeId: string;
+  skillsByCategory: Record<string, EmployeeSkill[]>;
+  skillGaps: SkillGap[];
+  recommendedTraining: TrainingRecommendation[];
+  careerPathSuggestions: CareerPathSuggestion[];
+  lastUpdated: Date;
+}
+
+export interface SkillGap {
+  skillId: string;
+  skillName: string;
+  currentLevel: number;
+  requiredLevel: number;
+  gapSize: number;
+  priority: 'high' | 'medium' | 'low';
+  developmentActions: string[];
+}
+
+export interface TrainingRecommendation {
+  trainingId: string;
+  trainingName: string;
+  trainingType: string;
+  targetSkills: string[];
+  priority: 'high' | 'medium' | 'low';
+  estimatedDuration: number;
+  estimatedCost: number;
+  provider?: string;
+}
+
+export interface CareerPathSuggestion {
+  targetPosition: string;
+  timeframe: number; // months
+  requiredSkills: string[];
+  recommendedExperience: string[];
+  developmentPlan: string;
+  readinessScore: number; // 0-100
+}
+
+export interface TalentWorkflow {
+  id: string;
+  workflowType: 'skill_assessment' | 'goal_setting' | 'performance_review' | 'training_approval';
+  employeeId: string;
+  managerId?: string;
+  hrUserId?: string;
+  currentStep: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  data: Record<string, any>;
+  approvals: WorkflowApproval[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WorkflowApproval {
+  approverId: string;
+  approverRole: 'manager' | 'hr' | 'admin';
+  status: 'pending' | 'approved' | 'rejected';
+  comments?: string;
+  approvedAt?: Date;
+}
+
+export interface TalentDashboard {
+  employeeId: string;
+  skillsOverview: {
+    totalSkills: number;
+    masterSkills: number;
+    developingSkills: number;
+    skillsByCategory: Record<string, number>;
+  };
+  goalsProgress: {
+    totalGoals: number;
+    completedGoals: number;
+    overallProgress: number;
+    goalsByType: Record<string, number>;
+  };
+  trainingProgress: {
+    totalTrainings: number;
+    completedTrainings: number;
+    scheduledTrainings: number;
+    totalHours: number;
+  };
+  performanceMetrics: {
+    latestRating?: number;
+    averageRating?: number;
+    promotionReadiness?: string;
+    retentionRisk?: string;
+  };
+  upcomingEvents: TalentEvent[];
+  recommendations: TalentRecommendation[];
+}
+
+export interface TalentEvent {
+  id: string;
+  type: 'training' | 'evaluation' | 'goal_review' | 'skill_assessment';
+  title: string;
+  description?: string;
+  dueDate: Date;
+  priority: 'high' | 'medium' | 'low';
+  status: 'pending' | 'completed';
+}
+
+export interface TalentRecommendation {
+  id: string;
+  type: 'skill_development' | 'career_move' | 'training' | 'goal_setting';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  actionItems: string[];
+  estimatedTimeframe: number; // days
+}
+
+export interface TalentAnalytics {
+  organizationOverview: {
+    totalEmployees: number;
+    avgSkillLevel: number;
+    skillCoverage: number;
+    trainingUtilization: number;
+    goalCompletionRate: number;
+  };
+  skillAnalytics: {
+    mostInDemandSkills: string[];
+    skillGapsByDepartment: Record<string, SkillGap[]>;
+    skillDevelopmentTrends: SkillTrend[];
+  };
+  performanceAnalytics: {
+    averageRating: number;
+    promotionReadiness: Record<string, number>;
+    retentionRisk: Record<string, number>;
+    successionPipeline: number;
+  };
+  trainingAnalytics: {
+    totalTrainingHours: number;
+    trainingROI: number;
+    completionRate: number;
+    trainingCostPerEmployee: number;
+  };
+}
+
+export interface SkillTrend {
+  skillId: string;
+  skillName: string;
+  category: string;
+  trend: 'increasing' | 'decreasing' | 'stable';
+  changeRate: number;
+  demandLevel: 'high' | 'medium' | 'low';
 }

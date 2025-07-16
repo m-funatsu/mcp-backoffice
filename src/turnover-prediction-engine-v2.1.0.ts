@@ -211,7 +211,7 @@ export class TurnoverPredictionEngine {
     startDate.setMonth(startDate.getMonth() - 6);
     const endDate = new Date();
     
-    const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+    const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString(), endDate.toISOString());
     
     // 平均到着・退社時刻計算
     const arrivalTimes = timeRecords.map(r => r.clockIn.getHours() * 60 + r.clockIn.getMinutes());
@@ -509,7 +509,7 @@ export class TurnoverPredictionEngine {
 
   private async analyzeLeaveUsagePattern(employeeId: string): Promise<LeaveUsagePattern> {
     // 有給残高データ取得
-    const leaveBalances = await this.db.getLeaveBalances(employeeId);
+    const leaveBalances = await this.db.getLeaveBalance(employeeId);
     
     // 簡易実装（実際はより詳細な分析）
     return {

@@ -27,11 +27,12 @@ import TimeSeriesForecasting from './time-series-forecasting-v2.1.0.js';
 import type { MCPToolName } from './types.js';
 
 /**
- * MCP Server for Attendance Management System
- * Compliant with Japanese Labor Standards Act
+ * AI-Native Strategic Platform Server
+ * Comprehensive HR, Finance, and Business Intelligence Platform
+ * with Predictive Analytics and Japanese Labor Standards Act Compliance
  */
 
-class AttendanceServer {
+class StrategicPlatformServer {
   private server: Server;
   public db: Database;
   private payrollCalculator: PayrollCalculator | null = null;
@@ -50,8 +51,8 @@ class AttendanceServer {
   constructor() {
     this.server = new Server(
       {
-        name: 'attendance-management-server',
-        version: '1.0.0',
+        name: 'ai-native-strategic-platform-server',
+        version: '2.1.0',
       },
       {
         capabilities: {
@@ -2192,7 +2193,7 @@ class AttendanceServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
-    console.error('Attendance Management MCP server running on stdio');
+    console.error('AI-Native Strategic Platform MCP server running on stdio');
     
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
@@ -2357,7 +2358,7 @@ class AttendanceServer {
       }
 
       const visualizations = await this.visualizationAlerts.generateHumanCapitalVisualization(
-        reportType === 'comprehensive' ? this.createHumanCapitalMetrics(report?.metrics || {}) : {} as any
+        reportType === 'comprehensive' ? this.createHumanCapitalMetrics((report as any)?.metrics || {}) : {} as any
       );
 
       return {
@@ -2406,14 +2407,57 @@ class AttendanceServer {
       // 可視化データ（オプション）
       let visualizations = [];
       if (includeVisualization) {
-        const overtimeViz = await this.visualizationAlerts.generateOvertimeVisualization(overtimePredictions);
-        const turnoverViz = await this.visualizationAlerts.generateTurnoverVisualization(turnoverPredictions);
-        const dashboardViz = await this.visualizationAlerts.generateHumanCapitalVisualization(dashboard);
+        const overtimeViz = await this.visualizationAlerts.generateOvertimeVisualization(overtimePredictions.map(p => ({ 
+          ...p, 
+          predictedHours: p.predictedMonthOvertime,
+          factors: {
+            historical: p.factors.historicalTrend,
+            seasonal: p.factors.seasonalPattern,
+            workload: p.factors.workloadIncrease,
+            deadline: p.factors.projectDeadlines
+          }
+        })));
+        const turnoverViz = await this.visualizationAlerts.generateTurnoverVisualization(turnoverPredictions.map(p => ({ 
+          ...p, 
+          timeframe: 6, 
+          actions: [],
+          keyFactors: {
+            attendance: p.keyFactors.attendancePattern,
+            overtime: p.keyFactors.overtimeHours,
+            leave: p.keyFactors.leaveUsage,
+            performance: p.keyFactors.performanceScore,
+            tenure: p.keyFactors.tenureMonths
+          }
+        })));
+        const dashboardViz = await this.visualizationAlerts.generateHumanCapitalVisualization(this.createHumanCapitalMetrics(dashboard));
         visualizations = [...overtimeViz, ...turnoverViz, ...dashboardViz];
       }
       
       // アラート監視
-      const alerts = await this.visualizationAlerts.monitorAlerts(overtimePredictions, turnoverPredictions);
+      const alerts = await this.visualizationAlerts.monitorAlerts(
+        overtimePredictions.map(p => ({ 
+          ...p, 
+          predictedHours: p.predictedMonthOvertime,
+          factors: {
+            historical: p.factors.historicalTrend,
+            seasonal: p.factors.seasonalPattern,
+            workload: p.factors.workloadIncrease,
+            deadline: p.factors.projectDeadlines
+          }
+        })),
+        turnoverPredictions.map(p => ({ 
+          ...p, 
+          timeframe: 6, 
+          actions: [],
+          keyFactors: {
+            attendance: p.keyFactors.attendancePattern,
+            overtime: p.keyFactors.overtimeHours,
+            leave: p.keyFactors.leaveUsage,
+            performance: p.keyFactors.performanceScore,
+            tenure: p.keyFactors.tenureMonths
+          }
+        }))
+      );
 
       // 統計計算
       const stats = {
@@ -2464,7 +2508,11 @@ class AttendanceServer {
     return {
       employeeCount: metrics.diversity?.genderDiversity?.totalEmployees || 100,
       diversity: {
-        genderRatio: metrics.diversity?.genderDiversity || { male: 0.6, female: 0.4, other: 0.0 }
+        genderRatio: metrics.diversity?.genderDiversity || { male: 0.6, female: 0.4, other: 0.0 },
+        managementDiversity: {
+          femaleManagerRatio: metrics.diversity?.managementDiversity?.femaleManagerRatio || 0.3,
+          avgTenure: metrics.diversity?.managementDiversity?.avgManagementTenure || 5.2
+        }
       },
       engagement: {
         enps: metrics.engagement?.enps?.overallENPS || 10,
@@ -2532,7 +2580,7 @@ class AttendanceServer {
 }
 
 // Export for testing
-export { AttendanceServer };
+export { StrategicPlatformServer };
 
-const server = new AttendanceServer();
+const server = new StrategicPlatformServer();
 server.run().catch(console.error);

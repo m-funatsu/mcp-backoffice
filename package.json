@@ -1,7 +1,7 @@
 {
-  "name": "mcp-attendance-management",
-  "version": "1.0.0",
-  "description": "MCP-based attendance management system compliant with Japanese Labor Standards Act",
+  "name": "ai-native-strategic-platform",
+  "version": "2.1.0",
+  "description": "AI-Native Strategic Platform for HR, Finance, and Business Intelligence with predictive analytics",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -23,13 +23,28 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f postgres",
     "docker:reset": "docker-compose down -v && docker-compose up -d",
-    "db:setup": "npm run docker:up && sleep 10 && npm run db:init",
-    "db:init": "tsx scripts/init-database.ts"
+    "postgres:start": "docker-compose -f docker-compose.simple.yml up -d",
+    "postgres:stop": "docker-compose -f docker-compose.simple.yml down",
+    "postgres:reset": "docker-compose -f docker-compose.simple.yml down -v && docker-compose -f docker-compose.simple.yml up -d",
+    "postgres:init": "tsx scripts/init-postgresql.ts",
+    "db:setup": "npm run postgres:start && sleep 10 && npm run postgres:init",
+    "db:init": "tsx scripts/init-database.ts",
+    "db-view": "tsx src/database-viewer.ts",
+    "db-view:structure": "tsx src/database-viewer.ts structure",
+    "db-view:data": "tsx src/database-viewer.ts data",
+    "db-view:stats": "tsx src/database-viewer.ts stats",
+    "db-view:all": "tsx src/database-viewer.ts all",
+    "sample-data": "tsx src/sample-data-generator.ts"
   },
   "keywords": [
     "mcp",
-    "attendance",
-    "payroll",
+    "ai-native",
+    "strategic-platform",
+    "hr-analytics",
+    "predictive-analytics",
+    "human-capital",
+    "finance-automation",
+    "business-intelligence",
     "japanese-labor-law",
     "ai-agent"
   ],

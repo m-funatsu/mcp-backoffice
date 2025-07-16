@@ -413,3 +413,285 @@ FALSE, TRUE),
 '[{"step": 1, "role": "sales_manager", "required": true}, {"step": 2, "role": "finance", "required": false}]', 
 FALSE, TRUE)
 ON CONFLICT (id) DO NOTHING;
+
+-- Human Capital Disclosure System Tables (人的資本開示システム) - v2.0.0
+
+-- Extended employee master for human capital disclosure
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_number TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS gender TEXT CHECK (gender IN ('male', 'female', 'other', 'not_specified'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS birth_date DATE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS disability_status TEXT CHECK (disability_status IN ('none', 'physical', 'mental', 'other', 'not_specified'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS education_level TEXT CHECK (education_level IN ('elementary', 'middle', 'high', 'vocational', 'bachelor', 'master', 'doctorate', 'other'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type TEXT CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'temporary', 'intern', 'consultant'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS management_level TEXT CHECK (management_level IN ('executive', 'senior_manager', 'manager', 'supervisor', 'team_lead', 'individual_contributor'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS tenure_years DECIMAL(5,2);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS annual_salary DECIMAL(12,2);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS work_model TEXT CHECK (work_model IN ('onsite', 'remote', 'hybrid'));
+
+-- Skills and competencies management
+CREATE TABLE IF NOT EXISTS skills (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('technical', 'soft', 'leadership', 'domain_specific', 'language', 'certification')),
+    description TEXT,
+    competency_levels INTEGER DEFAULT 5, -- 1-5 scale
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS employee_skills (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    skill_id TEXT NOT NULL,
+    proficiency_level INTEGER NOT NULL CHECK (proficiency_level >= 1 AND proficiency_level <= 5),
+    certification_date DATE,
+    certification_expiry DATE,
+    assessment_date DATE,
+    assessor_id TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (skill_id) REFERENCES skills(id),
+    FOREIGN KEY (assessor_id) REFERENCES employees(id),
+    UNIQUE(employee_id, skill_id)
+);
+
+-- Training and development tracking
+CREATE TABLE IF NOT EXISTS training_history (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    training_name TEXT NOT NULL,
+    training_type TEXT NOT NULL CHECK (training_type IN ('internal', 'external', 'e_learning', 'on_job', 'mentoring', 'coaching')),
+    provider TEXT,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    duration_hours DECIMAL(10,2),
+    cost DECIMAL(10,2),
+    status TEXT CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled', 'failed')) DEFAULT 'scheduled',
+    completion_rate DECIMAL(5,2), -- 0-100%
+    effectiveness_rating INTEGER CHECK (effectiveness_rating >= 1 AND effectiveness_rating <= 5),
+    roi_calculated DECIMAL(10,2),
+    related_skills JSONB,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+-- Performance evaluations and goal management
+CREATE TABLE IF NOT EXISTS performance_evaluations (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    evaluator_id TEXT NOT NULL,
+    evaluation_period TEXT NOT NULL, -- e.g., '2024-Q1', '2024-Annual'
+    evaluation_type TEXT NOT NULL CHECK (evaluation_type IN ('annual', 'semi_annual', 'quarterly', 'probation', 'project_based')),
+    evaluation_date DATE NOT NULL,
+    overall_rating INTEGER CHECK (overall_rating >= 1 AND overall_rating <= 5),
+    competency_ratings JSONB, -- JSON object with competency scores
+    goals_achievement DECIMAL(5,2), -- 0-100%
+    strengths TEXT,
+    areas_for_improvement TEXT,
+    development_plans TEXT,
+    promotion_readiness TEXT CHECK (promotion_readiness IN ('ready', 'developing', 'not_ready')),
+    succession_potential TEXT CHECK (succession_potential IN ('high', 'medium', 'low')),
+    retention_risk TEXT CHECK (retention_risk IN ('high', 'medium', 'low')),
+    feedback_360 JSONB, -- 360-degree feedback data
+    comments TEXT,
+    status TEXT CHECK (status IN ('draft', 'completed', 'approved', 'archived')) DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (evaluator_id) REFERENCES employees(id)
+);
+
+-- Goals and OKRs management
+CREATE TABLE IF NOT EXISTS goals_okrs (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    goal_type TEXT NOT NULL CHECK (goal_type IN ('individual', 'team', 'department', 'company', 'okr')),
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT CHECK (category IN ('performance', 'development', 'behavioral', 'project', 'strategic')),
+    target_value DECIMAL(10,2),
+    current_value DECIMAL(10,2) DEFAULT 0,
+    unit TEXT, -- e.g., 'percentage', 'count', 'hours'
+    weight INTEGER DEFAULT 100, -- relative importance
+    priority TEXT CHECK (priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+    start_date DATE NOT NULL,
+    due_date DATE NOT NULL,
+    status TEXT CHECK (status IN ('draft', 'active', 'completed', 'paused', 'cancelled')) DEFAULT 'draft',
+    achievement_rate DECIMAL(5,2), -- 0-100%
+    key_results JSONB, -- for OKRs
+    milestones JSONB,
+    parent_goal_id TEXT,
+    related_skills JSONB,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (parent_goal_id) REFERENCES goals_okrs(id)
+);
+
+-- Engagement and culture surveys
+CREATE TABLE IF NOT EXISTS engagement_surveys (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    survey_type TEXT NOT NULL CHECK (survey_type IN ('annual', 'pulse', 'exit', 'onboarding', 'project_feedback')),
+    survey_date DATE NOT NULL,
+    engagement_score INTEGER CHECK (engagement_score >= 1 AND engagement_score <= 10),
+    satisfaction_score INTEGER CHECK (satisfaction_score >= 1 AND satisfaction_score <= 10),
+    enps_score INTEGER CHECK (enps_score >= 0 AND enps_score <= 10), -- Employee Net Promoter Score
+    wellbeing_score INTEGER CHECK (wellbeing_score >= 1 AND wellbeing_score <= 10),
+    work_life_balance_score INTEGER CHECK (work_life_balance_score >= 1 AND work_life_balance_score <= 10),
+    career_development_score INTEGER CHECK (career_development_score >= 1 AND career_development_score <= 10),
+    manager_effectiveness_score INTEGER CHECK (manager_effectiveness_score >= 1 AND manager_effectiveness_score <= 10),
+    responses JSONB, -- detailed survey responses
+    comments TEXT,
+    anonymous BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+-- Succession planning and leadership pipeline
+CREATE TABLE IF NOT EXISTS succession_plans (
+    id TEXT PRIMARY KEY,
+    position_id TEXT NOT NULL, -- target position
+    employee_id TEXT NOT NULL, -- successor candidate
+    readiness_level TEXT CHECK (readiness_level IN ('ready_now', 'ready_1_year', 'ready_2_years', 'long_term')) NOT NULL,
+    development_needs TEXT,
+    development_plan TEXT,
+    probability_score INTEGER CHECK (probability_score >= 1 AND probability_score <= 10),
+    last_reviewed DATE,
+    next_review_date DATE,
+    status TEXT CHECK (status IN ('active', 'archived', 'promoted', 'withdrawn')) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+-- Health, safety, and compliance tracking
+CREATE TABLE IF NOT EXISTS health_safety_records (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    incident_type TEXT NOT NULL CHECK (incident_type IN ('injury', 'illness', 'near_miss', 'safety_violation', 'health_check')),
+    incident_date DATE NOT NULL,
+    severity_level TEXT CHECK (severity_level IN ('minor', 'moderate', 'serious', 'critical')) NOT NULL,
+    description TEXT NOT NULL,
+    location TEXT,
+    witnesses TEXT,
+    immediate_action TEXT,
+    root_cause TEXT,
+    corrective_measures TEXT,
+    follow_up_required BOOLEAN DEFAULT FALSE,
+    follow_up_date DATE,
+    resolved BOOLEAN DEFAULT FALSE,
+    resolved_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+-- Compliance and ethics tracking
+CREATE TABLE IF NOT EXISTS compliance_records (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    incident_type TEXT NOT NULL CHECK (incident_type IN ('harassment', 'discrimination', 'ethics_violation', 'data_breach', 'policy_violation')),
+    incident_date DATE NOT NULL,
+    severity_level TEXT CHECK (severity_level IN ('minor', 'moderate', 'serious', 'critical')) NOT NULL,
+    description TEXT NOT NULL,
+    investigation_status TEXT CHECK (investigation_status IN ('reported', 'investigating', 'resolved', 'closed', 'escalated')) DEFAULT 'reported',
+    investigation_notes TEXT,
+    resolution_measures TEXT,
+    follow_up_required BOOLEAN DEFAULT FALSE,
+    follow_up_date DATE,
+    resolved BOOLEAN DEFAULT FALSE,
+    resolved_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+-- Compensation and benefits tracking
+CREATE TABLE IF NOT EXISTS compensation_history (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    effective_date DATE NOT NULL,
+    change_type TEXT NOT NULL CHECK (change_type IN ('hire', 'promotion', 'merit_increase', 'market_adjustment', 'bonus', 'equity')),
+    previous_salary DECIMAL(12,2),
+    new_salary DECIMAL(12,2),
+    percentage_change DECIMAL(5,2),
+    reason TEXT,
+    approved_by TEXT,
+    approved_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (approved_by) REFERENCES employees(id)
+);
+
+-- Diversity and inclusion metrics
+CREATE TABLE IF NOT EXISTS diversity_metrics (
+    id TEXT PRIMARY KEY,
+    metric_date DATE NOT NULL,
+    department TEXT,
+    level TEXT, -- management level or job level
+    metric_type TEXT NOT NULL CHECK (metric_type IN ('gender', 'age', 'ethnicity', 'disability', 'tenure', 'education')),
+    category TEXT NOT NULL, -- specific category within metric_type
+    employee_count INTEGER NOT NULL,
+    percentage DECIMAL(5,2),
+    target_percentage DECIMAL(5,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Human capital KPI calculations
+CREATE TABLE IF NOT EXISTS human_capital_kpis (
+    id TEXT PRIMARY KEY,
+    calculation_date DATE NOT NULL,
+    kpi_category TEXT NOT NULL CHECK (kpi_category IN ('diversity', 'engagement', 'performance', 'development', 'retention', 'health_safety', 'compliance', 'succession')),
+    kpi_name TEXT NOT NULL,
+    kpi_value DECIMAL(10,2),
+    kpi_unit TEXT,
+    target_value DECIMAL(10,2),
+    benchmark_value DECIMAL(10,2),
+    calculation_method TEXT,
+    data_source TEXT,
+    period_type TEXT CHECK (period_type IN ('daily', 'weekly', 'monthly', 'quarterly', 'annual')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for human capital disclosure system
+CREATE INDEX IF NOT EXISTS idx_employee_skills_employee ON employee_skills(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_skills_skill ON employee_skills(skill_id);
+CREATE INDEX IF NOT EXISTS idx_training_history_employee ON training_history(employee_id);
+CREATE INDEX IF NOT EXISTS idx_training_history_dates ON training_history(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_performance_evaluations_employee ON performance_evaluations(employee_id);
+CREATE INDEX IF NOT EXISTS idx_performance_evaluations_period ON performance_evaluations(evaluation_period);
+CREATE INDEX IF NOT EXISTS idx_goals_okrs_employee ON goals_okrs(employee_id);
+CREATE INDEX IF NOT EXISTS idx_goals_okrs_status ON goals_okrs(status);
+CREATE INDEX IF NOT EXISTS idx_engagement_surveys_employee ON engagement_surveys(employee_id);
+CREATE INDEX IF NOT EXISTS idx_engagement_surveys_type ON engagement_surveys(survey_type);
+CREATE INDEX IF NOT EXISTS idx_succession_plans_employee ON succession_plans(employee_id);
+CREATE INDEX IF NOT EXISTS idx_succession_plans_position ON succession_plans(position_id);
+CREATE INDEX IF NOT EXISTS idx_health_safety_records_employee ON health_safety_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_records_employee ON compliance_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_compensation_history_employee ON compensation_history(employee_id);
+CREATE INDEX IF NOT EXISTS idx_diversity_metrics_date ON diversity_metrics(metric_date);
+CREATE INDEX IF NOT EXISTS idx_human_capital_kpis_category ON human_capital_kpis(kpi_category);
+
+-- Insert sample skills data
+INSERT INTO skills (id, name, category, description) VALUES
+('SKILL_001', 'JavaScript', 'technical', 'JavaScript programming language'),
+('SKILL_002', 'Python', 'technical', 'Python programming language'),
+('SKILL_003', 'SQL', 'technical', 'Database query language'),
+('SKILL_004', 'プロジェクト管理', 'soft', 'Project management skills'),
+('SKILL_005', 'チームリーダーシップ', 'leadership', 'Team leadership abilities'),
+('SKILL_006', 'コミュニケーション', 'soft', 'Communication skills'),
+('SKILL_007', 'データ分析', 'technical', 'Data analysis and interpretation'),
+('SKILL_008', '問題解決', 'soft', 'Problem solving capabilities'),
+('SKILL_009', 'UI/UX設計', 'technical', 'User interface and experience design'),
+('SKILL_010', '英語', 'language', 'English language proficiency')
+ON CONFLICT (id) DO NOTHING;

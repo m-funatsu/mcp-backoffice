@@ -1,0 +1,26 @@
+{
+  "steps": [
+    "1. PostgreSQLサーバーの起動確認",
+    "2. データベース「attendance_db」の作成",
+    "3. PostgreSQLスキーマの実行",
+    "4. 従業員データの移行",
+    "5. 勤怠記録データの移行",
+    "6. 給与計算データの移行",
+    "7. 経費申請データの移行",
+    "8. スキルデータの移行",
+    "9. 人的資本メトリクスの移行",
+    "10. データ整合性の確認",
+    "11. アプリケーション設定の更新",
+    "12. 移行完了の確認"
+  ],
+  "commands": [
+    "node migrate-to-postgresql.js",
+    "npm test -- --testNamePattern=\"PostgreSQL\"",
+    "npm run build",
+    "node dist/server.js"
+  ],
+  "configuration": {
+    ".env": "DATABASE_URL=postgresql://postgres:fntmss1992@localhost:5432/attendance_db",
+    "claude_desktop_config.json": "PostgreSQL接続設定の確認"
+  }
+}
