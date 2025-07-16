@@ -85,7 +85,7 @@ class Database extends DatabasePostgreSQL {
 
   // Additional methods for expense engine compatibility
   async getExpenseCategory(categoryId: string): Promise<any> {
-    const row = await this.get('SELECT * FROM expense_categories WHERE id = ?', [categoryId]);
+    const row = await this.get('SELECT * FROM expense_categories WHERE id = $1', [categoryId]);
     return row || null;
   }
 
@@ -93,13 +93,13 @@ class Database extends DatabasePostgreSQL {
     const id = `ACC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     await this.run(`
       INSERT INTO accounting_entries (id, expense_request_id, entry_date, description, debit_account, credit_account, amount, tax_amount, reference, exported, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [id, entry.expenseRequestId, entry.entryDate, entry.description, entry.debitAccount, entry.creditAccount, entry.amount, entry.taxAmount, entry.reference, entry.exported, new Date().toISOString()]);
     return id;
   }
 
   async getExpenseRequestsByEmployee(employeeId: string): Promise<any[]> {
-    const rows = await this.all('SELECT * FROM expense_requests WHERE employee_id = ?', [employeeId]);
+    const rows = await this.all('SELECT * FROM expense_requests WHERE employee_id = $1', [employeeId]);
     return rows;
   }
 
@@ -109,7 +109,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO expense_categories (id, name, description, is_active, accounting_code, approval_required)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `, [id, name, description, isActive, accountingCode, approvalRequired]);
     
     return id;
@@ -130,7 +130,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO expense_requests (id, employee_id, category_id, amount, description, expense_date, receipt_required, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [id, employeeId, categoryId, amount, description, expenseDate, receiptRequired, status]);
     
     return id;
@@ -140,14 +140,15 @@ class Database extends DatabasePostgreSQL {
     let sql = 'SELECT * FROM expense_requests';
     const params: any[] = [];
     const conditions: string[] = [];
+    let paramIndex = 1;
     
     if (employeeId) {
-      conditions.push('employee_id = ?');
+      conditions.push(`employee_id = $${paramIndex++}`);
       params.push(employeeId);
     }
     
     if (status) {
-      conditions.push('status = ?');
+      conditions.push(`status = $${paramIndex++}`);
       params.push(status);
     }
     
@@ -163,11 +164,11 @@ class Database extends DatabasePostgreSQL {
 
   // Leave management operations
   async getLeaveBalance(employeeId: string, leaveType?: LeaveType): Promise<LeaveBalance | null> {
-    let sql = `SELECT * FROM leave_balances WHERE employee_id = ?`;
+    let sql = `SELECT * FROM leave_balances WHERE employee_id = $1`;
     const params: any[] = [employeeId];
     
     if (leaveType) {
-      sql += ` AND leave_type = ?`;
+      sql += ` AND leave_type = $2`;
       params.push(leaveType);
     }
     
@@ -194,9 +195,9 @@ class Database extends DatabasePostgreSQL {
   async updateLeaveBalance(employeeId: string, leaveType: string, days: number): Promise<boolean> {
     const result = await this.run(`
       UPDATE leave_balances 
-      SET ${leaveType}_balance = ${leaveType}_balance + ?
-      WHERE employee_id = ?
-    `, [days, employeeId]);
+      SET ${leaveType}_balance = ${leaveType}_balance + $2
+      WHERE employee_id = $1
+    `, [employeeId, days]);
     
     return result.changes > 0;
   }
@@ -204,16 +205,16 @@ class Database extends DatabasePostgreSQL {
   async updateExpenseRequestStatus(requestId: string, status: string): Promise<boolean> {
     const result = await this.run(`
       UPDATE expense_requests 
-      SET status = ?
-      WHERE id = ?
-    `, [status, requestId]);
+      SET status = $2
+      WHERE id = $1
+    `, [requestId, status]);
     
     return result.changes > 0;
   }
 
   async getExpenseRequest(requestId: string): Promise<any> {
     const row = await this.get(`
-      SELECT * FROM expense_requests WHERE id = ?
+      SELECT * FROM expense_requests WHERE id = $1
     `, [requestId]);
     
     return row || null;
@@ -223,7 +224,7 @@ class Database extends DatabasePostgreSQL {
   async monitor36Compliance(employeeId: string, period: any): Promise<any> {
     const rows = await this.all(`
       SELECT * FROM labor_hours_summary 
-      WHERE employee_id = ? AND period_start >= ? AND period_end <= ?
+      WHERE employee_id = $1 AND period_start >= $2 AND period_end <= $3
     `, [employeeId, period.start, period.end]);
     
     return rows;
@@ -234,7 +235,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO compliance_alerts (id, employee_id, alert_type, severity, current_value, threshold_value, period_start, period_end)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [
       alertId,
       alertData.employeeId,
@@ -254,7 +255,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO objective_records (id, employee_id, record_date, ic_card_in, ic_card_out, self_reported_in, self_reported_out)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [
       recordId,
       record.employeeId,
@@ -271,7 +272,7 @@ class Database extends DatabasePostgreSQL {
   async generateComplianceReport(period: any): Promise<any> {
     const rows = await this.all(`
       SELECT * FROM compliance_alerts 
-      WHERE alert_date >= ? AND alert_date <= ?
+      WHERE alert_date >= $1 AND alert_date <= $2
       ORDER BY alert_date DESC
     `, [period.start, period.end]);
     
@@ -290,7 +291,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO health_safety_records (id, employee_id, incident_type, incident_date, severity_level, description)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `, [
       measureId,
       measure.employeeId,
@@ -309,7 +310,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO skills (id, name, category, description, competency_levels, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `, [skillId, skill.name, skill.category, skill.description, skill.competencyLevels || 5, skill.isActive !== false]);
     
     return skillId;
@@ -320,7 +321,7 @@ class Database extends DatabasePostgreSQL {
     const params: any[] = [];
     
     if (category) {
-      sql += ' AND category = ?';
+      sql += ' AND category = $1';
       params.push(category);
     }
     
@@ -334,8 +335,11 @@ class Database extends DatabasePostgreSQL {
     const id = `ES_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     await this.run(`
-      INSERT OR REPLACE INTO employee_skills (id, employee_id, skill_id, proficiency_level, assessment_date)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO employee_skills (id, employee_id, skill_id, proficiency_level, assessment_date)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (employee_id, skill_id) DO UPDATE SET
+        proficiency_level = EXCLUDED.proficiency_level,
+        assessment_date = EXCLUDED.assessment_date
     `, [id, employeeId, skillId, proficiencyLevel, new Date().toISOString()]);
     
     return id;
@@ -346,7 +350,7 @@ class Database extends DatabasePostgreSQL {
       SELECT es.*, s.name as skill_name, s.category as skill_category
       FROM employee_skills es
       JOIN skills s ON es.skill_id = s.id
-      WHERE es.employee_id = ?
+      WHERE es.employee_id = $1
       ORDER BY s.category, s.name
     `, [employeeId]);
     
@@ -359,7 +363,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO training_history (id, employee_id, training_name, training_type, provider, start_date, end_date, duration_hours, cost, status, related_skills, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [
       trainingId,
       training.employeeId,
@@ -379,16 +383,16 @@ class Database extends DatabasePostgreSQL {
   }
 
   async getTrainingHistory(employeeId: string, startDate?: Date, endDate?: Date): Promise<any[]> {
-    let sql = 'SELECT * FROM training_history WHERE employee_id = ?';
+    let sql = 'SELECT * FROM training_history WHERE employee_id = $1';
     const params: any[] = [employeeId];
     
     if (startDate) {
-      sql += ' AND start_date >= ?';
+      sql += ' AND start_date >= $2';
       params.push(startDate.toISOString().split('T')[0]);
     }
     
     if (endDate) {
-      sql += ' AND start_date <= ?';
+      sql += ' AND start_date <= $' + (startDate ? '3' : '2');
       params.push(endDate.toISOString().split('T')[0]);
     }
     
@@ -404,7 +408,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO performance_evaluations (id, employee_id, evaluator_id, evaluation_period, evaluation_date, overall_rating, competency_ratings, goals_achievement, strengths, areas_for_improvement, development_plans, promotion_readiness, succession_potential, retention_risk, feedback_360, comments, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     `, [
       evaluationId,
       evaluation.employeeId,
@@ -429,11 +433,11 @@ class Database extends DatabasePostgreSQL {
   }
 
   async getPerformanceEvaluations(employeeId: string, period?: string): Promise<any[]> {
-    let sql = 'SELECT * FROM performance_evaluations WHERE employee_id = ?';
+    let sql = 'SELECT * FROM performance_evaluations WHERE employee_id = $1';
     const params: any[] = [employeeId];
     
     if (period) {
-      sql += ' AND evaluation_period = ?';
+      sql += ' AND evaluation_period = $2';
       params.push(period);
     }
     
@@ -449,7 +453,7 @@ class Database extends DatabasePostgreSQL {
     
     await this.run(`
       INSERT INTO goals_okrs (id, employee_id, goal_type, title, description, category, target_value, current_value, unit, weight, priority, start_date, due_date, status, achievement_rate, key_results, milestones, parent_goal_id, related_skills, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
     `, [
       goalId,
       goal.employeeId,
@@ -477,11 +481,11 @@ class Database extends DatabasePostgreSQL {
   }
 
   async getGoals(employeeId: string, goalType?: string): Promise<any[]> {
-    let sql = 'SELECT * FROM goals_okrs WHERE employee_id = ?';
+    let sql = 'SELECT * FROM goals_okrs WHERE employee_id = $1';
     const params: any[] = [employeeId];
     
     if (goalType) {
-      sql += ' AND goal_type = ?';
+      sql += ' AND goal_type = $2';
       params.push(goalType);
     }
     
@@ -494,9 +498,9 @@ class Database extends DatabasePostgreSQL {
   async updateGoalProgress(goalId: string, currentValue: number, achievementRate: number): Promise<boolean> {
     const result = await this.run(`
       UPDATE goals_okrs 
-      SET current_value = ?, achievement_rate = ?
-      WHERE id = ?
-    `, [currentValue, achievementRate, goalId]);
+      SET current_value = $2, achievement_rate = $3
+      WHERE id = $1
+    `, [goalId, currentValue, achievementRate]);
     
     return result.changes > 0;
   }
@@ -511,7 +515,7 @@ class Database extends DatabasePostgreSQL {
         SUM(cost) as total_training_cost,
         COUNT(*) as total_training_sessions
       FROM training_history 
-      WHERE start_date >= ? AND start_date <= ? AND status = 'completed'
+      WHERE start_date >= $1 AND start_date <= $2 AND status = 'completed'
     `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
     
     const trainingByTypeResult = await this.all(`
@@ -521,7 +525,7 @@ class Database extends DatabasePostgreSQL {
         SUM(duration_hours) as total_hours,
         SUM(cost) as total_cost
       FROM training_history 
-      WHERE start_date >= ? AND start_date <= ? AND status = 'completed'
+      WHERE start_date >= $1 AND start_date <= $2 AND status = 'completed'
       GROUP BY training_type
     `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
     
