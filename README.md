@@ -43,8 +43,8 @@ Model Context Protocol (MCP) を基盤とした、日本の労働基準法に完
 │   AI Agent      │    │ Platform Core   │    │   Database      │
 │                 │◄──►│                 │◄──►│                 │
 │ - MCP Protocol  │    │ - HR Module     │    │ - PostgreSQL    │
-│ - Natural Lang  │    │ - Finance Module│    │ - SQLite        │
-│ - Tool Calling  │    │ - Analytics Mod │    │ - Time Records  │
+│ - Natural Lang  │    │ - Finance Module│    │ - Docker-based  │
+│ - Tool Calling  │    │ - Analytics Mod │    │ - Auto Migration│
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -88,8 +88,8 @@ Model Context Protocol (MCP) を基盤とした、日本の労働基準法に完
 
 - Node.js 18+
 - npm または yarn
-- PostgreSQL 12+ (本番環境)
-- SQLite 3+ (開発環境)
+- PostgreSQL 15+ (推奨: Docker環境)
+- Docker Desktop (PostgreSQL環境用)
 
 ### セットアップ
 
@@ -111,13 +111,14 @@ npm run build
 
 ```bash
 # Docker Desktopを起動してから実行
-npm run postgres:start
+docker-compose -f docker-compose.simple.yml up -d
 
-# データベース初期化
-npm run postgres:init
+# データベース初期化とデータ移行
+node migrate-to-postgresql.js
 
 # 確認
-npm run postgres:logs
+docker ps
+docker logs mcp-attendance-postgres
 ```
 
 #### 方法2: Windows用起動スクリプト
@@ -134,28 +135,30 @@ start-postgres.bat
 net start postgresql-x64-17
 
 # データベース作成
-createdb -U postgres attendance
+createdb -U postgres attendance_db
 
 # スキーマ初期化
-psql -U postgres -d attendance -f schema-postgresql.sql
+psql -U postgres -d attendance_db -f schema-postgresql.sql
 
-# または初期化スクリプト実行
-npm run postgres:init
+# データ移行
+node migrate-to-postgresql.js
 ```
 
 ### 利用可能なPostgreSQLコマンド
 
 ```bash
 # PostgreSQL関連
-npm run postgres:start    # PostgreSQLコンテナ起動
-npm run postgres:stop     # PostgreSQLコンテナ停止
-npm run postgres:reset    # データベースリセット
-npm run postgres:init     # スキーマ初期化
+docker-compose -f docker-compose.simple.yml up -d      # PostgreSQLコンテナ起動
+docker-compose -f docker-compose.simple.yml down       # PostgreSQLコンテナ停止
+docker-compose -f docker-compose.simple.yml restart    # PostgreSQLコンテナ再起動
 
 # データベース操作
-npm run db:setup          # 完全セットアップ
-npm run db-view           # データベース可視化
-npm run test-data         # テストデータ作成
+node migrate-to-postgresql.js     # SQLiteからPostgreSQLへデータ移行
+node src/database-viewer.ts       # データベース可視化
+node src/sample-data-generator.ts # サンプルデータ生成
+
+# 環境設定
+DATABASE_URL=postgresql://postgres:password@localhost:5432/attendance_db
 ```
 
 ## 🔧 使用方法
@@ -232,6 +235,7 @@ export const platformConfig: PlatformConfig = {
 #### 給与規則カスタマイズ
 
 ```sql
+-- PostgreSQL環境での設定例
 INSERT INTO payroll_rules (
     regular_hours_per_day,
     overtime_rate,
@@ -245,6 +249,10 @@ INSERT INTO payroll_rules (
     1.35,     -- 休日割増率
     '2024-01-01'
 );
+
+-- 接続確認
+SELECT version();
+SELECT current_database();
 ```
 
 ## 🧪 テスト・品質保証
@@ -301,14 +309,25 @@ src/
 │   ├── finance-module.ts      # 財務機能（経費・会計・予算）
 │   └── analytics-module.ts    # 分析機能（予測・可視化・レポート）
 ├── server.ts                  # MCPサーバーメイン
-├── database.ts                # データベース操作
+├── database.ts                # データベース操作（PostgreSQL統合）
+├── database_postgresql.ts     # PostgreSQL専用クラス
+├── database_sqlite.ts         # SQLite専用クラス（開発用）
 ├── payroll-engine.ts          # 給与計算エンジン
 ├── expense-engine.ts          # 経費管理エンジン
 ├── talent-management-engine-v2.2.0.ts # タレントマネジメントエンジン
 ├── predictive-analytics-engine-v2.1.0.ts # 予測分析エンジン
 ├── human-capital-dashboard-v2.1.0.ts # 人的資本ダッシュボード
+├── database-viewer.ts         # データベース可視化ツール
+├── sample-data-generator.ts   # サンプルデータ生成
 ├── types.ts                   # 型定義
 └── cli.ts                     # CLIインターフェース
+
+# 移行関連ファイル
+├── migrate-to-postgresql.js   # SQLite→PostgreSQL移行スクリプト
+├── migration-plan.json        # 移行計画設定
+├── schema-postgresql.sql      # PostgreSQL専用スキーマ
+├── docker-compose.simple.yml  # Docker環境設定
+└── start-postgres.bat         # Windows用起動スクリプト
 ```
 
 ## 📈 戦略的ロードマップ
@@ -375,3 +394,22 @@ MIT License
 **🎯 現在のバージョン**: v2.2.0  
 **🚀 次回マイルストーン**: v2.3.0 統合異常検知エンジン  
 **💡 長期目標**: 日本のHR & Financetech市場でのエージェント型プラットフォームリーダーシップ確立
+
+---
+
+## 🔄 Recent Updates
+
+### ✅ PostgreSQL Migration Complete (v2.2.1)
+- **Database Migration**: SQLite → PostgreSQL完了
+- **Data Transfer**: 82名従業員データ + 100件勤怠記録移行
+- **Docker Integration**: PostgreSQL 15-alpine環境構築  
+- **Schema Migration**: PostgreSQL専用スキーマ適用
+- **Connection Management**: 環境変数ベース接続管理
+- **Migration Tools**: 自動移行スクリプト実装
+
+### 🛠️ Technical Improvements
+- **DatabasePostgreSQL Class**: PostgreSQL専用データベースクラス
+- **Generic Query Methods**: query(), get(), all(), run()メソッド
+- **Type Safety**: AttendanceReport型拡張とPostgreSQL互換性
+- **Error Handling**: 堅牢なエラーハンドリング実装
+- **Docker Environment**: 完全なDocker化環境構築
