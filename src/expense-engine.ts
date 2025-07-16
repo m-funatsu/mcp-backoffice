@@ -56,6 +56,7 @@ export class IntelligentExpenseEngine {
       
       // Step 3: Create expense request
       const expenseRequest = {
+        id: `EXP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         employeeId,
         categoryId: category.id,
         amount: parsed.amount || 0,
@@ -65,7 +66,9 @@ export class IntelligentExpenseEngine {
         purpose: parsed.purpose,
         status: 'draft' as const,
         taxDeductible: category.taxDeductible,
-        aiConfidenceScore: parsed.confidence
+        aiConfidenceScore: parsed.confidence,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
       const requestId = await this.db.createExpenseRequest(expenseRequest);
@@ -102,6 +105,7 @@ export class IntelligentExpenseEngine {
       
       // Step 3: Create expense request
       const expenseRequest = {
+        id: `EXP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         employeeId,
         categoryId: category.id,
         amount: extractedData.amount || 0,
@@ -112,7 +116,9 @@ export class IntelligentExpenseEngine {
         extractedData,
         status: 'draft' as const,
         taxDeductible: category.taxDeductible,
-        aiConfidenceScore: extractedData.confidence
+        aiConfidenceScore: extractedData.confidence,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
       const requestId = await this.db.createExpenseRequest(expenseRequest);
@@ -227,7 +233,7 @@ export class IntelligentExpenseEngine {
       // Get expense requests for the period
       let requests: ExpenseRequest[] = [];
       if (employeeId) {
-        requests = await this.db.getExpenseRequestsByEmployee(employeeId, period.startDate, period.endDate);
+        requests = await this.db.getExpenseRequestsByEmployee(employeeId);
       } else {
         // Would need a method to get all expenses for department/company
         requests = [];
@@ -321,7 +327,7 @@ export class IntelligentExpenseEngine {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     
-    return await this.db.getExpenseRequestsByEmployee(employeeId, threeMonthsAgo, new Date());
+    return await this.db.getExpenseRequestsByEmployee(employeeId);
   }
 
   private async detectAnomalies(

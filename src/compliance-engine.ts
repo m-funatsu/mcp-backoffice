@@ -168,7 +168,7 @@ export class ComplianceEngine {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         id,
         record.employeeId,
         record.recordDate?.toISOString().split('T')[0],
@@ -190,7 +190,7 @@ export class ComplianceEngine {
         record.verifiedOut?.toISOString(),
         record.verifiedBy,
         record.verificationMethod
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -210,7 +210,7 @@ export class ComplianceEngine {
         WHERE employee_id = ? AND record_date = ?
       `;
       
-      this.db['db'].get(sql, [employeeId, date.toISOString().split('T')[0]], (err, row: any) => {
+      this.db.get(sql, [employeeId, date.toISOString().split('T')[0]], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -332,7 +332,7 @@ export class ComplianceEngine {
         ORDER BY effective_from DESC LIMIT 1
       `;
       
-      this.db['db'].get(sql, [], (err, row: any) => {
+      this.db.get(sql, [], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -353,7 +353,7 @@ export class ComplianceEngine {
         WHERE employee_id = ? AND strftime('%Y-%m', calculation_date) = ?
       `;
       
-      this.db['db'].get(sql, [employeeId, month], (err, row: any) => {
+      this.db.get(sql, [employeeId, month], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -371,7 +371,7 @@ export class ComplianceEngine {
         WHERE employee_id = ? AND strftime('%Y', calculation_date) = ?
       `;
       
-      this.db['db'].get(sql, [employeeId, year.toString()], (err, row: any) => {
+      this.db.get(sql, [employeeId, year.toString()], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -392,7 +392,7 @@ export class ComplianceEngine {
         GROUP BY strftime('%Y-%m', calculation_date)
       `;
       
-      this.db['db'].get(sql, [employeeId, year.toString()], (err, row: any) => {
+      this.db.get(sql, [employeeId, year.toString()], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {

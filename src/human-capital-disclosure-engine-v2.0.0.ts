@@ -726,14 +726,14 @@ export class HumanCapitalDisclosureEngine {
     const totalWorkforce = employees.length;
     const averageAge = totalWorkforce > 0 
       ? employees.reduce((sum, emp) => {
-          const age = differenceInDays(new Date(), emp.joinDate) / 365.25;
+          const age = differenceInDays(new Date(), emp.startDate) / 365.25;
           return sum + age;
         }, 0) / totalWorkforce
       : 0;
 
     const averageTenure = totalWorkforce > 0 
       ? employees.reduce((sum, emp) => {
-          const tenure = differenceInMonths(new Date(), emp.joinDate) / 12;
+          const tenure = differenceInMonths(new Date(), emp.startDate) / 12;
           return sum + tenure;
         }, 0) / totalWorkforce
       : 0;

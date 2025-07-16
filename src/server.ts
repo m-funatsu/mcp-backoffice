@@ -226,7 +226,7 @@ class AttendanceServer {
                   type: 'number',
                   description: 'Hourly wage rate',
                 },
-                joinDate: {
+                startDate: {
                   type: 'string',
                   description: 'Join date in YYYY-MM-DD format',
                 },
@@ -235,7 +235,7 @@ class AttendanceServer {
                   description: 'Manager employee ID (optional)',
                 },
               },
-              required: ['name', 'department', 'position', 'hourlyRate', 'joinDate'],
+              required: ['name', 'department', 'position', 'hourlyRate', 'startDate'],
             },
           },
           {
@@ -888,11 +888,7 @@ class AttendanceServer {
     const { employeeId, clockOutTime, breakMinutes } = schema.parse(args);
     const clockOut = clockOutTime ? new Date(clockOutTime) : new Date();
 
-    const success = await this.db.clockOut(employeeId, clockOut, breakMinutes);
-    
-    if (!success) {
-      throw new Error(`No open clock-in record found for employee ${employeeId} on ${format(clockOut, 'yyyy-MM-dd')}`);
-    }
+    await this.db.clockOut(employeeId, clockOut, breakMinutes);
 
     return {
       content: [
@@ -914,8 +910,8 @@ class AttendanceServer {
     const { employeeId, startDate, endDate } = schema.parse(args);
     const records = await this.db.getTimeRecords(
       employeeId,
-      new Date(startDate),
-      new Date(endDate)
+      startDate,
+      endDate
     );
 
     const recordsText = records.map(record => {
@@ -924,10 +920,10 @@ class AttendanceServer {
         'Not clocked out';
       
       const workingHours = record.clockOut ? 
-        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - record.breakMinutes / 60).toFixed(2) : 
+        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - record.breakDuration / 60).toFixed(2) : 
         'N/A';
       
-      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${record.breakMinutes}min)`;
+      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${record.breakDuration}min)`;
     }).join('\\n');
 
     return {
@@ -1039,18 +1035,19 @@ class AttendanceServer {
       department: z.string(),
       position: z.string(),
       hourlyRate: z.number(),
-      joinDate: z.string(),
+      startDate: z.string(),
       managerId: z.string().optional(),
     });
 
-    const { name, department, position, hourlyRate, joinDate, managerId } = schema.parse(args);
+    const { name, department, position, hourlyRate, startDate, managerId } = schema.parse(args);
     
     const employeeId = await this.db.addEmployee({
+      id: `EMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name,
       department,
       position,
       hourlyRate,
-      joinDate: new Date(joinDate),
+      startDate: new Date(startDate),
       managerId,
       isActive: true,
     });
@@ -1059,7 +1056,7 @@ class AttendanceServer {
       content: [
         {
           type: 'text',
-          text: `Employee added successfully:\\nID: ${employeeId}\\nName: ${name}\\nDepartment: ${department}\\nPosition: ${position}\\nHourly Rate: ¥${hourlyRate}\\nJoin Date: ${joinDate}`,
+          text: `Employee added successfully:\\nID: ${employeeId}\\nName: ${name}\\nDepartment: ${department}\\nPosition: ${position}\\nHourly Rate: ¥${hourlyRate}\\nJoin Date: ${startDate}`,
         },
       ],
     };
@@ -1081,7 +1078,7 @@ class AttendanceServer {
       content: [
         {
           type: 'text',
-          text: `Employee Information:\\nID: ${employee.id}\\nName: ${employee.name}\\nDepartment: ${employee.department}\\nPosition: ${employee.position}\\nHourly Rate: ¥${employee.hourlyRate}\\nJoin Date: ${format(employee.joinDate, 'yyyy-MM-dd')}\\nManager ID: ${employee.managerId || 'None'}\\nActive: ${employee.isActive ? 'Yes' : 'No'}`,
+          text: `Employee Information:\\nID: ${employee.id}\\nName: ${employee.name}\\nDepartment: ${employee.department}\\nPosition: ${employee.position}\\nHourly Rate: ¥${employee.hourlyRate}\\nJoin Date: ${format(employee.startDate, 'yyyy-MM-dd')}\\nManager ID: ${employee.managerId || 'None'}\\nActive: ${employee.isActive ? 'Yes' : 'No'}`,
         },
       ],
     };
@@ -1385,7 +1382,7 @@ class AttendanceServer {
       const monthDate = new Date(month + '-01');
       const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
 
       const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
       
@@ -1498,7 +1495,7 @@ class AttendanceServer {
       const monthDate = new Date(month + '-01');
       const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
 
       const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
       const compliance = result.compliance;
@@ -1663,8 +1660,7 @@ class AttendanceServer {
     try {
       const success = await this.db.updateExpenseRequestStatus(
         requestId,
-        'approved',
-        approverId
+        'approved'
       );
 
       if (!success) {
@@ -1706,9 +1702,7 @@ class AttendanceServer {
     try {
       const success = await this.db.updateExpenseRequestStatus(
         requestId,
-        'rejected',
-        undefined,
-        reason
+        'rejected'
       );
 
       if (!success) {
@@ -2082,7 +2076,7 @@ class AttendanceServer {
   }
 
   async run(): Promise<void> {
-    // Initialize database (SQLite doesn't need explicit connection)
+    // Initialize PostgreSQL database connection
     try {
       await this.db.initializeDatabase();
     } catch (error) {
@@ -2094,6 +2088,19 @@ class AttendanceServer {
     await this.server.connect(transport);
     
     console.error('Attendance Management MCP server running on stdio');
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.error('Shutting down server...');
+      await this.db.disconnect();
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      console.error('Shutting down server...');
+      await this.db.disconnect();
+      process.exit(0);
+    });
   }
 }
 

@@ -157,7 +157,7 @@ export class WorkingHoursCalculator {
         clockIn: timeRecord.clockIn,
         clockOut: timeRecord.clockIn, // fallback
         totalMinutes: 0,
-        breakMinutes: timeRecord.breakMinutes,
+        breakMinutes: timeRecord.breakDuration,
         workingMinutes: 0,
         regularHours: 0,
         overtimeHours: 0,
@@ -176,7 +176,7 @@ export class WorkingHoursCalculator {
     const clockIn = timeRecord.clockIn;
     const clockOut = timeRecord.clockOut;
     const totalMinutes = Math.floor((clockOut.getTime() - clockIn.getTime()) / (1000 * 60));
-    const breakMinutes = timeRecord.breakMinutes;
+    const breakMinutes = timeRecord.breakDuration;
     const workingMinutes = totalMinutes - breakMinutes;
     const workingHours = workingMinutes / 60;
 

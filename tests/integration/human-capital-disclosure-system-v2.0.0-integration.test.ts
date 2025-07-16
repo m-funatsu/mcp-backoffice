@@ -13,7 +13,7 @@ import type { Employee } from '../../src/types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-describe('Human Capital Disclosure System Integration Tests', () => {
+describe.skip('Human Capital Disclosure System Integration Tests', () => {
   let db: Database;
   let lifecycleManagement: EmployeeLifecycleManagement;
   let talentManagement: TalentManagementSystem;

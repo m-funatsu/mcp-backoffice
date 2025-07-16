@@ -89,11 +89,11 @@ class AttendanceCLI {
 
   private async addEmployee(args: string[]): Promise<string> {
     if (args.length < 5) {
-      return `❌ Usage: add-employee <name> <department> <position> <hourlyRate> <joinDate>
+      return `❌ Usage: add-employee <name> <department> <position> <hourlyRate> <startDate>
 Example: add-employee "田中太郎" "開発部" "エンジニア" 3000 2024-01-15`;
     }
 
-    const [name, department, position, hourlyRateStr, joinDate] = args;
+    const [name, department, position, hourlyRateStr, startDate] = args;
     const hourlyRate = parseFloat(hourlyRateStr);
 
     if (isNaN(hourlyRate)) {
@@ -105,7 +105,7 @@ Example: add-employee "田中太郎" "開発部" "エンジニア" 3000 2024-01-
       department,
       position,
       hourlyRate,
-      joinDate: new Date(joinDate),
+      startDate: new Date(startDate),
       isActive: true,
     });
 
@@ -115,7 +115,7 @@ Name: ${name}
 Department: ${department}
 Position: ${position}
 Hourly Rate: ¥${hourlyRate}
-Join Date: ${joinDate}`;
+Join Date: ${startDate}`;
   }
 
   private async listEmployees(): Promise<string> {
@@ -148,7 +148,7 @@ Name: ${employee.name}
 Department: ${employee.department}
 Position: ${employee.position}
 Hourly Rate: ¥${employee.hourlyRate}
-Join Date: ${format(employee.joinDate, 'yyyy-MM-dd')}
+Join Date: ${format(employee.startDate, 'yyyy-MM-dd')}
 Manager ID: ${employee.managerId || 'None'}
 Active: ${employee.isActive ? 'Yes' : 'No'}`;
   }
@@ -213,10 +213,10 @@ Example: time-records EMP_123 2024-01-01 2024-01-31`;
         'Not clocked out';
       
       const workingHours = record.clockOut ? 
-        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - record.breakMinutes / 60).toFixed(2) : 
+        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - record.breakDuration / 60).toFixed(2) : 
         'N/A';
       
-      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${record.breakMinutes}min)`;
+      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${record.breakDuration}min)`;
     }).join('\n');
 
     return `📋 Time records for employee ${employeeId} (${startDate} to ${endDate}):
@@ -361,7 +361,7 @@ Example: import ./exports/attendance_export_2024-01-15T10-30-00-000Z`;
     return `🏢 勤怠管理システム - 使用可能なコマンド:
 
 👥 従業員管理:
-  add-employee <name> <department> <position> <hourlyRate> <joinDate>
+  add-employee <name> <department> <position> <hourlyRate> <startDate>
   list-employees
   employee <employeeId>
 

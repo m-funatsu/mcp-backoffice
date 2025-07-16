@@ -231,7 +231,7 @@ export class LeaveManagement {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         requestId,
         input.employeeId,
         input.leaveType,
@@ -240,7 +240,7 @@ export class LeaveManagement {
         daysRequested,
         input.halfDay ? 1 : 0,
         input.reason || null
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -311,7 +311,7 @@ export class LeaveManagement {
     }
 
     // Check leave policy constraints
-    const policy = await this.getLeavePolicy(request.leaveType, employee.joinDate);
+    const policy = await this.getLeavePolicy(request.leaveType, employee.startDate);
     if (policy.maxConsecutiveDays && daysRequested > policy.maxConsecutiveDays) {
       throw new Error(`連続休暇日数の上限を超えています。上限: ${policy.maxConsecutiveDays}日`);
     }
@@ -383,12 +383,12 @@ export class LeaveManagement {
           AND lr.employee_id != ?
       `;
 
-      this.db['db'].get(sql, [
+      this.db.get(sql, [
         employee.department,
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0],
         employeeId
-      ], (err, row: any) => {
+      ], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -425,12 +425,12 @@ export class LeaveManagement {
         WHERE id = ?
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         approverId,
         notes || null,
         approverId === 'SYSTEM_AUTO_APPROVAL' ? 1 : 0,
         requestId
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -455,11 +455,11 @@ export class LeaveManagement {
         WHERE id = ?
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         approverId,
         notes || null,
         requestId
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -481,7 +481,7 @@ export class LeaveManagement {
         WHERE employee_id = ? AND leave_type = ? AND year = ?
       `;
 
-      this.db['db'].get(sql, [employeeId, leaveType, currentYear], async (err, row: any) => {
+      this.db.get(sql, [employeeId, leaveType, currentYear], async (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -515,9 +515,10 @@ export class LeaveManagement {
       throw new Error('従業員が見つかりません');
     }
 
-    const policy = await this.getLeavePolicy(leaveType, employee.joinDate);
-    const grantedDays = this.calculateGrantedDays(employee.joinDate, policy);
+    const policy = await this.getLeavePolicy(leaveType, employee.startDate);
+    const grantedDays = this.calculateGrantedDays(employee.startDate, policy);
     const expiryDate = policy.expiryMonths ? new Date(year + 1, 0, 1) : undefined;
+    const balanceId = Math.floor(Math.random() * 1000000);
 
     return new Promise((resolve, reject) => {
       const sql = `
@@ -527,19 +528,19 @@ export class LeaveManagement {
         ) VALUES (?, ?, ?, ?, 0, ?, ?)
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         employeeId,
         leaveType,
         year,
         grantedDays,
         grantedDays,
         expiryDate ? expiryDate.toISOString().split('T')[0] : null
-      ], function(err) {
+      ], (err: any) => {
         if (err) {
           reject(err);
         } else {
           resolve({
-            id: this.lastID,
+            id: balanceId,
             employeeId,
             leaveType,
             year,
@@ -558,8 +559,8 @@ export class LeaveManagement {
   /**
    * Calculate granted days based on tenure
    */
-  private calculateGrantedDays(joinDate: Date, policy: LeavePolicy): number {
-    const tenureMonths = Math.floor((new Date().getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  private calculateGrantedDays(startDate: Date, policy: LeavePolicy): number {
+    const tenureMonths = Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
     
     if (tenureMonths >= policy.tenureMonths) {
       return policy.grantedDays;
@@ -583,13 +584,13 @@ export class LeaveManagement {
         WHERE employee_id = ? AND leave_type = ? AND year = ?
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         -daysDelta,
         -daysDelta,
         employeeId,
         leaveType,
         balance.year
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -606,7 +607,7 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `SELECT * FROM leave_requests WHERE id = ?`;
       
-      this.db['db'].get(sql, [requestId], (err, row: any) => {
+      this.db.get(sql, [requestId], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -648,11 +649,11 @@ export class LeaveManagement {
           AND end_date >= ?
       `;
 
-      this.db['db'].all(sql, [
+      this.db.all(sql, [
         employeeId,
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0]
-      ], (err, rows: any[]) => {
+      ], (err: any, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
@@ -683,8 +684,8 @@ export class LeaveManagement {
   /**
    * Get leave policy
    */
-  private async getLeavePolicy(leaveType: LeaveType, joinDate: Date): Promise<LeavePolicy> {
-    const tenureMonths = Math.floor((new Date().getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  private async getLeavePolicy(leaveType: LeaveType, startDate: Date): Promise<LeavePolicy> {
+    const tenureMonths = Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
     
     return new Promise((resolve, reject) => {
       const sql = `
@@ -694,7 +695,7 @@ export class LeaveManagement {
         LIMIT 1
       `;
 
-      this.db['db'].get(sql, [leaveType, tenureMonths], (err, row: any) => {
+      this.db.get(sql, [leaveType, tenureMonths], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -734,11 +735,11 @@ export class LeaveManagement {
         ORDER BY tc.date, tc.start_time
       `;
 
-      this.db['db'].all(sql, [
+      this.db.all(sql, [
         department,
         startDate.toISOString().split('T')[0],
         endDate.toISOString().split('T')[0]
-      ], (err, rows: any[]) => {
+      ], (err: any, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
@@ -782,10 +783,10 @@ export class LeaveManagement {
         GROUP BY leave_type
       `;
 
-      this.db['db'].all(sql, [
+      this.db.all(sql, [
         startDate.toISOString(),
         endDate.toISOString()
-      ], (err, rows: any[]) => {
+      ], (err: any, rows: any[]) => {
         if (err) {
           reject(err);
         } else {

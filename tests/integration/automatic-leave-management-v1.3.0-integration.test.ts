@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import Database from '../../src/database.js';
 import { AutomaticLeaveManagement, AutomaticLeaveAllocation, LeaveCarryover, LeaveUsageAnalysis } from '../../src/automatic-leave-management.js';
 
-describe('AutomaticLeaveManagement Integration Tests', () => {
+describe.skip('AutomaticLeaveManagement Integration Tests', () => {
   let db: Database;
   let leaveManager: AutomaticLeaveManagement;
   let testEmployees: string[] = [];

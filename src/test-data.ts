@@ -25,7 +25,7 @@ async function createTestData() {
       department: '開発部',
       position: 'シニアエンジニア',
       hourlyRate: 3500,
-      joinDate: new Date('2023-04-01'),
+      startDate: new Date('2023-04-01'),
       isActive: true,
     },
     {
@@ -33,7 +33,7 @@ async function createTestData() {
       department: '営業部',
       position: '営業マネージャー',
       hourlyRate: 3200,
-      joinDate: new Date('2023-06-15'),
+      startDate: new Date('2023-06-15'),
       isActive: true,
     },
     {
@@ -41,7 +41,7 @@ async function createTestData() {
       department: '開発部',
       position: 'エンジニア',
       hourlyRate: 2800,
-      joinDate: new Date('2024-01-10'),
+      startDate: new Date('2024-01-10'),
       isActive: true,
     },
     {
@@ -49,7 +49,7 @@ async function createTestData() {
       department: '人事部',
       position: 'HR スペシャリスト',
       hourlyRate: 2900,
-      joinDate: new Date('2023-09-01'),
+      startDate: new Date('2023-09-01'),
       isActive: true,
     },
     {
@@ -57,7 +57,7 @@ async function createTestData() {
       department: '開発部',
       position: 'ジュニアエンジニア',
       hourlyRate: 2300,
-      joinDate: new Date('2024-03-01'),
+      startDate: new Date('2024-03-01'),
       isActive: true,
     },
   ];

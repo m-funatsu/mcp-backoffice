@@ -58,7 +58,7 @@ class DatabasePostgreSQL {
       employee.department,
       employee.position,
       employee.hourlyRate,
-      employee.joinDate.toISOString().split('T')[0],
+      employee.startDate.toISOString().split('T')[0],
       employee.managerId || null,
       employee.isActive
     ]);
@@ -82,7 +82,7 @@ class DatabasePostgreSQL {
       department: row.department,
       position: row.position,
       hourlyRate: parseFloat(row.hourly_rate),
-      joinDate: new Date(row.join_date),
+      startDate: new Date(row.join_date),
       managerId: row.manager_id,
       isActive: row.is_active
     };
@@ -99,7 +99,7 @@ class DatabasePostgreSQL {
       department: row.department,
       position: row.position,
       hourlyRate: parseFloat(row.hourly_rate),
-      joinDate: new Date(row.join_date),
+      startDate: new Date(row.join_date),
       managerId: row.manager_id,
       isActive: row.is_active
     }));
@@ -163,7 +163,7 @@ class DatabasePostgreSQL {
       date: new Date(row.date),
       clockIn: new Date(row.clock_in),
       clockOut: row.clock_out ? new Date(row.clock_out) : undefined,
-      breakMinutes: row.break_minutes,
+      breakDuration: row.break_minutes,
       recordType: row.record_type as 'ic_card' | 'pc_log' | 'manual',
       notes: row.notes,
       approvedBy: row.approved_by,
@@ -220,6 +220,7 @@ class DatabasePostgreSQL {
     
     const row = result.rows[0];
     return {
+      id: row.id,
       employeeId: row.employee_id,
       month: row.month,
       regularHours: parseFloat(row.regular_hours),

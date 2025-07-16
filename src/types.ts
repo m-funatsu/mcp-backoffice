@@ -1,10 +1,11 @@
 export interface Employee {
   id: string;
   name: string;
+  email?: string;
   department: string;
   position: string;
   hourlyRate: number;
-  joinDate: Date;
+  startDate: Date;
   managerId?: string;
   isActive: boolean;
   // Extended payroll fields
@@ -111,7 +112,7 @@ export interface TimeRecord {
   date: Date;
   clockIn: Date;
   clockOut?: Date;
-  breakMinutes: number;
+  breakDuration: number; // in minutes
   recordType: 'ic_card' | 'pc_log' | 'manual';
   notes?: string;
   approvedBy?: string;
@@ -119,6 +120,7 @@ export interface TimeRecord {
 }
 
 export interface PayrollCalculation {
+  id: string;
   employeeId: string;
   month: string; // YYYY-MM format
   regularHours: number;
@@ -229,6 +231,7 @@ export interface ExpenseCategory {
   parentCategoryId?: string;
   taxDeductible: boolean;
   approvalRequired: boolean;
+  accountingCode?: string;
   dailyLimit?: number;
   monthlyLimit?: number;
   validationRules: ValidationRules;
@@ -256,6 +259,7 @@ export interface ExpenseRequest {
   description: string;
   purpose?: string;
   receiptImageUrl?: string;
+  receiptRequired?: boolean;
   extractedData?: ExtractedReceiptData;
   status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'reimbursed';
   submittedAt?: Date;

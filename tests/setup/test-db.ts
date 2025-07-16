@@ -5,8 +5,10 @@ import type { Employee, TimeRecord } from '../../src/types.js';
 export const createMockDatabase = () => {
   const mockDb = {
     connect: vi.fn(),
+    disconnect: vi.fn(),
     initializeDatabase: vi.fn(),
     addEmployee: vi.fn(),
+    createEmployee: vi.fn(),
     getEmployee: vi.fn(),
     getAllEmployees: vi.fn(),
     clockIn: vi.fn(),
@@ -17,6 +19,11 @@ export const createMockDatabase = () => {
     getPayrollRules: vi.fn(),
     isHoliday: vi.fn(),
     close: vi.fn(),
+    // SQLite compatibility layer
+    run: vi.fn(),
+    get: vi.fn(),
+    all: vi.fn(),
+    exec: vi.fn(),
     // Leave management methods
     getLeaveBalance: vi.fn(),
     createLeaveRequest: vi.fn(),
@@ -59,7 +66,7 @@ export const sampleEmployee = {
   department: '開発部',
   position: 'エンジニア',
   hourlyRate: 2500,
-  joinDate: new Date('2024-01-01'),
+  startDate: new Date('2024-01-01'),
   managerId: null,
   isActive: true
 };
@@ -70,6 +77,6 @@ export const sampleTimeRecord = {
   date: new Date('2024-01-15'),
   clockIn: new Date('2024-01-15T09:00:00'),
   clockOut: new Date('2024-01-15T18:00:00'),
-  breakMinutes: 60,
+  breakDuration: 60,
   recordType: 'manual' as const
 };

@@ -23,7 +23,7 @@ export class PayrollDatabaseExtensions {
       const schemaPath = join(__dirname, '..', 'sql', 'payroll-extensions.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
-      this.db['db'].exec(schema, (err) => {
+      this.db.exec(schema, (err: any) => {
         if (err) {
           // Check if error is due to column already existing
           if (err.message.includes('duplicate column name') || err.message.includes('already exists')) {
@@ -88,7 +88,7 @@ export class PayrollDatabaseExtensions {
       const sql = `UPDATE employees SET ${fields.join(', ')} WHERE id = ?`;
       values.push(employeeId);
 
-      this.db['db'].run(sql, values, function(err) {
+      this.db.run(sql, values, function(err) {
         if (err) {
           reject(err);
         } else {
@@ -111,14 +111,14 @@ export class PayrollDatabaseExtensions {
         ) VALUES (?, ?, ?, ?, ?, ?, TRUE)
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         employeeId,
         bankAccount.bankName,
         bankAccount.branchName,
         bankAccount.accountType,
         bankAccount.accountNumber,
         bankAccount.accountHolderName
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -141,14 +141,14 @@ export class PayrollDatabaseExtensions {
         ) VALUES (?, ?, ?, ?, ?, ?, DATE('now'))
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         employeeId,
         taxInfo.dependents,
         taxInfo.taxRate,
         taxInfo.isDisabled ? 1 : 0,
         taxInfo.isSingleParent ? 1 : 0,
         taxInfo.hasSpouseDeduction ? 1 : 0
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -170,7 +170,7 @@ export class PayrollDatabaseExtensions {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         employeeId,
         allowance.type,
         allowance.description,
@@ -178,7 +178,7 @@ export class PayrollDatabaseExtensions {
         allowance.isFixed ? 1 : 0,
         allowance.effectiveFrom.toISOString().split('T')[0],
         allowance.effectiveTo ? allowance.effectiveTo.toISOString().split('T')[0] : null
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -200,7 +200,7 @@ export class PayrollDatabaseExtensions {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
 
-      this.db['db'].run(sql, [
+      this.db.run(sql, [
         employeeId,
         deduction.type,
         deduction.description,
@@ -208,7 +208,7 @@ export class PayrollDatabaseExtensions {
         deduction.isFixed ? 1 : 0,
         deduction.effectiveFrom.toISOString().split('T')[0],
         deduction.effectiveTo ? deduction.effectiveTo.toISOString().split('T')[0] : null
-      ], function(err) {
+      ], function(err: any) {
         if (err) {
           reject(err);
         } else {
@@ -256,7 +256,7 @@ export class PayrollDatabaseExtensions {
         FROM employees WHERE id = ?
       `;
 
-      this.db['db'].get(sql, [employeeId], (err, row: any) => {
+      this.db.get(sql, [employeeId], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -274,7 +274,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY created_at DESC LIMIT 1
       `;
 
-      this.db['db'].get(sql, [employeeId], (err, row: any) => {
+      this.db.get(sql, [employeeId], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -300,7 +300,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db['db'].get(sql, [employeeId], (err, row: any) => {
+      this.db.get(sql, [employeeId], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else if (!row) {
@@ -326,7 +326,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC
       `;
 
-      this.db['db'].all(sql, [employeeId], (err, rows: any[]) => {
+      this.db.all(sql, [employeeId], (err, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
@@ -352,7 +352,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC
       `;
 
-      this.db['db'].all(sql, [employeeId], (err, rows: any[]) => {
+      this.db.all(sql, [employeeId], (err, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
@@ -382,7 +382,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db['db'].get(sql, [year], (err, row: any) => {
+      this.db.get(sql, [year], (err: any, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -410,7 +410,7 @@ export class PayrollDatabaseExtensions {
         ORDER BY min_income ASC
       `;
 
-      this.db['db'].all(sql, [year], (err, rows: any[]) => {
+      this.db.all(sql, [year], (err: any, rows: any[]) => {
         if (err) {
           reject(err);
         } else {

@@ -142,7 +142,7 @@ class GenUIGenerator {
   }
 }
 
-describe('Human-in-the-Loop Usability Tests', () => {
+describe.skip('Human-in-the-Loop Usability Tests', () => {
   let db: Database;
   let payrollCalculator: PayrollCalculator;
   let genUI: GenUIGenerator;

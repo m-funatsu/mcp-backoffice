@@ -115,7 +115,7 @@ export class AutomaticLeaveManagement {
    * 有給休暇付与日数計算（労働基準法準拠）
    */
   private async calculateLeaveAllocation(employee: Employee, targetDate: Date): Promise<AutomaticLeaveAllocation | null> {
-    const tenureMonths = this.calculateTenureMonths(employee.joinDate, targetDate);
+    const tenureMonths = this.calculateTenureMonths(employee.startDate, targetDate);
     const currentYear = targetDate.getFullYear();
     
     // 労働基準法第39条に基づく有給休暇付与日数
@@ -268,6 +268,10 @@ export class AutomaticLeaveManagement {
     const requests = await this.getLeaveRequestsByPeriod(employeeId, startDate, endDate);
     const balance = await this.db.getLeaveBalance(employeeId, 'annual');
     
+    if (!balance) {
+      throw new Error(`No leave balance found for employee ${employeeId}`);
+    }
+    
     const totalUsed = requests
       .filter(r => r.status === 'approved')
       .reduce((sum, r) => sum + r.daysRequested, 0);
@@ -319,6 +323,10 @@ export class AutomaticLeaveManagement {
       try {
         const balance = await this.db.getLeaveBalance(employeeId, leaveType);
         
+        if (!balance) {
+          continue;
+        }
+        
         // リアルタイム計算: 承認待ちの申請も考慮
         const pendingRequests = await this.getPendingRequests(employeeId, leaveType);
         const pendingDays = pendingRequests.reduce((sum, req) => sum + req.daysRequested, 0);
@@ -360,6 +368,13 @@ export class AutomaticLeaveManagement {
 
   private async analyzeLeaveBalance(request: LeaveRequest): Promise<any> {
     const balance = await this.db.getLeaveBalance(request.employeeId, request.leaveType);
+    if (!balance) {
+      return {
+        sufficient: false,
+        utilizationRate: 0,
+        remainingAfterRequest: 0
+      };
+    }
     return {
       sufficient: balance.remainingDays >= request.daysRequested,
       utilizationRate: balance.usedDays / balance.grantedDays,

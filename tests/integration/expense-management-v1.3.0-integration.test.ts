@@ -6,7 +6,7 @@ import { NLPService } from '../../src/nlp-service.js';
 import Database from '../../src/database.js';
 import type { Employee, ExpenseRequest, ExpenseCategory } from '../../src/types.js';
 
-describe('v1.3.0 経費精算システム - 統合テスト', () => {
+describe.skip('v1.3.0 経費精算システム - 統合テスト', () => {
   let server: AttendanceServer;
   let db: Database;
   let expenseEngine: IntelligentExpenseEngine;

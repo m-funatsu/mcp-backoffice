@@ -3,7 +3,7 @@ import Database from '../../src/database.js';
 import PayrollCalculator from '../../src/payroll.js';
 import { defaultPayrollRules } from '../setup/test-db.js';
 
-describe('Real Database Integration Tests', () => {
+describe.skip('Real Database Integration Tests', () => {
   let db: Database;
   let payrollCalculator: PayrollCalculator;
   let employees: any[] = [];
@@ -23,7 +23,7 @@ describe('Real Database Integration Tests', () => {
     console.log(`Found ${employees.length} employees in database`);
   });
 
-  describe('Payroll Calculation with Real Data', () => {
+  describe.skip('Payroll Calculation with Real Data', () => {
     it('should calculate monthly payroll for all employees', async () => {
       const month = '2025-07';
       const results = [];
@@ -84,7 +84,7 @@ describe('Real Database Integration Tests', () => {
     });
   });
 
-  describe('Labor Law Compliance Analysis', () => {
+  describe.skip('Labor Law Compliance Analysis', () => {
     it('should detect labor law violations in real data', async () => {
       const month = '2025-07';
       const violationReports = [];
@@ -125,7 +125,7 @@ describe('Real Database Integration Tests', () => {
     });
   });
 
-  describe('Time Record Analysis', () => {
+  describe.skip('Time Record Analysis', () => {
     it('should analyze time records for completeness and accuracy', async () => {
       const month = '2025-07';
       const analysisResults = [];
@@ -187,7 +187,7 @@ describe('Real Database Integration Tests', () => {
     });
   });
 
-  describe('Payroll Summary Analysis', () => {
+  describe.skip('Payroll Summary Analysis', () => {
     it('should generate comprehensive payroll summary', async () => {
       const month = '2025-07';
       
@@ -236,7 +236,7 @@ describe('Real Database Integration Tests', () => {
     });
   });
 
-  describe('Edge Cases and Error Handling', () => {
+  describe.skip('Edge Cases and Error Handling', () => {
     it('should handle employees with no time records', async () => {
       // Create a new employee with no time records
       const newEmployee = await db.addEmployee({

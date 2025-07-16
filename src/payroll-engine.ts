@@ -171,6 +171,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       // 4. Create payroll calculation
       const month = this.getCurrentMonth();
       const calculation: PayrollCalculation = {
+        id: `PAY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         employeeId: employee.id,
         month,
         regularHours: workingHours.reduce((sum, h) => sum + h.regularHours, 0),
@@ -291,7 +292,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const monthDate = new Date(month + '-01');
     const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-    const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
+    const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
     const workingHours = await this.calculateWorkingHours(timeRecords);
 
     // Calculate base salary and premiums
@@ -607,8 +608,8 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const unemploymentInsurance = Math.floor(grossPay * 0.003);
     
     // 介護保険料（40歳以上、1.64%、労使折半）
-    const age = employee.joinDate ? 
-      Math.floor((Date.now() - employee.joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
+    const age = employee.startDate ? 
+      Math.floor((Date.now() - employee.startDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
     const longTermCareInsurance = age >= 40 ? 
       Math.floor(standardMonthlyRemuneration * 0.0082) : 0;
 

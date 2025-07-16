@@ -23,7 +23,7 @@ async function createComprehensiveTestData() {
       department: '開発部',
       position: 'エンジニア',
       hourlyRate: 3000,
-      joinDate: new Date('2023-04-01'),
+      startDate: new Date('2023-04-01'),
       isActive: true,
       scenario: 'normal', // 正常な勤務パターン
     },
@@ -32,7 +32,7 @@ async function createComprehensiveTestData() {
       department: '営業部',
       position: '営業マネージャー',
       hourlyRate: 3500,
-      joinDate: new Date('2023-06-15'),
+      startDate: new Date('2023-06-15'),
       isActive: true,
       scenario: 'overtime', // 残業が多い
     },
@@ -41,7 +41,7 @@ async function createComprehensiveTestData() {
       department: '運用部',
       position: 'システム管理者',
       hourlyRate: 3200,
-      joinDate: new Date('2023-08-01'),
+      startDate: new Date('2023-08-01'),
       isActive: true,
       scenario: 'night_shift', // 深夜勤務
     },
@@ -50,7 +50,7 @@ async function createComprehensiveTestData() {
       department: 'プロジェクト部',
       position: 'プロジェクトマネージャー',
       hourlyRate: 4000,
-      joinDate: new Date('2023-01-01'),
+      startDate: new Date('2023-01-01'),
       isActive: true,
       scenario: 'violation', // 労働基準法違反
     },
@@ -59,7 +59,7 @@ async function createComprehensiveTestData() {
       department: '営業部',
       position: '営業',
       hourlyRate: 2800,
-      joinDate: new Date('2023-10-01'),
+      startDate: new Date('2023-10-01'),
       isActive: true,
       scenario: 'irregular', // 不規則勤務
     },
@@ -68,7 +68,7 @@ async function createComprehensiveTestData() {
       department: '事務部',
       position: '事務員',
       hourlyRate: 2500,
-      joinDate: new Date('2024-01-01'),
+      startDate: new Date('2024-01-01'),
       isActive: true,
       scenario: 'part_time', // 短時間勤務
     },
@@ -77,7 +77,7 @@ async function createComprehensiveTestData() {
       department: '開発部',
       position: 'ジュニアエンジニア',
       hourlyRate: 2200,
-      joinDate: new Date('2024-04-01'),
+      startDate: new Date('2024-04-01'),
       isActive: true,
       scenario: 'newcomer', // 新人（一部欠勤あり）
     },
@@ -86,7 +86,7 @@ async function createComprehensiveTestData() {
       department: '保守部',
       position: 'エンジニア',
       hourlyRate: 3300,
-      joinDate: new Date('2023-07-01'),
+      startDate: new Date('2023-07-01'),
       isActive: true,
       scenario: 'holiday_work', // 祝日勤務
     }
@@ -95,8 +95,12 @@ async function createComprehensiveTestData() {
   const employeeData: Array<{id: string, info: any}> = [];
   
   for (const employee of employees) {
-    const id = await db.addEmployee(employee);
-    employeeData.push({id, info: employee});
+    const employeeWithId = {
+      ...employee,
+      id: `EMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    };
+    const id = await db.addEmployee(employeeWithId);
+    employeeData.push({id, info: employeeWithId});
     console.log(`✅ Added employee: ${employee.name} (ID: ${id}) - Scenario: ${employee.scenario}`);
   }
   

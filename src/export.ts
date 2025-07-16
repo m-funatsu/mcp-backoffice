@@ -338,15 +338,17 @@ class DataExporter {
     // Import employees
     for (const employee of data.employees) {
       try {
-        await this.db.addEmployee({
+        const employeeWithId = {
+          id: `EMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           name: employee.name,
           department: employee.department,
           position: employee.position,
           hourlyRate: employee.hourlyRate,
-          joinDate: employee.joinDate,
+          startDate: employee.startDate,
           managerId: employee.managerId,
           isActive: employee.isActive
-        });
+        };
+        await this.db.addEmployee(employeeWithId);
       } catch (error) {
         console.log(`Error importing employee ${employee.name}:`, error);
       }
