@@ -42,8 +42,8 @@ Model Context Protocol (MCP) を基盤とした、日本の労働基準法に完
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   AI Agent      │    │ Platform Core   │    │   Database      │
 │                 │◄──►│                 │◄──►│                 │
-│ - MCP Protocol  │    │ - HR Module     │    │ - PostgreSQL    │
-│ - Natural Lang  │    │ - Finance Module│    │ - Docker-based  │
+│ - MCP Protocol  │    │ - HR Module     │    │ - PostgreSQL 15 │
+│ - Natural Lang  │    │ - Finance Module│    │ - Docker Container│
 │ - Tool Calling  │    │ - Analytics Mod │    │ - Auto Migration│
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -105,7 +105,7 @@ npm install
 npm run build
 ```
 
-### PostgreSQLセットアップ
+### PostgreSQLデータベースセットアップ
 
 #### 方法1: Docker Compose（推奨）
 
@@ -153,9 +153,9 @@ docker-compose -f docker-compose.simple.yml down       # PostgreSQLコンテナ�
 docker-compose -f docker-compose.simple.yml restart    # PostgreSQLコンテナ再起動
 
 # データベース操作
-node migrate-to-postgresql.js     # SQLiteからPostgreSQLへデータ移行
 node src/database-viewer.ts       # データベース可視化
 node src/sample-data-generator.ts # サンプルデータ生成
+psql -U postgres -d attendance_db # PostgreSQL直接接続
 
 # 環境設定
 DATABASE_URL=postgresql://postgres:password@localhost:5432/attendance_db
@@ -250,7 +250,7 @@ INSERT INTO payroll_rules (
     '2024-01-01'
 );
 
--- 接続確認
+-- PostgreSQL接続確認
 SELECT version();
 SELECT current_database();
 ```
@@ -311,7 +311,6 @@ src/
 ├── server.ts                  # MCPサーバーメイン
 ├── database.ts                # データベース操作（PostgreSQL統合）
 ├── database_postgresql.ts     # PostgreSQL専用クラス
-├── database_sqlite.ts         # SQLite専用クラス（開発用）
 ├── payroll-engine.ts          # 給与計算エンジン
 ├── expense-engine.ts          # 経費管理エンジン
 ├── talent-management-engine-v2.2.0.ts # タレントマネジメントエンジン
@@ -322,12 +321,11 @@ src/
 ├── types.ts                   # 型定義
 └── cli.ts                     # CLIインターフェース
 
-# 移行関連ファイル
-├── migrate-to-postgresql.js   # SQLite→PostgreSQL移行スクリプト
-├── migration-plan.json        # 移行計画設定
-├── schema-postgresql.sql      # PostgreSQL専用スキーマ
+# PostgreSQL環境ファイル
+├── schema-postgresql.sql      # PostgreSQLスキーマ定義
 ├── docker-compose.simple.yml  # Docker環境設定
-└── start-postgres.bat         # Windows用起動スクリプト
+├── start-postgres.bat         # Windows用起動スクリプト
+└── migrate-to-postgresql.js   # データ移行スクリプト
 ```
 
 ## 📈 戦略的ロードマップ
@@ -400,7 +398,7 @@ MIT License
 ## 🔄 Recent Updates
 
 ### ✅ PostgreSQL Migration Complete (v2.2.1)
-- **Database Migration**: SQLite → PostgreSQL完了
+- **Database Migration**: PostgreSQL環境構築完了
 - **Data Transfer**: 82名従業員データ + 100件勤怠記録移行
 - **Docker Integration**: PostgreSQL 15-alpine環境構築  
 - **Schema Migration**: PostgreSQL専用スキーマ適用
