@@ -220,7 +220,11 @@ export type MCPToolName =
   | 'monitor_36_compliance'
   | 'record_objective_time'
   | 'generate_compliance_report'
-  | 'record_health_check';
+  | 'record_health_check'
+  | 'predict_overtime'
+  | 'predict_turnover'
+  | 'generate_hr_dashboard'
+  | 'get_predictive_analytics';
 
 // Expense Management Types - v1.3.0
 export interface ExpenseCategory {
@@ -829,4 +833,92 @@ export interface EmployeeComprehensiveProfile {
   recentEvaluations: PerformanceEvaluation[];
   activeDevelopmentPlans: DevelopmentPlan[];
   skillsAssessments: SkillsAssessment[];
+}
+
+// Predictive Analytics Types - v2.1.0
+export interface PredictionResult {
+  id: string;
+  employeeId: string;
+  predictionType: 'overtime' | 'turnover' | 'performance';
+  predictionDate: Date;
+  confidence: number;
+  result: any;
+  createdAt: Date;
+}
+
+export interface HRAnalytics {
+  period: string;
+  metrics: {
+    turnoverRate: number;
+    avgOvertimeHours: number;
+    engagementScore: number;
+    productivityIndex: number;
+  };
+  predictions: PredictionResult[];
+  trends: {
+    direction: 'increasing' | 'decreasing' | 'stable';
+    magnitude: number;
+  };
+}
+
+export interface OvertimePrediction {
+  employeeId: string;
+  predictedHours: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  factors: {
+    historical: number;
+    seasonal: number;
+    workload: number;
+    deadline: number;
+  };
+  recommendations: string[];
+}
+
+export interface TurnoverPrediction {
+  employeeId: string;
+  riskScore: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  keyFactors: {
+    attendance: number;
+    overtime: number;
+    leave: number;
+    performance: number;
+    tenure: number;
+  };
+  timeframe: number;
+  actions: string[];
+}
+
+export interface HumanCapitalMetrics {
+  employeeCount: number;
+  diversity: {
+    genderRatio: { male: number; female: number; other: number };
+    ageDistribution: Record<string, number>;
+    managementDiversity: { femaleManagerRatio: number; avgTenure: number };
+  };
+  engagement: {
+    enps: number;
+    satisfactionScore: number;
+    retentionRate: number;
+    turnoverRate: number;
+  };
+  productivity: {
+    revenuePerEmployee: number;
+    overtimeRatio: number;
+    absenteeismRate: number;
+    avgOvertimeHours: number;
+  };
+  development: {
+    trainingHoursPerEmployee: number;
+    skillDevelopmentRate: number;
+    promotionRate: number;
+    trainingROI: number;
+  };
+  predictions: {
+    overtimeRisk: { high: number; medium: number; low: number };
+    turnoverRisk: { critical: number; high: number; medium: number; low: number };
+    skillGap: { technical: number; leadership: number; soft: number };
+  };
 }
