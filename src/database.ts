@@ -89,6 +89,16 @@ class Database extends DatabasePostgreSQL {
     return row || null;
   }
 
+  async updateEmployee(employeeId: string, updates: any): Promise<boolean> {
+    const result = await this.run('UPDATE employees SET name = $1, department = $2, position = $3 WHERE id = $4', 
+      [updates.name, updates.department, updates.position, employeeId]);
+    return result.rowCount > 0;
+  }
+
+  async exec(sql: string): Promise<void> {
+    await this.run(sql);
+  }
+
   async createAccountingEntry(entry: any): Promise<string> {
     const id = `ACC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     await this.run(`

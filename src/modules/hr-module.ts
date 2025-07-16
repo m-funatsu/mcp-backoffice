@@ -113,7 +113,7 @@ export class HRModule implements PlatformModule {
   async getTimeRecords(employeeId: string, startDate?: string, endDate?: string): Promise<TimeRecord[]> {
     const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const end = endDate || new Date().toISOString();
-    return await this.db.getTimeRecords(employeeId, start, end);
+    return await this.db.getTimeRecords(employeeId, new Date(start), new Date(end));
   }
 
   /**

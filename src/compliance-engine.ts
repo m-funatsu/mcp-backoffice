@@ -158,14 +158,21 @@ export class ComplianceEngine {
     
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT OR REPLACE INTO objective_time_records (
+        INSERT INTO objective_time_records (
           id, employee_id, record_date,
           ic_card_in, ic_card_out, ic_card_device_id, ic_card_location,
           pc_login, pc_logout, pc_device_id, pc_ip_address,
           self_reported_in, self_reported_out, self_report_reason,
           discrepancy_detected, discrepancy_minutes, discrepancy_explanation,
           verified_in, verified_out, verified_by, verification_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        ON CONFLICT (id) DO UPDATE SET
+          employee_id = $2, record_date = $3,
+          ic_card_in = $4, ic_card_out = $5, ic_card_device_id = $6, ic_card_location = $7,
+          pc_login = $8, pc_logout = $9, pc_device_id = $10, pc_ip_address = $11,
+          self_reported_in = $12, self_reported_out = $13, self_report_reason = $14,
+          discrepancy_detected = $15, discrepancy_minutes = $16, discrepancy_explanation = $17,
+          verified_in = $18, verified_out = $19, verified_by = $20, verification_method = $21
       `;
       
       this.db.run(sql, [
@@ -190,12 +197,10 @@ export class ComplianceEngine {
         record.verifiedOut?.toISOString(),
         record.verifiedBy,
         record.verificationMethod
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(id);
-        }
+      ]).then(() => {
+        resolve(id);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -207,13 +212,11 @@ export class ComplianceEngine {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM objective_time_records 
-        WHERE employee_id = ? AND record_date = ?
+        WHERE employee_id = $1 AND record_date = $2
       `;
       
-      this.db.get(sql, [employeeId, date.toISOString().split('T')[0]], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [employeeId, date.toISOString().split('T')[0]]).then((row: any) => {
+        if (!row) {
           resolve(null);
         } else {
           const record = this.mapObjectiveTimeRecord(row);
@@ -226,6 +229,8 @@ export class ComplianceEngine {
           
           resolve(record);
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -328,19 +333,19 @@ export class ComplianceEngine {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM labor_agreements 
-        WHERE effective_from <= DATE('now') AND effective_to >= DATE('now')
+        WHERE effective_from <= CURRENT_DATE AND effective_to >= CURRENT_DATE
         ORDER BY effective_from DESC LIMIT 1
       `;
       
-      this.db.get(sql, [], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, []).then((row: any) => {
+        if (!row) {
           // デフォルト協定を返す
           resolve(this.getDefaultAgreement());
         } else {
           resolve(this.mapLaborAgreement(row));
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -350,15 +355,17 @@ export class ComplianceEngine {
       const sql = `
         SELECT COALESCE(SUM(statutory_overtime), 0) as total_overtime
         FROM detailed_work_hours 
-        WHERE employee_id = ? AND strftime('%Y-%m', calculation_date) = ?
+        WHERE employee_id = $1 AND TO_CHAR(calculation_date, 'YYYY-MM') = $2
       `;
       
-      this.db.get(sql, [employeeId, month], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
+      this.db.get(sql, [employeeId, month]).then((row: any) => {
+        if (row) {
           resolve(row?.total_overtime || 0);
+        } else {
+          resolve(0);
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -368,15 +375,17 @@ export class ComplianceEngine {
       const sql = `
         SELECT COALESCE(SUM(statutory_overtime), 0) as total_overtime
         FROM detailed_work_hours 
-        WHERE employee_id = ? AND strftime('%Y', calculation_date) = ?
+        WHERE employee_id = $1 AND TO_CHAR(calculation_date, 'YYYY') = $2
       `;
       
-      this.db.get(sql, [employeeId, year.toString()], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
+      this.db.get(sql, [employeeId, year.toString()]).then((row: any) => {
+        if (row) {
           resolve(row?.total_overtime || 0);
+        } else {
+          resolve(0);
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -386,18 +395,20 @@ export class ComplianceEngine {
       const sql = `
         SELECT COUNT(*) as count
         FROM detailed_work_hours 
-        WHERE employee_id = ? 
-        AND strftime('%Y', calculation_date) = ?
+        WHERE employee_id = $1 
+        AND TO_CHAR(calculation_date, 'YYYY') = $2
         AND statutory_overtime > 45.0
-        GROUP BY strftime('%Y-%m', calculation_date)
+        GROUP BY TO_CHAR(calculation_date, 'YYYY-MM')
       `;
       
-      this.db.get(sql, [employeeId, year.toString()], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
+      this.db.get(sql, [employeeId, year.toString()]).then((row: any) => {
+        if (row) {
           resolve(row?.count || 0);
+        } else {
+          resolve(0);
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }

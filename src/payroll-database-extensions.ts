@@ -23,19 +23,17 @@ export class PayrollDatabaseExtensions {
       const schemaPath = join(__dirname, '..', 'sql', 'payroll-extensions.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
-      this.db.exec(schema, (err: any) => {
-        if (err) {
-          // Check if error is due to column already existing
-          if (err.message.includes('duplicate column name') || err.message.includes('already exists')) {
-            console.error('Payroll schema extensions already exist, skipping initialization');
-            resolve();
-          } else {
-            console.error('Error initializing payroll schema:', err);
-            reject(err);
-          }
-        } else {
-          console.error('Payroll schema extensions initialized successfully');
+      this.db.exec(schema).then(() => {
+        console.error('Payroll schema extensions initialized successfully');
+        resolve();
+      }).catch((err: any) => {
+        // Check if error is due to column already existing
+        if (err.message.includes('duplicate column name') || err.message.includes('already exists')) {
+          console.error('Payroll schema extensions already exist, skipping initialization');
           resolve();
+        } else {
+          console.error('Error initializing payroll schema:', err);
+          reject(err);
         }
       });
     });
@@ -58,26 +56,32 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const fields = [];
       const values = [];
+      let paramIndex = 1;
 
       if (updates.employeeNumber !== undefined) {
-        fields.push('employee_number = ?');
+        fields.push(`employee_number = $${paramIndex}`);
         values.push(updates.employeeNumber);
+        paramIndex++;
       }
       if (updates.socialInsuranceNumber !== undefined) {
-        fields.push('social_insurance_number = ?');
+        fields.push(`social_insurance_number = $${paramIndex}`);
         values.push(updates.socialInsuranceNumber);
+        paramIndex++;
       }
       if (updates.contractType !== undefined) {
-        fields.push('contract_type = ?');
+        fields.push(`contract_type = $${paramIndex}`);
         values.push(updates.contractType);
+        paramIndex++;
       }
       if (updates.salaryType !== undefined) {
-        fields.push('salary_type = ?');
+        fields.push(`salary_type = $${paramIndex}`);
         values.push(updates.salaryType);
+        paramIndex++;
       }
       if (updates.baseSalary !== undefined) {
-        fields.push('base_salary = ?');
+        fields.push(`base_salary = $${paramIndex}`);
         values.push(updates.baseSalary);
+        paramIndex++;
       }
 
       if (fields.length === 0) {
@@ -85,15 +89,13 @@ export class PayrollDatabaseExtensions {
         return;
       }
 
-      const sql = `UPDATE employees SET ${fields.join(', ')} WHERE id = ?`;
+      const sql = `UPDATE employees SET ${fields.join(', ')} WHERE id = $${paramIndex}`;
       values.push(employeeId);
 
-      this.db.run(sql, values, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      this.db.run(sql, values).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -105,10 +107,17 @@ export class PayrollDatabaseExtensions {
   async setEmployeeBankAccount(employeeId: string, bankAccount: BankAccount): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT OR REPLACE INTO employee_bank_accounts (
+        INSERT INTO employee_bank_accounts (
           employee_id, bank_name, branch_name, account_type, 
           account_number, account_holder_name, is_primary
-        ) VALUES (?, ?, ?, ?, ?, ?, TRUE)
+        ) VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+        ON CONFLICT (employee_id) DO UPDATE SET
+          bank_name = $2,
+          branch_name = $3,
+          account_type = $4,
+          account_number = $5,
+          account_holder_name = $6,
+          is_primary = TRUE
       `;
 
       this.db.run(sql, [
@@ -118,12 +127,10 @@ export class PayrollDatabaseExtensions {
         bankAccount.accountType,
         bankAccount.accountNumber,
         bankAccount.accountHolderName
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -135,10 +142,17 @@ export class PayrollDatabaseExtensions {
   async setEmployeeTaxInfo(employeeId: string, taxInfo: TaxInfo): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT OR REPLACE INTO employee_tax_info (
+        INSERT INTO employee_tax_info (
           employee_id, dependents, tax_rate, is_disabled, 
           is_single_parent, has_spouse_deduction, effective_from
-        ) VALUES (?, ?, ?, ?, ?, ?, DATE('now'))
+        ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE)
+        ON CONFLICT (employee_id) DO UPDATE SET
+          dependents = $2,
+          tax_rate = $3,
+          is_disabled = $4,
+          is_single_parent = $5,
+          has_spouse_deduction = $6,
+          effective_from = CURRENT_DATE
       `;
 
       this.db.run(sql, [
@@ -148,12 +162,10 @@ export class PayrollDatabaseExtensions {
         taxInfo.isDisabled ? 1 : 0,
         taxInfo.isSingleParent ? 1 : 0,
         taxInfo.hasSpouseDeduction ? 1 : 0
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -167,7 +179,7 @@ export class PayrollDatabaseExtensions {
       const sql = `
         INSERT INTO employee_allowances (
           employee_id, type, description, amount, is_fixed, effective_from, effective_to
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       `;
 
       this.db.run(sql, [
@@ -178,12 +190,10 @@ export class PayrollDatabaseExtensions {
         allowance.isFixed ? 1 : 0,
         allowance.effectiveFrom.toISOString().split('T')[0],
         allowance.effectiveTo ? allowance.effectiveTo.toISOString().split('T')[0] : null
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -197,7 +207,7 @@ export class PayrollDatabaseExtensions {
       const sql = `
         INSERT INTO employee_deductions (
           employee_id, type, description, amount, is_fixed, effective_from, effective_to
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       `;
 
       this.db.run(sql, [
@@ -208,12 +218,10 @@ export class PayrollDatabaseExtensions {
         deduction.isFixed ? 1 : 0,
         deduction.effectiveFrom.toISOString().split('T')[0],
         deduction.effectiveTo ? deduction.effectiveTo.toISOString().split('T')[0] : null
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -253,15 +261,13 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT employee_number, social_insurance_number, contract_type, salary_type, base_salary
-        FROM employees WHERE id = ?
+        FROM employees WHERE id = $1
       `;
 
-      this.db.get(sql, [employeeId], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row || {});
-        }
+      this.db.get(sql, [employeeId]).then((row: any) => {
+        resolve(row || {});
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -270,14 +276,12 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM employee_bank_accounts 
-        WHERE employee_id = ? AND is_primary = TRUE 
+        WHERE employee_id = $1 AND is_primary = TRUE 
         ORDER BY created_at DESC LIMIT 1
       `;
 
-      this.db.get(sql, [employeeId], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [employeeId]).then((row: any) => {
+        if (!row) {
           resolve(undefined);
         } else {
           resolve({
@@ -288,6 +292,8 @@ export class PayrollDatabaseExtensions {
             accountHolderName: row.account_holder_name
           });
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -296,14 +302,12 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM employee_tax_info 
-        WHERE employee_id = ? AND (effective_to IS NULL OR effective_to > DATE('now'))
+        WHERE employee_id = $1 AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db.get(sql, [employeeId], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [employeeId]).then((row: any) => {
+        if (!row) {
           resolve(undefined);
         } else {
           resolve({
@@ -314,6 +318,8 @@ export class PayrollDatabaseExtensions {
             hasSpouseDeduction: row.has_spouse_deduction === 1
           });
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -322,24 +328,22 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM employee_allowances 
-        WHERE employee_id = ? AND (effective_to IS NULL OR effective_to > DATE('now'))
+        WHERE employee_id = $1 AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
         ORDER BY effective_from DESC
       `;
 
-      this.db.all(sql, [employeeId], (err, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          const allowances = rows.map(row => ({
-            type: row.type,
-            description: row.description,
-            amount: row.amount,
-            isFixed: row.is_fixed === 1,
-            effectiveFrom: new Date(row.effective_from),
-            effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
-          }));
-          resolve(allowances);
-        }
+      this.db.all(sql, [employeeId]).then((rows: any[]) => {
+        const allowances = rows.map(row => ({
+          type: row.type,
+          description: row.description,
+          amount: row.amount,
+          isFixed: row.is_fixed === 1,
+          effectiveFrom: new Date(row.effective_from),
+          effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
+        }));
+        resolve(allowances);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -348,24 +352,22 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM employee_deductions 
-        WHERE employee_id = ? AND (effective_to IS NULL OR effective_to > DATE('now'))
+        WHERE employee_id = $1 AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
         ORDER BY effective_from DESC
       `;
 
-      this.db.all(sql, [employeeId], (err, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          const deductions = rows.map(row => ({
-            type: row.type,
-            description: row.description,
-            amount: row.amount,
-            isFixed: row.is_fixed === 1,
-            effectiveFrom: new Date(row.effective_from),
-            effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
-          }));
-          resolve(deductions);
-        }
+      this.db.all(sql, [employeeId]).then((rows: any[]) => {
+        const deductions = rows.map(row => ({
+          type: row.type,
+          description: row.description,
+          amount: row.amount,
+          isFixed: row.is_fixed === 1,
+          effectiveFrom: new Date(row.effective_from),
+          effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
+        }));
+        resolve(deductions);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -378,22 +380,20 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM social_insurance_rates 
-        WHERE year = ? AND (effective_to IS NULL OR effective_to > DATE('now'))
+        WHERE year = $1 AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db.get(sql, [year], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row || {
-            health_insurance_rate: 0.0991,
-            pension_insurance_rate: 0.183,
-            unemployment_insurance_rate: 0.006,
-            long_term_care_insurance_rate: 0.0123,
-            workers_compensation_rate: 0.003
-          });
-        }
+      this.db.get(sql, [year]).then((row: any) => {
+        resolve(row || {
+          health_insurance_rate: 0.0991,
+          pension_insurance_rate: 0.183,
+          unemployment_insurance_rate: 0.006,
+          long_term_care_insurance_rate: 0.0123,
+          workers_compensation_rate: 0.003
+        });
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -406,16 +406,14 @@ export class PayrollDatabaseExtensions {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM tax_brackets 
-        WHERE year = ? AND (effective_to IS NULL OR effective_to > DATE('now'))
+        WHERE year = $1 AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
         ORDER BY min_income ASC
       `;
 
-      this.db.all(sql, [year], (err: any, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows || []);
-        }
+      this.db.all(sql, [year]).then((rows: any[]) => {
+        resolve(rows || []);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }

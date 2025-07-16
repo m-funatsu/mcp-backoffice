@@ -228,7 +228,7 @@ export class LeaveManagement {
         INSERT INTO leave_requests (
           id, employee_id, leave_type, start_date, end_date, 
           days_requested, half_day, reason, status, requested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)
       `;
 
       this.db.run(sql, [
@@ -240,26 +240,24 @@ export class LeaveManagement {
         daysRequested,
         input.halfDay ? 1 : 0,
         input.reason || null
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({
-            id: requestId,
-            employeeId: input.employeeId,
-            leaveType: input.leaveType,
-            startDate: input.startDate,
-            endDate: input.endDate,
-            daysRequested,
-            halfDay: input.halfDay || false,
-            reason: input.reason,
-            status: 'pending' as RequestStatus,
-            requestedAt: new Date(),
-            autoApproved: false,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-        }
+      ]).then(() => {
+        resolve({
+          id: requestId,
+          employeeId: input.employeeId,
+          leaveType: input.leaveType,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          daysRequested,
+          halfDay: input.halfDay || false,
+          reason: input.reason,
+          status: 'pending' as RequestStatus,
+          requestedAt: new Date(),
+          autoApproved: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -388,14 +386,12 @@ export class LeaveManagement {
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0],
         employeeId
-      ], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          // Allow if less than 30% of department is on leave
-          const onLeaveCount = row.on_leave_count || 0;
-          resolve(onLeaveCount < 2); // Simple rule: allow if less than 2 people already on leave
-        }
+      ]).then((row: any) => {
+        // Allow if less than 30% of department is on leave
+        const onLeaveCount = row?.on_leave_count || 0;
+        resolve(onLeaveCount < 2); // Simple rule: allow if less than 2 people already on leave
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -417,12 +413,12 @@ export class LeaveManagement {
       const sql = `
         UPDATE leave_requests 
         SET status = 'approved', 
-            approved_by = ?, 
+            approved_by = $1, 
             approved_at = CURRENT_TIMESTAMP,
-            approval_notes = ?,
-            auto_approved = ?,
+            approval_notes = $2,
+            auto_approved = $3,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
+        WHERE id = $4
       `;
 
       this.db.run(sql, [
@@ -430,12 +426,10 @@ export class LeaveManagement {
         notes || null,
         approverId === 'SYSTEM_AUTO_APPROVAL' ? 1 : 0,
         requestId
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -448,23 +442,21 @@ export class LeaveManagement {
       const sql = `
         UPDATE leave_requests 
         SET status = 'rejected', 
-            approved_by = ?, 
+            approved_by = $1, 
             approved_at = CURRENT_TIMESTAMP,
-            approval_notes = ?,
+            approval_notes = $2,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
+        WHERE id = $3
       `;
 
       this.db.run(sql, [
         approverId,
         notes || null,
         requestId
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -478,13 +470,11 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM leave_balances 
-        WHERE employee_id = ? AND leave_type = ? AND year = ?
+        WHERE employee_id = $1 AND leave_type = $2 AND year = $3
       `;
 
-      this.db.get(sql, [employeeId, leaveType, currentYear], async (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [employeeId, leaveType, currentYear]).then(async (row: any) => {
+        if (!row) {
           // Create initial balance
           const balance = await this.initializeLeaveBalance(employeeId, leaveType, currentYear);
           resolve(balance);
@@ -502,6 +492,8 @@ export class LeaveManagement {
             updatedAt: new Date(row.updated_at)
           });
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -525,7 +517,7 @@ export class LeaveManagement {
         INSERT INTO leave_balances (
           employee_id, leave_type, year, granted_days, 
           used_days, remaining_days, expiry_date
-        ) VALUES (?, ?, ?, ?, 0, ?, ?)
+        ) VALUES ($1, $2, $3, $4, 0, $5, $6)
       `;
 
       this.db.run(sql, [
@@ -535,23 +527,21 @@ export class LeaveManagement {
         grantedDays,
         grantedDays,
         expiryDate ? expiryDate.toISOString().split('T')[0] : null
-      ], (err: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({
-            id: balanceId,
-            employeeId,
-            leaveType,
-            year,
-            grantedDays,
-            usedDays: 0,
-            remainingDays: grantedDays,
-            expiryDate,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-        }
+      ]).then(() => {
+        resolve({
+          id: balanceId,
+          employeeId,
+          leaveType,
+          year,
+          grantedDays,
+          usedDays: 0,
+          remainingDays: grantedDays,
+          expiryDate,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -578,10 +568,10 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `
         UPDATE leave_balances 
-        SET used_days = used_days + ?, 
-            remaining_days = remaining_days - ?,
+        SET used_days = used_days + $1, 
+            remaining_days = remaining_days - $2,
             updated_at = CURRENT_TIMESTAMP
-        WHERE employee_id = ? AND leave_type = ? AND year = ?
+        WHERE employee_id = $3 AND leave_type = $4 AND year = $5
       `;
 
       this.db.run(sql, [
@@ -590,12 +580,10 @@ export class LeaveManagement {
         employeeId,
         leaveType,
         balance.year
-      ], function(err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
+      ]).then(() => {
+        resolve();
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -605,12 +593,10 @@ export class LeaveManagement {
    */
   async getLeaveRequest(requestId: string): Promise<LeaveRequest | null> {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM leave_requests WHERE id = ?`;
+      const sql = `SELECT * FROM leave_requests WHERE id = $1`;
       
-      this.db.get(sql, [requestId], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [requestId]).then((row: any) => {
+        if (!row) {
           resolve(null);
         } else {
           resolve({
@@ -632,6 +618,8 @@ export class LeaveManagement {
             updatedAt: new Date(row.updated_at)
           });
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -643,40 +631,38 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM leave_requests 
-        WHERE employee_id = ? 
+        WHERE employee_id = $1 
           AND status IN ('pending', 'approved')
-          AND start_date <= ? 
-          AND end_date >= ?
+          AND start_date <= $2 
+          AND end_date >= $3
       `;
 
       this.db.all(sql, [
         employeeId,
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0]
-      ], (err: any, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          const requests = rows.map(row => ({
-            id: row.id,
-            employeeId: row.employee_id,
-            leaveType: row.leave_type as LeaveType,
-            startDate: new Date(row.start_date),
-            endDate: new Date(row.end_date),
-            daysRequested: row.days_requested,
-            halfDay: row.half_day === 1,
-            reason: row.reason,
-            status: row.status as RequestStatus,
-            requestedAt: new Date(row.requested_at),
-            approvedBy: row.approved_by,
-            approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
-            approvalNotes: row.approval_notes,
-            autoApproved: row.auto_approved === 1,
-            createdAt: new Date(row.created_at),
-            updatedAt: new Date(row.updated_at)
-          }));
-          resolve(requests);
-        }
+      ]).then((rows: any[]) => {
+        const requests = rows.map(row => ({
+          id: row.id,
+          employeeId: row.employee_id,
+          leaveType: row.leave_type as LeaveType,
+          startDate: new Date(row.start_date),
+          endDate: new Date(row.end_date),
+          daysRequested: row.days_requested,
+          halfDay: row.half_day === 1,
+          reason: row.reason,
+          status: row.status as RequestStatus,
+          requestedAt: new Date(row.requested_at),
+          approvedBy: row.approved_by,
+          approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
+          approvalNotes: row.approval_notes,
+          autoApproved: row.auto_approved === 1,
+          createdAt: new Date(row.created_at),
+          updatedAt: new Date(row.updated_at)
+        }));
+        resolve(requests);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -690,15 +676,13 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM leave_policies 
-        WHERE leave_type = ? AND tenure_months <= ?
+        WHERE leave_type = $1 AND tenure_months <= $2
         ORDER BY tenure_months DESC
         LIMIT 1
       `;
 
-      this.db.get(sql, [leaveType, tenureMonths], (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
+      this.db.get(sql, [leaveType, tenureMonths]).then((row: any) => {
+        if (!row) {
           reject(new Error(`Leave policy not found for ${leaveType}`));
         } else {
           resolve({
@@ -718,6 +702,8 @@ export class LeaveManagement {
             createdAt: new Date(row.created_at)
           });
         }
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -731,7 +717,7 @@ export class LeaveManagement {
         SELECT tc.*, e.name as employee_name
         FROM team_calendar tc
         JOIN employees e ON tc.employee_id = e.id
-        WHERE tc.department = ? AND tc.date BETWEEN ? AND ?
+        WHERE tc.department = $1 AND tc.date BETWEEN $2 AND $3
         ORDER BY tc.date, tc.start_time
       `;
 
@@ -739,25 +725,23 @@ export class LeaveManagement {
         department,
         startDate.toISOString().split('T')[0],
         endDate.toISOString().split('T')[0]
-      ], (err: any, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          const events = rows.map(row => ({
-            id: row.id,
-            department: row.department,
-            date: new Date(row.date),
-            employeeId: row.employee_id,
-            eventType: row.event_type as EventType,
-            eventTitle: row.event_title,
-            allDay: row.all_day === 1,
-            startTime: row.start_time,
-            endTime: row.end_time,
-            createdAt: new Date(row.created_at),
-            employeeName: row.employee_name
-          }));
-          resolve(events);
-        }
+      ]).then((rows: any[]) => {
+        const events = rows.map(row => ({
+          id: row.id,
+          department: row.department,
+          date: new Date(row.date),
+          employeeId: row.employee_id,
+          eventType: row.event_type as EventType,
+          eventTitle: row.event_title,
+          allDay: row.all_day === 1,
+          startTime: row.start_time,
+          endTime: row.end_time,
+          createdAt: new Date(row.created_at),
+          employeeName: row.employee_name
+        }));
+        resolve(events);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }
@@ -777,58 +761,56 @@ export class LeaveManagement {
           SUM(CASE WHEN status = 'approved' THEN days_requested ELSE 0 END) as total_days_approved,
           leave_type,
           AVG(CASE WHEN approved_at IS NOT NULL THEN 
-            (julianday(approved_at) - julianday(requested_at)) ELSE NULL END) as avg_processing_time
+            EXTRACT(EPOCH FROM (approved_at - requested_at)) / 86400 ELSE NULL END) as avg_processing_time
         FROM leave_requests
-        WHERE requested_at BETWEEN ? AND ?
+        WHERE requested_at BETWEEN $1 AND $2
         GROUP BY leave_type
       `;
 
       this.db.all(sql, [
         startDate.toISOString(),
         endDate.toISOString()
-      ], (err: any, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          const analytics: LeaveAnalytics = {
-            totalRequests: 0,
-            approvedRequests: 0,
-            rejectedRequests: 0,
-            pendingRequests: 0,
-            totalDaysRequested: 0,
-            totalDaysApproved: 0,
-            averageProcessingTime: 0,
-            mostPopularLeaveType: 'annual',
-            departmentBreakdown: {}
-          };
+      ]).then((rows: any[]) => {
+        const analytics: LeaveAnalytics = {
+          totalRequests: 0,
+          approvedRequests: 0,
+          rejectedRequests: 0,
+          pendingRequests: 0,
+          totalDaysRequested: 0,
+          totalDaysApproved: 0,
+          averageProcessingTime: 0,
+          mostPopularLeaveType: 'annual',
+          departmentBreakdown: {}
+        };
 
-          let maxRequests = 0;
-          let totalProcessingTime = 0;
-          let processedRequests = 0;
+        let maxRequests = 0;
+        let totalProcessingTime = 0;
+        let processedRequests = 0;
 
-          rows.forEach(row => {
-            analytics.totalRequests += row.total_requests;
-            analytics.approvedRequests += row.approved_requests;
-            analytics.rejectedRequests += row.rejected_requests;
-            analytics.pendingRequests += row.pending_requests;
-            analytics.totalDaysRequested += row.total_days_requested;
-            analytics.totalDaysApproved += row.total_days_approved;
+        rows.forEach(row => {
+          analytics.totalRequests += row.total_requests;
+          analytics.approvedRequests += row.approved_requests;
+          analytics.rejectedRequests += row.rejected_requests;
+          analytics.pendingRequests += row.pending_requests;
+          analytics.totalDaysRequested += row.total_days_requested;
+          analytics.totalDaysApproved += row.total_days_approved;
 
-            if (row.total_requests > maxRequests) {
-              maxRequests = row.total_requests;
-              analytics.mostPopularLeaveType = row.leave_type;
-            }
+          if (row.total_requests > maxRequests) {
+            maxRequests = row.total_requests;
+            analytics.mostPopularLeaveType = row.leave_type;
+          }
 
-            if (row.avg_processing_time) {
-              totalProcessingTime += row.avg_processing_time * row.approved_requests;
-              processedRequests += row.approved_requests;
-            }
-          });
+          if (row.avg_processing_time) {
+            totalProcessingTime += row.avg_processing_time * row.approved_requests;
+            processedRequests += row.approved_requests;
+          }
+        });
 
-          analytics.averageProcessingTime = processedRequests > 0 ? totalProcessingTime / processedRequests : 0;
+        analytics.averageProcessingTime = processedRequests > 0 ? totalProcessingTime / processedRequests : 0;
 
-          resolve(analytics);
-        }
+        resolve(analytics);
+      }).catch((err: any) => {
+        reject(err);
       });
     });
   }

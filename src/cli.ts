@@ -277,17 +277,17 @@ Example: attendance-report EMP_123 2024-01`;
     await this.initializePayrollCalculator();
     const report = await this.payrollCalculator!.generateAttendanceReport(employeeId, month);
     
-    const violationsText = report.violations.length > 0 ? 
+    const violationsText = report.violations && report.violations.length > 0 ? 
       `\n\n⚠️ 違反事項:\n${report.violations.join('\n')}` : 
       '\n\n✅ 違反事項なし';
     
     return `📊 勤怠レポート - ${report.employeeName} (${month})
 出勤日数: ${report.totalWorkingDays}日
-通常労働時間: ${report.totalRegularHours.toFixed(2)}時間
-時間外労働時間: ${report.totalOvertimeHours.toFixed(2)}時間
-深夜労働時間: ${report.totalLateNightHours.toFixed(2)}時間
-休日労働時間: ${report.totalHolidayHours.toFixed(2)}時間
-給与: ¥${report.calculatedPay.totalPay.toLocaleString()}${violationsText}`;
+通常労働時間: ${report.totalRegularHours?.toFixed(2) || 0}時間
+時間外労働時間: ${report.totalOvertimeHours?.toFixed(2) || 0}時間
+深夜労働時間: ${report.totalLateNightHours?.toFixed(2) || 0}時間
+休日労働時間: ${report.totalHolidayHours?.toFixed(2) || 0}時間
+給与: ¥${report.calculatedPay?.totalPay?.toLocaleString() || 0}${violationsText}`;
   }
 
   private async exportData(args: string[]): Promise<string> {
