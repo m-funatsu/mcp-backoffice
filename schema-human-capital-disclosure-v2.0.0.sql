@@ -15,19 +15,17 @@
 
 -- 1. 従業員マスタテーブルの拡張
 -- 多様性・リーダーシップ・組織階層管理の強化
--- SQLiteでは IF NOT EXISTS がサポートされていないため、エラーを無視
+-- PostgreSQLでは IF NOT EXISTS が標準でサポートされている
 -- 既存のテーブルに新しいカラムを追加
 BEGIN;
--- 既存のカラムが存在しない場合のみ追加
-PRAGMA table_info(employees);
--- 各カラムを個別に追加（エラーが発生してもスキップ）
-ALTER TABLE employees ADD COLUMN gender VARCHAR(20);
-ALTER TABLE employees ADD COLUMN age INTEGER;
-ALTER TABLE employees ADD COLUMN nationality VARCHAR(100);
-ALTER TABLE employees ADD COLUMN disability_status VARCHAR(50);
-ALTER TABLE employees ADD COLUMN education_level VARCHAR(100);
-ALTER TABLE employees ADD COLUMN employment_type VARCHAR(50) DEFAULT 'full_time';
-ALTER TABLE employees ADD COLUMN manager_id INTEGER;
+-- 各カラムを個別に追加（PostgreSQLでは IF NOT EXISTS 使用）
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS age INTEGER;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS disability_status VARCHAR(50);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS education_level VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type VARCHAR(50) DEFAULT 'full_time';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS manager_id INTEGER;
 COMMIT;
 
 -- インデックス追加
@@ -458,7 +456,7 @@ CREATE INDEX IF NOT EXISTS idx_diversity_metrics_period ON diversity_metrics(rep
 -- =============================================================================
 
 -- 基本的なスキルカテゴリの挿入
-INSERT OR IGNORE INTO skills (skill_id, skill_name, skill_category, skill_type, description, industry_standard) VALUES
+INSERT INTO skills (skill_id, skill_name, skill_category, skill_type, description, industry_standard) VALUES
 ('SKILL_001', 'プロジェクト管理', 'マネジメント', 'leadership', 'プロジェクトの計画・実行・監視・完了を統括する能力', TRUE),
 ('SKILL_002', 'チームリーダーシップ', 'リーダーシップ', 'leadership', 'チームを導き、モチベーションを高める能力', TRUE),
 ('SKILL_003', 'コミュニケーション', 'ソフトスキル', 'soft', '効果的な意思疎通を行う能力', TRUE),
@@ -466,23 +464,26 @@ INSERT OR IGNORE INTO skills (skill_id, skill_name, skill_category, skill_type, 
 ('SKILL_005', 'プログラミング（Python）', 'テクニカル', 'technical', 'Python言語でのプログラミング能力', TRUE),
 ('SKILL_006', 'プログラミング（JavaScript）', 'テクニカル', 'technical', 'JavaScript言語でのプログラミング能力', TRUE),
 ('SKILL_007', '問題解決', 'ソフトスキル', 'soft', '複雑な問題を分析し、解決策を見出す能力', TRUE),
-('SKILL_008', 'プレゼンテーション', 'ソフトスキル', 'soft', '効果的なプレゼンテーションを行う能力', TRUE);
+('SKILL_008', 'プレゼンテーション', 'ソフトスキル', 'soft', '効果的なプレゼンテーションを行う能力', TRUE)
+ON CONFLICT (skill_id) DO NOTHING;
 
 -- 基本的な研修コースの挿入
-INSERT OR IGNORE INTO training_courses (course_id, course_name, course_category, course_type, duration_hours, target_audience, learning_objectives) VALUES
+INSERT INTO training_courses (course_id, course_name, course_category, course_type, duration_hours, target_audience, learning_objectives) VALUES
 ('COURSE_001', 'リーダーシップ基礎研修', 'リーダーシップ', 'internal', 16, '新任管理職', 'リーダーシップの基本概念と実践方法を習得する'),
 ('COURSE_002', 'プロジェクト管理入門', 'マネジメント', 'external', 24, '中級社員', 'プロジェクト管理の基本手法を学ぶ'),
 ('COURSE_003', 'データ分析基礎', 'テクニカル', 'e_learning', 20, '全社員', 'データ分析の基本概念と手法を理解する'),
 ('COURSE_004', 'コミュニケーション向上研修', 'ソフトスキル', 'internal', 8, '全社員', '効果的なコミュニケーション技術を身につける'),
-('COURSE_005', 'ハラスメント防止研修', 'コンプライアンス', 'internal', 4, '全社員', 'ハラスメントの理解と予防方法を学ぶ');
+('COURSE_005', 'ハラスメント防止研修', 'コンプライアンス', 'internal', 4, '全社員', 'ハラスメントの理解と予防方法を学ぶ')
+ON CONFLICT (course_id) DO NOTHING;
 
 -- 基本的な人的資本指標の定義
-INSERT OR IGNORE INTO human_capital_metrics (metric_id, metric_name, metric_category, iso30414_category, metric_unit, calculation_method, is_kpi, visibility_level) VALUES
+INSERT INTO human_capital_metrics (metric_id, metric_name, metric_category, iso30414_category, metric_unit, calculation_method, is_kpi, visibility_level) VALUES
 ('METRIC_001', '従業員エンゲージメント率', 'engagement', 'Organizational culture', '%', 'エンゲージメントサーベイ結果の平均値', TRUE, 'internal'),
 ('METRIC_002', '離職率', 'workforce', 'Workforce composition', '%', '年間離職者数 / 期首従業員数 × 100', TRUE, 'public'),
 ('METRIC_003', '女性管理職比率', 'diversity', 'Diversity', '%', '女性管理職数 / 全管理職数 × 100', TRUE, 'public'),
 ('METRIC_004', '研修時間（一人当たり）', 'development', 'Skills and capabilities', 'hours', '年間研修時間合計 / 従業員数', TRUE, 'internal'),
-('METRIC_005', '労働災害発生率', 'health_safety', 'Health, safety and well-being', 'incidents/1000employees', '年間労働災害件数 / 従業員数 × 1000', TRUE, 'public');
+('METRIC_005', '労働災害発生率', 'health_safety', 'Health, safety and well-being', 'incidents/1000employees', '年間労働災害件数 / 従業員数 × 1000', TRUE, 'public')
+ON CONFLICT (metric_id) DO NOTHING;
 
 -- =============================================================================
 -- 10. ビュー定義（レポーティング用）
@@ -513,7 +514,7 @@ LEFT JOIN employee_skills es ON e.id = es.employee_id
 LEFT JOIN training_history th ON e.id = th.employee_id AND th.status = 'completed'
 LEFT JOIN performance_evaluations pe ON e.id = pe.employee_id
 LEFT JOIN survey_responses sr ON e.id = sr.employee_id
-WHERE e.is_active = 1
+WHERE e.is_active = true
 GROUP BY e.id, e.name, e.department, e.position, e.gender, e.age, e.nationality, e.education_level, e.employment_type, e.join_date, e.manager_id;
 
 -- 部署別人的資本指標ビュー
@@ -538,7 +539,7 @@ LEFT JOIN employee_skills es ON e.id = es.employee_id
 LEFT JOIN performance_evaluations pe ON e.id = pe.employee_id
 LEFT JOIN survey_responses sr ON e.id = sr.employee_id
 LEFT JOIN training_history th ON e.id = th.employee_id
-WHERE e.is_active = 1
+WHERE e.is_active = true
 GROUP BY e.department;
 
 -- スキル分布ビュー

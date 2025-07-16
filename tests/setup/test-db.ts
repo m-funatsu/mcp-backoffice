@@ -19,7 +19,7 @@ export const createMockDatabase = () => {
     getPayrollRules: vi.fn(),
     isHoliday: vi.fn(),
     close: vi.fn(),
-    // SQLite compatibility layer
+    // PostgreSQL database layer
     run: vi.fn(),
     get: vi.fn(),
     all: vi.fn(),

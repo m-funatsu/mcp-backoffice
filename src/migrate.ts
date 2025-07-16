@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 
-// Migration script is deprecated - SQLite support has been removed
+// PostgreSQL database initialization - old migration script is deprecated
 // Use PostgreSQL directly instead
 
-console.log('Migration script is deprecated. SQLite support has been removed.');
+console.log('Migration script is deprecated. PostgreSQL is now the primary database.');
 console.log('Use PostgreSQL directly instead.');
 
 export {};

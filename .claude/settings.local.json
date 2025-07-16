@@ -34,7 +34,9 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(timeout 30s npm test:*)",
-      "Bash(sqlite3:*)"
+      "Bash(psql:*)",
+      "Bash(pg_dump:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": []
   }
