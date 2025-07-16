@@ -306,15 +306,31 @@ export class PayrollCalculator {
     // Count working days
     const workingDays = timeRecords.filter(record => record.clockOut).length;
 
+    // Calculate dates for the month
+    const monthDate = new Date(month + '-01');
+    const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
     return {
       employeeId,
       employeeName: employee.name,
+      startDate,
+      endDate,
       month,
       totalWorkingDays: workingDays,
       totalRegularHours: calculation.regularHours,
       totalOvertimeHours: calculation.overtimeHours,
       totalLateNightHours: calculation.lateNightHours,
       totalHolidayHours: calculation.holidayHours,
+      totalHours: calculation.regularHours + calculation.overtimeHours + calculation.lateNightHours + calculation.holidayHours,
+      regularHours: calculation.regularHours,
+      overtimeHours: calculation.overtimeHours,
+      lateNightHours: calculation.lateNightHours,
+      holidayHours: calculation.holidayHours,
+      daysWorked: workingDays,
+      daysAbsent: 0, // TODO: Calculate from leave records
+      tardyCount: 0, // TODO: Calculate from time records
+      earlyLeaveCount: 0, // TODO: Calculate from time records
       violations,
       calculatedPay: calculation
     };
@@ -335,8 +351,10 @@ export class PayrollCalculator {
 
         // Get violations for this employee
         const report = await this.generateAttendanceReport(employee.id, month);
-        for (const violation of report.violations) {
-          allViolations.push({ employeeId: employee.id, violation });
+        if (report.violations) {
+          for (const violation of report.violations) {
+            allViolations.push({ employeeId: employee.id, violation });
+          }
         }
       } catch (error) {
         console.error(`Error calculating payroll for employee ${employee.id}:`, error);

@@ -211,7 +211,7 @@ export class TurnoverPredictionEngine {
     startDate.setMonth(startDate.getMonth() - 6);
     const endDate = new Date();
     
-    const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString(), endDate.toISOString());
+    const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
     
     // 平均到着・退社時刻計算
     const arrivalTimes = timeRecords.map(r => r.clockIn.getHours() * 60 + r.clockIn.getMinutes());

@@ -1016,8 +1016,8 @@ class StrategicPlatformServer {
     const { employeeId, startDate, endDate } = schema.parse(args);
     const records = await this.db.getTimeRecords(
       employeeId,
-      startDate,
-      endDate
+      new Date(startDate),
+      new Date(endDate)
     );
 
     const recordsText = records.map(record => {
@@ -1115,7 +1115,7 @@ class StrategicPlatformServer {
     await this.initializePayrollCalculator();
     const report = await this.payrollCalculator!.generateAttendanceReport(employeeId, month);
     
-    const violationsText = report.violations.length > 0 ? 
+    const violationsText = report.violations && report.violations.length > 0 ? 
       `\\n\\n⚠️ 違反事項:\\n${report.violations.join('\\n')}` : 
       '\\n\\n✅ 違反事項なし';
     
@@ -1124,12 +1124,12 @@ class StrategicPlatformServer {
         {
           type: 'text',
           text: `勤怠レポート - ${report.employeeName} (${month})\\n` +
-                `出勤日数: ${report.totalWorkingDays}日\\n` +
-                `通常労働時間: ${report.totalRegularHours.toFixed(2)}時間\\n` +
-                `時間外労働時間: ${report.totalOvertimeHours.toFixed(2)}時間\\n` +
-                `深夜労働時間: ${report.totalLateNightHours.toFixed(2)}時間\\n` +
-                `休日労働時間: ${report.totalHolidayHours.toFixed(2)}時間\\n` +
-                `給与: ¥${report.calculatedPay.totalPay.toLocaleString()}${violationsText}`,
+                `出勤日数: ${report.totalWorkingDays || 0}日\\n` +
+                `通常労働時間: ${report.totalRegularHours?.toFixed(2) || 0}時間\\n` +
+                `時間外労働時間: ${report.totalOvertimeHours?.toFixed(2) || 0}時間\\n` +
+                `深夜労働時間: ${report.totalLateNightHours?.toFixed(2) || 0}時間\\n` +
+                `休日労働時間: ${report.totalHolidayHours?.toFixed(2) || 0}時間\\n` +
+                `給与: ¥${report.calculatedPay?.totalPay?.toLocaleString() || 'N/A'}${violationsText}`,
         },
       ],
     };
@@ -1148,7 +1148,6 @@ class StrategicPlatformServer {
     const { name, department, position, hourlyRate, startDate, managerId } = schema.parse(args);
     
     const employeeId = await this.db.addEmployee({
-      id: `EMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name,
       department,
       position,
@@ -1488,7 +1487,7 @@ class StrategicPlatformServer {
       const monthDate = new Date(month + '-01');
       const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-      const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
 
       const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
       
@@ -1601,7 +1600,7 @@ class StrategicPlatformServer {
       const monthDate = new Date(month + '-01');
       const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-      const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+      const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
 
       const result = await this.payrollEngine.calculateCompliancePayroll(employee, timeRecords);
       const compliance = result.compliance;

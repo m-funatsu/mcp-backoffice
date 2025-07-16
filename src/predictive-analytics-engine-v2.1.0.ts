@@ -168,7 +168,7 @@ export class PredictiveAnalyticsEngine {
       startDate.setMonth(startDate.getMonth() - 3);
       const endDate = new Date();
       
-      const timeRecords = await this.db.getTimeRecords(employee.id, startDate.toISOString(), endDate.toISOString());
+      const timeRecords = await this.db.getTimeRecords(employee.id, startDate, endDate);
       
       // 残業時間予測計算
       const prediction = await this.calculateOvertimePrediction(employee, timeRecords);

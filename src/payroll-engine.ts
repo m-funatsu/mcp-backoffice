@@ -292,7 +292,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const monthDate = new Date(month + '-01');
     const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-    const timeRecords = await this.db.getTimeRecords(employeeId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+    const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
     const workingHours = await this.calculateWorkingHours(timeRecords);
 
     // Calculate base salary and premiums
