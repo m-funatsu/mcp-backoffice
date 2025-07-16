@@ -1,6 +1,6 @@
 /**
- * PostgreSQLシミュレーション環境
- * 実際のPostgreSQLサーバーが利用できない場合の代替環境
+ * PostgreSQLシミュレーション環境（レガシー版）
+ * 注意: このスクリプトは参考用です。現在はPostgreSQLのみサポート
  */
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
@@ -24,9 +24,9 @@ class PostgreSQLSimulation {
   }
 
   async simulate() {
-    console.log('🔄 PostgreSQL移行シミュレーションを開始します...');
+    console.log('🔄 PostgreSQL移行シミュレーションを開始します（レガシー版）...');
     
-    // 1. SQLiteからデータを読み込み
+    // 1. データを読み込み（レガシー版）
     await this.loadSQLiteData();
     
     // 2. PostgreSQLスキーマの確認
@@ -45,7 +45,7 @@ class PostgreSQLSimulation {
   }
 
   async loadSQLiteData() {
-    console.log('📊 SQLiteデータの読み込み中...');
+    console.log('📊 データの読み込み中（レガシー版）...');
     
     // 従業員データ
     this.migrationData.employees = await this.queryAsync('SELECT * FROM employees');

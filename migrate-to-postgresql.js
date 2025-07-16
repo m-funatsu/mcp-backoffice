@@ -1,5 +1,6 @@
 /**
- * SQLiteからPostgreSQLへのデータマイグレーションスクリプト
+ * データベース移行スクリプト（レガシー版）
+ * 注意: このスクリプトは参考用です。現在はPostgreSQLのみサポート
  */
 import sqlite3 from 'sqlite3';
 import { Client } from 'pg';
@@ -22,7 +23,7 @@ const pgClient = new Client({
 
 async function migrateToPostgreSQL() {
   try {
-    console.log('🚀 SQLiteからPostgreSQLへの移行を開始します...');
+    console.log('🚀 データベース移行を開始します（レガシー版）...');
     
     // PostgreSQLに接続
     await pgClient.connect();
@@ -82,9 +83,9 @@ async function migrateToPostgreSQL() {
 }
 
 async function migrateData(pgClient) {
-  console.log('📊 データ移行を開始します...');
+  console.log('📊 データ移行を開始します（レガシー版）...');
   
-  // 従業員データの移行
+  // 従業員データの移行（レガシー版）
   await new Promise((resolve, reject) => {
     sqliteDb.all('SELECT * FROM employees', async (err, rows) => {
       if (err) {
