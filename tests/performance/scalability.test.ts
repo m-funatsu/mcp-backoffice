@@ -9,7 +9,7 @@ describe('Performance & Scalability Tests', () => {
   let performanceMetrics: any = {};
 
   beforeAll(async () => {
-    db = new Database(':memory:');
+    db = new Database(process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/attendance_test');
     try {
       await db.initializeDatabase();
     } catch (error) {

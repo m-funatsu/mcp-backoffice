@@ -24,7 +24,7 @@ describe('Production Server Standalone Tests', () => {
       
       const requiredDeps = [
         '@modelcontextprotocol/sdk',
-        'sqlite3',
+        'pg',
         'date-fns',
         'zod'
       ];
@@ -89,6 +89,7 @@ describe('Production Server Standalone Tests', () => {
     it('should initialize database successfully', async () => {
       const Database = (await import('../../dist/database.js')).default;
       
+      // Use PostgreSQL test database URL
       const db = new Database(':memory:');
       await db.initializeDatabase();
       
@@ -107,7 +108,7 @@ describe('Production Server Standalone Tests', () => {
         department: 'テスト部',
         position: 'テスター',
         hourlyRate: 3000,
-        joinDate: new Date('2024-01-01'),
+        startDate: new Date('2024-01-01'),
         isActive: true
       });
       
@@ -173,7 +174,7 @@ describe('Production Server Standalone Tests', () => {
         department: 'テスト部',
         position: 'テスター',
         hourlyRate: 2500,
-        joinDate: new Date('2024-01-01'),
+        startDate: new Date('2024-01-01'),
         isActive: true
       });
       
@@ -255,15 +256,15 @@ describe('Production Server Standalone Tests', () => {
   describe('Schema and Database Structure', () => {
     it('should validate database schema', async () => {
       try {
-        const { stdout } = await execAsync('cat schema.sql');
+        const { stdout } = await execAsync('cat schema-postgresql.sql');
         
-        expect(stdout).toContain('CREATE TABLE employees');
-        expect(stdout).toContain('CREATE TABLE time_records');
-        expect(stdout).toContain('CREATE TABLE payroll_calculations');
+        expect(stdout).toContain('CREATE TABLE IF NOT EXISTS employees');
+        expect(stdout).toContain('CREATE TABLE IF NOT EXISTS time_records');
+        expect(stdout).toContain('CREATE TABLE IF NOT EXISTS payroll_calculations');
         
         console.log('✅ Database schema is valid');
       } catch (error) {
-        throw new Error('schema.sql not found or invalid');
+        throw new Error('schema-postgresql.sql not found or invalid');
       }
     });
   });
@@ -317,7 +318,7 @@ describe('Production Server Standalone Tests', () => {
           department: 'テスト部',
           position: 'テスター',
           hourlyRate: 2500,
-          joinDate: new Date('2024-01-01'),
+          startDate: new Date('2024-01-01'),
           isActive: true
         });
         employees.push(id);

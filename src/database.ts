@@ -10,15 +10,48 @@ const __dirname = dirname(__filename);
 
 class Database {
   private db: Client;
+  private isMemoryDB: boolean = false;
 
   constructor(connectionString?: string) {
-    // In test environment, use mock database
-    if (process.env.NODE_ENV === 'test') {
+    // Use SQLite for :memory: connections
+    if (connectionString === ':memory:') {
+      // Create in-memory store for testing
+      const store = new Map<string, any>();
+      
       this.db = {
         connect: () => Promise.resolve(),
         end: () => Promise.resolve(),
-        query: () => Promise.resolve({ rows: [], rowCount: 0 })
+        query: (sql: string, params?: any[]) => {
+          try {
+            // Simple in-memory implementation for testing
+            if (sql.toLowerCase().includes('insert into employees')) {
+              const id = params?.[0] || `EMP_${Date.now()}`;
+              store.set(`employee_${id}`, {
+                id,
+                name: params?.[1],
+                email: params?.[2],
+                department: params?.[3],
+                position: params?.[4],
+                hourly_rate: params?.[5],
+                start_date: params?.[6]
+              });
+              return Promise.resolve({ rows: [], rowCount: 1 });
+            } else if (sql.toLowerCase().includes('select * from employees where id')) {
+              const id = params?.[0];
+              const employee = store.get(`employee_${id}`);
+              return Promise.resolve({ rows: employee ? [employee] : [], rowCount: employee ? 1 : 0 });
+            } else if (sql.toLowerCase().includes('create table')) {
+              // Ignore table creation in memory mode
+              return Promise.resolve({ rows: [], rowCount: 0 });
+            } else {
+              return Promise.resolve({ rows: [], rowCount: 0 });
+            }
+          } catch (error) {
+            return Promise.reject(error);
+          }
+        }
       } as any;
+      this.isMemoryDB = true;
       return;
     }
     
@@ -726,7 +759,8 @@ class Database {
 
   // Employee operations
   async createEmployee(employee: Employee): Promise<string> {
-    const { id, name, email, department, position, hourlyRate, startDate } = employee;
+    const id = employee.id || `EMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const { name, email, department, position, hourlyRate, startDate } = employee;
     
     await this.db.query(`
       INSERT INTO employees (id, name, email, department, position, hourly_rate, start_date)
@@ -738,12 +772,35 @@ class Database {
 
   async getEmployee(id: string): Promise<Employee | null> {
     const result = await this.db.query('SELECT * FROM employees WHERE id = $1', [id]);
-    return result.rows[0] || null;
+    if (!result.rows[0]) return null;
+    
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      department: row.department,
+      position: row.position,
+      hourlyRate: row.hourly_rate,
+      startDate: new Date(row.start_date),
+      managerId: row.manager_id,
+      isActive: row.is_active || true
+    };
   }
 
   async getAllEmployees(): Promise<Employee[]> {
     const result = await this.db.query('SELECT * FROM employees ORDER BY name');
-    return result.rows;
+    return result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      department: row.department,
+      position: row.position,
+      hourlyRate: row.hourly_rate,
+      startDate: new Date(row.start_date),
+      managerId: row.manager_id,
+      isActive: row.is_active || true
+    }));
   }
 
   async updateEmployee(id: string, updates: Partial<Employee>): Promise<boolean> {

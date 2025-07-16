@@ -18,7 +18,13 @@
     "test:integration": "vitest tests/integration",
     "test:security": "vitest tests/security",
     "test:e2e": "vitest tests/e2e",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f postgres",
+    "docker:reset": "docker-compose down -v && docker-compose up -d",
+    "db:setup": "npm run docker:up && sleep 10 && npm run db:init",
+    "db:init": "tsx scripts/init-database.ts"
   },
   "keywords": [
     "mcp",
