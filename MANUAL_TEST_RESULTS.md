@@ -14,7 +14,7 @@
 ## 🔧 テスト環境
 - **OS**: WSL2 (Ubuntu)
 - **Node.js**: v18.x
-- **データベース**: SQLite
+- **データベース**: PostgreSQL 15+
 - **Claude Desktop**: 最新版
 
 ## 🧪 テストシナリオ & 結果

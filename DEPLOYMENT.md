@@ -18,11 +18,9 @@ npm run build
 ### 2. データベースの初期化
 
 ```bash
-# SQLiteを使用する場合
-npm run init-db
-
-# PostgreSQLを使用する場合（オプション）
-npm run init-pg
+# PostgreSQLデータベースの初期化
+npm run postgres:start
+npm run postgres:init
 ```
 
 ### 3. Claude Desktop設定
@@ -185,16 +183,19 @@ sudo certbot certonly --standalone -d your-domain.com
 ### データベースバックアップ
 
 ```bash
-# SQLite バックアップスクリプト
+# PostgreSQL バックアップスクリプト
 #!/bin/bash
-DB_PATH="/path/to/attendance.db"
+DB_HOST="localhost"
+DB_PORT="5432"
+DB_NAME="attendance_db"
+DB_USER="postgres"
 BACKUP_DIR="/path/to/backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 
-sqlite3 $DB_PATH ".backup $BACKUP_DIR/attendance_backup_$DATE.db"
+pg_dump -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME > $BACKUP_DIR/attendance_backup_$DATE.sql
 
 # 古いバックアップの削除（30日以上前）
-find $BACKUP_DIR -name "attendance_backup_*.db" -mtime +30 -delete
+find $BACKUP_DIR -name "attendance_backup_*.sql" -mtime +30 -delete
 ```
 
 ## 監視とログ
@@ -246,8 +247,8 @@ CREATE INDEX idx_time_records_employee_date ON time_records(employee_id, date);
 CREATE INDEX idx_time_records_date_range ON time_records(date);
 CREATE INDEX idx_employees_active ON employees(is_active);
 
--- 定期的なVACUUM（SQLite）
-PRAGMA auto_vacuum = INCREMENTAL;
+-- 定期的なVACUUM（PostgreSQL）
+VACUUM ANALYZE;
 ```
 
 ### Node.js最適化
@@ -268,9 +269,9 @@ process.env.UV_THREADPOOL_SIZE = '16'; // ファイルI/O並列度向上
    - Claude Desktopの再起動
 
 2. **データベース接続エラー**
-   - ファイルパーミッションを確認
+   - PostgreSQL接続設定を確認
    - ディスクスペースを確認
-   - SQLiteファイルの整合性チェック
+   - PostgreSQLサービスの状態確認
 
 3. **パフォーマンスが遅い**
    - データベースインデックスを確認

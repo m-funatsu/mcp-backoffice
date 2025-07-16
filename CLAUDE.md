@@ -255,7 +255,7 @@ interface ComplianceTimeEngine {
 ### 現行（v1.2.0）
 - **言語**: TypeScript
 - **ランタイム**: Node.js 18+
-- **データベース**: SQLite（本番: PostgreSQL）
+- **データベース**: PostgreSQL 15+
 - **プロトコル**: MCP (Model Context Protocol)
 
 ### 進化計画

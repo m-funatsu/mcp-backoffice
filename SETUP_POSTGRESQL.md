@@ -82,8 +82,8 @@ npm run init-pg
 ### 3.3 既存データの移行（必要に応じて）
 
 ```bash
-# SQLiteからPostgreSQLへのデータ移行
-npm run migrate
+# PostgreSQLデータベース初期化
+npm run postgres:init
 ```
 
 ## 4. MCP統合の設定
