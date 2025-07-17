@@ -128,7 +128,8 @@ export class ProactiveMonitoringSystem {
       for (const record of records) {
         if (!record.clockOut) continue;
 
-        const workHours = this.calculateWorkHours(record.clockIn, record.clockOut, record.breakDuration);
+        const breakMinutes = record.breakMinutes || record.breakDuration || 0;
+        const workHours = this.calculateWorkHours(record.clockIn, record.clockOut, breakMinutes);
         const overtimeHours = Math.max(0, workHours - 8);
 
         if (overtimeHours > 6) { // More than 6 hours overtime

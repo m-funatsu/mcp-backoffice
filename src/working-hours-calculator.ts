@@ -67,7 +67,7 @@ const JAPANESE_HOLIDAYS_2024: Date[] = [
   new Date('2024-05-04'), // みどりの日
   new Date('2024-05-05'), // こどもの日
   new Date('2024-05-06'), // 振替休日
-  new Date('2024-07-15'), // 海の日
+  new Date('2024-07-15'), // 海の日（2024年は7月15日）
   new Date('2024-08-11'), // 山の日
   new Date('2024-08-12'), // 振替休日
   new Date('2024-09-16'), // 敬老の日
@@ -157,7 +157,7 @@ export class WorkingHoursCalculator {
         clockIn: timeRecord.clockIn,
         clockOut: timeRecord.clockIn, // fallback
         totalMinutes: 0,
-        breakMinutes: timeRecord.breakDuration,
+        breakMinutes: timeRecord.breakMinutes || timeRecord.breakDuration || 0,
         workingMinutes: 0,
         regularHours: 0,
         overtimeHours: 0,
@@ -176,7 +176,7 @@ export class WorkingHoursCalculator {
     const clockIn = timeRecord.clockIn;
     const clockOut = timeRecord.clockOut;
     const totalMinutes = Math.floor((clockOut.getTime() - clockIn.getTime()) / (1000 * 60));
-    const breakMinutes = timeRecord.breakDuration;
+    const breakMinutes = timeRecord.breakMinutes || timeRecord.breakDuration || 0;
     const workingMinutes = totalMinutes - breakMinutes;
     const workingHours = workingMinutes / 60;
 
@@ -184,13 +184,28 @@ export class WorkingHoursCalculator {
     const isWeekend = this.isWeekend(timeRecord.date);
 
     // Calculate regular vs overtime hours
-    let regularHours = Math.min(workingHours, this.rules.regularHoursPerDay);
-    let overtimeHours = Math.max(0, workingHours - this.rules.regularHoursPerDay);
+    let regularHours: number;
+    let overtimeHours: number;
 
-    // For holidays and weekends, all hours may be considered overtime/premium
     if (isHoliday || isWeekend) {
+      // For holidays and weekends, all hours are considered overtime/premium
       regularHours = 0;
       overtimeHours = workingHours;
+    } else {
+      // Check if this is primarily a night shift (starts after 21:00 or ends before 6:00)
+      // But exclude normal day shifts that end late (e.g., 9:00-20:00)
+      const isNightShift = (clockIn.getHours() >= 22 || clockOut.getHours() <= 6) && 
+                           !(clockIn.getHours() >= 6 && clockIn.getHours() <= 12 && clockOut.getHours() >= 18 && clockOut.getHours() <= 23);
+      
+      if (isNightShift) {
+        // For night shifts, all hours are considered overtime
+        regularHours = 0;
+        overtimeHours = workingHours;
+      } else {
+        // Normal working day
+        regularHours = Math.min(workingHours, this.rules.regularHoursPerDay);
+        overtimeHours = Math.max(0, workingHours - this.rules.regularHoursPerDay);
+      }
     }
 
     // Calculate late night hours
@@ -255,41 +270,53 @@ export class WorkingHoursCalculator {
     
     let lateNightMinutes = 0;
     
-    // Create date objects for comparison
-    const workStart = new Date(clockIn);
-    const workEnd = new Date(clockOut);
+    // Create date boundaries for calculations
+    const workStart = clockIn.getTime();
+    const workEnd = clockOut.getTime();
     
-    // Handle work that spans across midnight
-    let currentDate = new Date(workStart);
-    currentDate.setHours(0, 0, 0, 0);
+    // Handle work that might span multiple days
+    const currentDate = new Date(clockIn);
+    const nextDate = new Date(clockIn);
+    nextDate.setDate(nextDate.getDate() + 1);
     
-    while (currentDate <= workEnd) {
-      const dayStart = new Date(currentDate);
-      dayStart.setHours(Math.max(lateNightStart, workStart.getHours()), 
-                        workStart.getHours() === lateNightStart ? workStart.getMinutes() : 0, 0, 0);
-      
-      const dayEnd = new Date(currentDate);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-      dayEnd.setHours(Math.min(lateNightEnd, workEnd.getHours()), 
-                      workEnd.getHours() === lateNightEnd ? workEnd.getMinutes() : 0, 0, 0);
-      
-      // Calculate overlap with late night period
-      const startTime = Math.max(dayStart.getTime(), workStart.getTime());
-      const endTime = Math.min(dayEnd.getTime(), workEnd.getTime());
-      
-      if (startTime < endTime) {
-        lateNightMinutes += Math.floor((endTime - startTime) / (1000 * 60));
+    // Calculate late night periods that could overlap with work
+    const periods = [
+      {
+        // Late night period from current day 22:00 to next day 05:00
+        start: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), lateNightStart, 0, 0),
+        end: new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate(), lateNightEnd, 0, 0)
       }
-      
-      currentDate.setDate(currentDate.getDate() + 1);
+    ];
+    
+    // If work starts before 05:00, also check previous day's late night period
+    if (clockIn.getHours() < lateNightEnd) {
+      const prevDate = new Date(clockIn);
+      prevDate.setDate(prevDate.getDate() - 1);
+      periods.unshift({
+        start: new Date(prevDate.getFullYear(), prevDate.getMonth(), prevDate.getDate(), lateNightStart, 0, 0),
+        end: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), lateNightEnd, 0, 0)
+      });
     }
     
-    // Subtract proportional break time during late night hours
-    const totalWorkMinutes = Math.floor((workEnd.getTime() - workStart.getTime()) / (1000 * 60));
+    // Calculate overlap with each late night period
+    for (const period of periods) {
+      const periodStart = period.start.getTime();
+      const periodEnd = period.end.getTime();
+      
+      const overlapStart = Math.max(workStart, periodStart);
+      const overlapEnd = Math.min(workEnd, periodEnd);
+      
+      if (overlapStart < overlapEnd) {
+        lateNightMinutes += (overlapEnd - overlapStart) / (1000 * 60);
+      }
+    }
+    
+    // Subtract proportional break time
+    const totalWorkMinutes = Math.floor((clockOut.getTime() - clockIn.getTime()) / (1000 * 60));
     const lateNightBreakMinutes = totalWorkMinutes > 0 ? 
       Math.floor((lateNightMinutes / totalWorkMinutes) * breakMinutes) : 0;
     
-    return Math.max(0, lateNightMinutes - lateNightBreakMinutes) / 60;
+    return Math.max(0, (lateNightMinutes - lateNightBreakMinutes)) / 60;
   }
 
   /**
@@ -298,9 +325,9 @@ export class WorkingHoursCalculator {
    */
   private getRequiredBreakMinutes(workingHours: number): number {
     if (workingHours > 8) {
-      return this.rules.breakMinutesFor8Hours;
+      return this.rules.breakMinutesFor8Hours; // 60分
     } else if (workingHours > 6) {
-      return this.rules.breakMinutesFor6Hours;
+      return this.rules.breakMinutesFor6Hours; // 45分
     }
     return 0;
   }

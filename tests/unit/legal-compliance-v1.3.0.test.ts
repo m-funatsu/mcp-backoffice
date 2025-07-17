@@ -3,7 +3,7 @@
  * 日本労働基準法準拠テスト
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from '../../src/database.js';
 import { ComplianceEngine } from '../../src/compliance-engine.js';
 import { AutomaticLeaveManagement } from '../../src/automatic-leave-management.js';

@@ -1025,11 +1025,12 @@ class StrategicPlatformServer {
         format(record.clockOut, 'HH:mm:ss') : 
         'Not clocked out';
       
+      const breakMinutes = record.breakMinutes || record.breakDuration || 0;
       const workingHours = record.clockOut ? 
-        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - record.breakDuration / 60).toFixed(2) : 
+        ((record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - breakMinutes / 60).toFixed(2) : 
         'N/A';
       
-      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${record.breakDuration}min)`;
+      return `${format(record.date, 'yyyy-MM-dd')}: ${format(record.clockIn, 'HH:mm:ss')} - ${clockOutText} (${workingHours}h, break: ${breakMinutes}min)`;
     }).join('\\n');
 
     return {

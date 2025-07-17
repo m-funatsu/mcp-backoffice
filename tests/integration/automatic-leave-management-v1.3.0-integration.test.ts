@@ -3,7 +3,7 @@
  * 有給休暇自動管理システム統合テスト
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from '../../src/database.js';
 import { AutomaticLeaveManagement, AutomaticLeaveAllocation, LeaveCarryover, LeaveUsageAnalysis } from '../../src/automatic-leave-management.js';
 

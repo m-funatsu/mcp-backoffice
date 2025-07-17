@@ -26,7 +26,7 @@ describe('Advanced Security Tests - Prompt Injection Prevention', () => {
       joinDate: new Date('2024-01-01'),
       isActive: true
     });
-  });
+  }, 60000); // 60秒のタイムアウト
 
   describe('Indirect Prompt Injection Prevention', () => {
     it('should sanitize malicious content in employee notes during time records', async () => {

@@ -147,7 +147,7 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '開発部',
         position: 'エンジニア',
         hourlyRate: 2500,
-        joinDate: new Date('2022-04-01'),
+        startDate: new Date('2022-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -202,7 +202,7 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '運用部',
         position: 'オペレーター',
         hourlyRate: 2000,
-        joinDate: new Date('2021-01-15'),
+        startDate: new Date('2021-01-15'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -237,7 +237,7 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '営業部',
         position: '営業',
         hourlyRate: 3000,
-        joinDate: new Date('2020-10-01'),
+        startDate: new Date('2020-10-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -275,7 +275,7 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '経理部',
         position: '経理',
         hourlyRate: 3500,
-        joinDate: new Date('2019-04-01'),
+        startDate: new Date('2019-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -320,7 +320,8 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '開発部',
         position: 'エンジニア',
         hourlyRate: 2500,
-        joinDate: new Date('2020-04-01'), // 4年前入社（若手）
+        startDate: new Date('2020-04-01'), // 4年前入社（若手）
+        birthDate: new Date('1990-04-01'), // 34歳（40歳未満）
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -332,7 +333,8 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '開発部',
         position: 'シニアエンジニア',
         hourlyRate: 4000,
-        joinDate: new Date('1980-04-01'), // 40年以上前入社（ベテラン）
+        startDate: new Date('1980-04-01'), // 40年以上前入社（ベテラン）
+        birthDate: new Date('1970-04-01'), // 54歳（40歳以上）
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -377,7 +379,7 @@ describe('IntegratedPayrollEngine v1.2.0 - 単体テスト', () => {
         department: '総務部',
         position: '総務',
         hourlyRate: 2000,
-        joinDate: new Date('2022-04-01'),
+        startDate: new Date('2022-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'

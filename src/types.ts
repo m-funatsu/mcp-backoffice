@@ -8,6 +8,7 @@ export interface Employee {
   startDate: Date;
   managerId?: string;
   isActive: boolean;
+  birthDate?: Date; // For age-based calculations (e.g., long-term care insurance)
   // Extended payroll fields
   employeeNumber?: string;
   socialInsuranceNumber?: string;
@@ -112,7 +113,8 @@ export interface TimeRecord {
   date: Date;
   clockIn: Date;
   clockOut?: Date;
-  breakDuration: number; // in minutes
+  breakDuration?: number; // in minutes (legacy)
+  breakMinutes?: number; // in minutes (preferred)
   recordType: 'ic_card' | 'pc_log' | 'manual';
   notes?: string;
   approvedBy?: string;

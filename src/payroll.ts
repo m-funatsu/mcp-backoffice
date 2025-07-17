@@ -48,7 +48,7 @@ export class PayrollCalculator {
 
     const clockIn = record.clockIn;
     const clockOut = record.clockOut;
-    const breakMinutes = record.breakDuration;
+    const breakMinutes = record.breakMinutes || record.breakDuration || 0;
     
     // Total worked time in minutes
     const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60) - breakMinutes;
@@ -297,8 +297,9 @@ export class PayrollCalculator {
     // Check break time violations
     for (const record of timeRecords) {
       if (record.clockOut) {
-        const workingHours = (record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - (record.breakDuration / 60);
-        const breakViolations = this.validateBreakTime(workingHours, record.breakDuration);
+        const breakMinutes = record.breakMinutes || record.breakDuration || 0;
+        const workingHours = (record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60 * 60) - (breakMinutes / 60);
+        const breakViolations = this.validateBreakTime(workingHours, breakMinutes);
         violations.push(...breakViolations.map(v => `${format(record.date, 'yyyy-MM-dd')}: ${v}`));
       }
     }

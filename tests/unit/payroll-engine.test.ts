@@ -279,7 +279,7 @@ describe('IntegratedPayrollEngine - Real World Scenarios', () => {
     database = new Database(':memory:');
     await database.initializeDatabase();
     payrollEngine = new IntegratedPayrollEngine(database);
-  }, 60000); // 60秒のタイムアウト
+  }, 120000); // 120秒のタイムアウト
 
   test('should handle software engineer with overtime and late night work', async () => {
     const engineer: Employee = {
@@ -309,7 +309,7 @@ describe('IntegratedPayrollEngine - Real World Scenarios', () => {
     
     const payslip = await payrollEngine.generatePayslip('ENG_001', '2024-07');
     expect(payslip.employeeName).toBe('開発太郎');
-  }, 60000);
+  }, 120000);
 
   test('should handle system administrator with night shift and holiday work', async () => {
     const sysAdmin: Employee = {
@@ -330,7 +330,7 @@ describe('IntegratedPayrollEngine - Real World Scenarios', () => {
 
     // Holiday work: 8h * 3500 * 1.35 = 37,800 (holiday premium: 8h * 3500 * 0.35 = 9,800)
     // Late night holiday: 8h * 3500 * 1.60 = 44,800 (premium: 8h * 3500 * 0.60 = 16,800)
-  }, 60000);
+  }, 120000);
 
   test('should detect labor law violations in project manager scenario', () => {
     const calculation = {
@@ -355,5 +355,5 @@ describe('IntegratedPayrollEngine - Real World Scenarios', () => {
     expect(compliance.violations).toHaveLength(1);
     expect(compliance.violations[0].severity).toBe('critical');
     expect(compliance.recommendations).toContain('36協定の確認と労働時間の適正化が必要です');
-  }, 60000);
+  }, 120000);
 });

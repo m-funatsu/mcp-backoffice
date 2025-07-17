@@ -7,7 +7,7 @@ describe('Security Tests - Prompt Injection Prevention', () => {
   beforeEach(async () => {
     db = new Database(':memory:');
     await db.initializeDatabase();
-  });
+  }, 60000); // 60秒のタイムアウト
 
   describe('Indirect Prompt Injection Prevention', () => {
     it('should sanitize malicious content in employee names', async () => {

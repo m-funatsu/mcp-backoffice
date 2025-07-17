@@ -42,6 +42,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # PostgreSQL Web管理ツール
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mcp-attendance-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - gui
+
   # 将来的なRedis Cache（オプション）
   redis:
     image: redis:7-alpine
@@ -60,6 +79,8 @@ volumes:
   postgres_test_data:
     driver: local
   redis_data:
+    driver: local
+  pgadmin_data:
     driver: local
 
 networks:

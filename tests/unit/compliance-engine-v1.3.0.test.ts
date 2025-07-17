@@ -3,7 +3,7 @@
  * 労働基準法第36条協定監視システム テスト
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from '../../src/database.js';
 import { ComplianceEngine, LaborAgreement, ComplianceStatus, ObjectiveTimeRecord, ComplianceAlert } from '../../src/compliance-engine.js';
 

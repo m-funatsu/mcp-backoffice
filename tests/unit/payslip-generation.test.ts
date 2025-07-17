@@ -44,7 +44,7 @@ describe('給与明細生成機能テスト', () => {
         department: '開発部',
         position: 'シニアエンジニア',
         hourlyRate: 3000,
-        joinDate: new Date('2020-04-01'),
+        startDate: new Date('2020-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -64,7 +64,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         },
         {
@@ -73,7 +73,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-02'),
           clockIn: new Date('2024-07-02T09:00:00'),
           clockOut: new Date('2024-07-02T19:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -118,7 +118,7 @@ describe('給与明細生成機能テスト', () => {
         department: '営業部',
         position: '営業マネージャー',
         hourlyRate: 3500,
-        joinDate: new Date('2018-04-01'),
+        startDate: new Date('2018-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -147,7 +147,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -177,7 +177,7 @@ describe('給与明細生成機能テスト', () => {
         department: '総務部',
         position: '総務',
         hourlyRate: 2500,
-        joinDate: new Date('2022-04-01'),
+        startDate: new Date('2022-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -206,7 +206,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -238,7 +238,7 @@ describe('給与明細生成機能テスト', () => {
         department: '役員',
         position: '取締役',
         hourlyRate: 8000,
-        joinDate: new Date('2015-04-01'),
+        startDate: new Date('2015-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -258,7 +258,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -286,7 +286,7 @@ describe('給与明細生成機能テスト', () => {
         department: '営業部',
         position: '営業',
         hourlyRate: 3000,
-        joinDate: new Date('2018-04-01'),
+        startDate: new Date('2018-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -305,7 +305,7 @@ describe('給与明細生成機能テスト', () => {
         department: '営業部',
         position: '営業',
         hourlyRate: 3000,
-        joinDate: new Date('2018-04-01'),
+        startDate: new Date('2018-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -325,7 +325,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -351,7 +351,8 @@ describe('給与明細生成機能テスト', () => {
         department: '開発部',
         position: 'エンジニア',
         hourlyRate: 2500,
-        joinDate: new Date('2020-04-01'), // 4年前入社
+        startDate: new Date('2020-04-01'), // 4年前入社
+        birthDate: new Date('1990-04-01'), // 34歳（40歳未満）
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -364,7 +365,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -387,7 +388,8 @@ describe('給与明細生成機能テスト', () => {
         department: '管理部',
         position: '部長',
         hourlyRate: 4000,
-        joinDate: new Date('1980-04-01'), // 44年前入社
+        startDate: new Date('1980-04-01'), // 44年前入社
+        birthDate: new Date('1970-04-01'), // 54歳（40歳以上）
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -400,7 +402,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -423,7 +425,7 @@ describe('給与明細生成機能テスト', () => {
         department: '運用部',
         position: 'オペレーター',
         hourlyRate: 2000,
-        joinDate: new Date('2021-04-01'),
+        startDate: new Date('2021-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -436,7 +438,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T22:00:00'),
           clockOut: new Date('2024-07-02T06:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -464,7 +466,7 @@ describe('給与明細生成機能テスト', () => {
         department: 'サポート部',
         position: 'サポート',
         hourlyRate: 2500,
-        joinDate: new Date('2020-04-01'),
+        startDate: new Date('2020-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'
@@ -477,7 +479,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-07'), // 日曜日
           clockIn: new Date('2024-07-07T09:00:00'),
           clockOut: new Date('2024-07-07T17:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'manual'
         }
       ];
@@ -507,7 +509,7 @@ describe('給与明細生成機能テスト', () => {
         department: '経理部',
         position: '経理',
         hourlyRate: 3000,
-        joinDate: new Date('2019-04-01'),
+        startDate: new Date('2019-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly',
@@ -538,7 +540,7 @@ describe('給与明細生成機能テスト', () => {
           date: new Date('2024-07-01'),
           clockIn: new Date('2024-07-01T09:00:00'),
           clockOut: new Date('2024-07-01T19:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         }
       ];
@@ -576,7 +578,7 @@ describe('給与明細生成機能テスト', () => {
         department: '開発部',
         position: 'エンジニア',
         hourlyRate: 2500,
-        joinDate: new Date('2020-04-01'),
+        startDate: new Date('2020-04-01'),
         isActive: true,
         contractType: 'full_time',
         salaryType: 'hourly'

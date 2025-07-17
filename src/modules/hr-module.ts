@@ -535,7 +535,8 @@ export class HRModule implements PlatformModule {
     return timeRecords.reduce((total, record) => {
       if (record.clockOut) {
         const workMinutes = (record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60);
-        const workHours = (workMinutes - record.breakDuration) / 60;
+        const breakMinutes = record.breakMinutes || record.breakDuration || 0;
+        const workHours = (workMinutes - breakMinutes) / 60;
         return total + Math.max(0, workHours - 8);
       }
       return total;

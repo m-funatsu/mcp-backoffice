@@ -333,7 +333,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
         description: '深夜手当',
         amount: lateNightPay,
         hours: workingHours.reduce((sum, h) => sum + h.lateNightHours, 0),
-        rate: this.rules.lateNightRate
+        rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.lateNightHours, 0), 'late_night')
       });
     }
 
@@ -343,77 +343,16 @@ export class IntegratedPayrollEngine implements PayrollEngine {
         description: '休日手当',
         amount: holidayPay,
         hours: workingHours.reduce((sum, h) => sum + h.holidayHours, 0),
-        rate: this.rules.holidayRate
+        rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.holidayHours, 0), 'holiday')
       });
     }
 
+    // Calculate total allowances
     const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0);
     const totalGrossPay = grossPay + totalAllowances;
 
-    // Calculate Japanese tax and social insurance
-    const taxCalculation = this.calculateJapaneseTax(totalGrossPay, employee);
-    const socialInsurance = this.calculateSocialInsurance(totalGrossPay, employee);
-
-    // Calculate deductions
-    const deductions: PayrollDeduction[] = [];
-    
-    // Tax deductions
-    if (taxCalculation.incomeTax > 0) {
-      deductions.push({
-        type: 'income_tax',
-        description: '所得税',
-        amount: taxCalculation.incomeTax,
-        rate: this.getIncomeTaxRate(totalGrossPay)
-      });
-    }
-
-    if (taxCalculation.residentTax > 0) {
-      deductions.push({
-        type: 'resident_tax',
-        description: '住民税',
-        amount: taxCalculation.residentTax,
-        rate: 0.10 // 10% standard rate
-      });
-    }
-
-    // Social insurance deductions
-    if (socialInsurance.healthInsurance > 0) {
-      deductions.push({
-        type: 'social_insurance',
-        description: '健康保険',
-        amount: socialInsurance.healthInsurance,
-        rate: 0.0495 // Approximate rate
-      });
-    }
-
-    if (socialInsurance.pensionInsurance > 0) {
-      deductions.push({
-        type: 'social_insurance',
-        description: '厚生年金',
-        amount: socialInsurance.pensionInsurance,
-        rate: 0.0915 // Approximate rate
-      });
-    }
-
-    if (socialInsurance.unemploymentInsurance > 0) {
-      deductions.push({
-        type: 'unemployment',
-        description: '雇用保険',
-        amount: socialInsurance.unemploymentInsurance,
-        rate: 0.003 // Employee portion
-      });
-    }
-
-    if (socialInsurance.longTermCareInsurance > 0) {
-      deductions.push({
-        type: 'social_insurance',
-        description: '介護保険',
-        amount: socialInsurance.longTermCareInsurance,
-        rate: 0.01225 // Approximate rate
-      });
-    }
-
     // Add employee deductions
+    const deductions: PayrollDeduction[] = [];
     if (employee.deductions) {
       for (const deduction of employee.deductions) {
         deductions.push({
@@ -424,22 +363,50 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       }
     }
 
+    // Calculate taxes
+    const taxCalculation = this.calculateJapaneseTax(totalGrossPay, employee);
+    
+    // Calculate social insurance
+    const socialInsurance = this.calculateSocialInsurance(totalGrossPay, employee);
+
+    // Add tax deductions
+    deductions.push({
+      type: 'income_tax',
+      description: '所得税',
+      amount: taxCalculation.incomeTax,
+      rate: this.getIncomeTaxRate(totalGrossPay)
+    });
+
+    deductions.push({
+      type: 'resident_tax',
+      description: '住民税',
+      amount: taxCalculation.residentTax,
+      rate: 0.10
+    });
+
+    deductions.push({
+      type: 'social_insurance',
+      description: '社会保険料',
+      amount: socialInsurance.total
+    });
+
+    // Calculate net pay
     const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
     const netPay = totalGrossPay - totalDeductions;
 
-    // Create working summary
+    // Calculate working summary
     const workingSummary: WorkingSummary = {
       regularHours: workingHours.reduce((sum, h) => sum + h.regularHours, 0),
       overtimeHours: workingHours.reduce((sum, h) => sum + h.overtimeHours, 0),
       lateNightHours: workingHours.reduce((sum, h) => sum + h.lateNightHours, 0),
       holidayHours: workingHours.reduce((sum, h) => sum + h.holidayHours, 0),
-      totalWorkingDays: workingHours.length,
-      absentDays: 0, // Will be calculated from leave records
-      paidLeaves: 0  // Will be calculated from leave records
+      totalWorkingDays: timeRecords.filter(r => r.clockIn && r.clockOut).length,
+      absentDays: 0, // TODO: Calculate based on expected working days
+      paidLeaves: 0  // TODO: Calculate based on leave records
     };
 
-    const payslip: PayslipData = {
-      employeeId,
+    return {
+      employeeId: employee.id,
       employeeName: employee.name,
       month,
       baseSalary,
@@ -451,8 +418,6 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       workingSummary,
       generatedAt: new Date()
     };
-
-    return payslip;
   }
 
   /**
@@ -608,8 +573,8 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const unemploymentInsurance = Math.floor(grossPay * 0.003);
     
     // 介護保険料（40歳以上、1.64%、労使折半）
-    const age = employee.startDate ? 
-      Math.floor((Date.now() - employee.startDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
+    const age = employee.birthDate ? 
+      Math.floor((Date.now() - employee.birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
     const longTermCareInsurance = age >= 40 ? 
       Math.floor(standardMonthlyRemuneration * 0.0082) : 0;
 

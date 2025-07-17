@@ -22,7 +22,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
         department: 'システム開発部',
         position: 'シニアエンジニア',
         hourlyRate: 3000,
-        joinDate: new Date('2023-04-01'),
+        startDate: new Date('2023-04-01'),
         managerId: 'MGR_001',
         isActive: true
       };
@@ -36,7 +36,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-01'),
           clockIn: new Date('2024-03-01T09:00:00'),
           clockOut: new Date('2024-03-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         },
         // 残業日（深夜労働含む）
@@ -46,7 +46,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-04'),
           clockIn: new Date('2024-03-04T09:00:00'),
           clockOut: new Date('2024-03-05T01:30:00'), // 翌日1:30まで
-          breakMinutes: 90, // 長時間労働での休憩
+          breakDuration: 90, // 長時間労働での休憩
           recordType: 'pc_log'
         },
         // 祝日出勤（建国記念の日想定）
@@ -56,7 +56,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-11'),
           clockIn: new Date('2024-03-11T10:00:00'),
           clockOut: new Date('2024-03-11T16:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'manual',
           notes: '緊急対応のため祝日出勤'
         },
@@ -67,7 +67,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-15'),
           clockIn: new Date('2024-03-15T13:00:00'),
           clockOut: new Date('2024-03-15T17:00:00'),
-          breakMinutes: 0,
+          breakDuration: 0,
           recordType: 'manual',
           notes: '午後のみ勤務'
         },
@@ -78,7 +78,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-20'),
           clockIn: new Date('2024-03-20T23:00:00'),
           clockOut: new Date('2024-03-21T07:00:00'), // 翌朝7時まで
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'manual',
           notes: 'システムメンテナンス'
         },
@@ -89,7 +89,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-03-25'),
           clockIn: new Date('2024-03-25T08:00:00'),
           clockOut: new Date('2024-03-25T22:30:00'),
-          breakMinutes: 30, // 不十分な休憩時間
+          breakDuration: 30, // 不十分な休憩時間
           recordType: 'pc_log'
         }
       ];
@@ -141,7 +141,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
         department: 'プロジェクト推進部',
         position: 'マネージャー',
         hourlyRate: 3500,
-        joinDate: new Date('2022-01-01'),
+        startDate: new Date('2022-01-01'),
         managerId: 'DIR_001',
         isActive: true
       };
@@ -161,7 +161,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date,
           clockIn,
           clockOut,
-          breakMinutes: day <= 10 ? 45 : 30, // 前半は休憩不足、後半はさらに不足
+          breakDuration: day <= 10 ? 45 : 30, // 前半は休憩不足、後半はさらに不足
           recordType: 'pc_log'
         });
       }
@@ -198,7 +198,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
         department: '品質保証部',
         position: 'テスター',
         hourlyRate: 2800,
-        joinDate: new Date('2023-10-01'),
+        startDate: new Date('2023-10-01'),
         isActive: true
       };
 
@@ -211,7 +211,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-04-01'),
           clockIn: new Date('2024-04-01T09:00:00'),
           clockOut: new Date('2024-04-01T17:25:00'), // 8時間25分勤務
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         },
         // 31分の残業（切り上げ対象）
@@ -221,7 +221,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-04-02'),
           clockIn: new Date('2024-04-02T09:00:00'),
           clockOut: new Date('2024-04-02T17:31:00'), // 8時間31分勤務
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         },
         // 60時間ちょうどの残業（高残業率境界）
@@ -231,7 +231,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-04-03'),
           clockIn: new Date('2024-04-03T09:00:00'),
           clockOut: new Date('2024-04-04T01:00:00'), // 15時間勤務
-          breakMinutes: 120,
+          breakDuration: 120,
           recordType: 'manual',
           notes: '月末締処理'
         },
@@ -242,7 +242,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-04-05'),
           clockIn: new Date('2024-04-05T21:30:00'),
           clockOut: new Date('2024-04-06T06:30:00'), // 22:00-05:00をまたぐ
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'manual'
         }
       ];
@@ -286,7 +286,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
         department: '営業部',
         position: '営業',
         hourlyRate: 2600,
-        joinDate: new Date('2024-01-01'),
+        startDate: new Date('2024-01-01'),
         isActive: true
       };
 
@@ -299,7 +299,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-05-01'),
           clockIn: new Date('2024-05-01T09:00:00'),
           clockOut: new Date('2024-05-01T18:00:00'),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         },
         // 退勤打刻なし
@@ -309,7 +309,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-05-02'),
           clockIn: new Date('2024-05-02T09:00:00'),
           clockOut: undefined, // 退勤なし
-          breakMinutes: 0,
+          breakDuration: 0,
           recordType: 'ic_card'
         },
         // 正常な記録
@@ -319,7 +319,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date: new Date('2024-05-03'),
           clockIn: new Date('2024-05-03T09:00:00'),
           clockOut: new Date('2024-05-03T17:30:00'),
-          breakMinutes: 45,
+          breakDuration: 45,
           recordType: 'manual'
         }
       ];
@@ -352,7 +352,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
         department: 'データ分析部',
         position: 'データサイエンティスト',
         hourlyRate: 4000,
-        joinDate: new Date('2023-01-01'),
+        startDate: new Date('2023-01-01'),
         isActive: true
       };
 
@@ -366,7 +366,7 @@ describe('Payroll Analysis with Real Data Scenarios', () => {
           date,
           clockIn: new Date(`2024-01-${String(day).padStart(2, '0')}T09:00:00`),
           clockOut: new Date(`2024-01-${String(day).padStart(2, '0')}T18:30:00`),
-          breakMinutes: 60,
+          breakDuration: 60,
           recordType: 'ic_card'
         });
       }
