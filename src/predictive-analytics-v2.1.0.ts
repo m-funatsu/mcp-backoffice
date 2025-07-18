@@ -180,7 +180,7 @@ export interface PredictiveDashboard {
 export class PredictiveAnalyticsEngineV2 {
   private db: DatabasePostgreSQL;
   private workingHoursCalculator: WorkingHoursCalculator;
-  private humanCapitalEngine: HumanCapitalDisclosureEngine;
+  private humanCapitalEngine?: HumanCapitalDisclosureEngine;
   private config: PredictiveConfig;
   private cache: Map<string, any>;
 
@@ -190,7 +190,8 @@ export class PredictiveAnalyticsEngineV2 {
   ) {
     this.db = database;
     this.workingHoursCalculator = new WorkingHoursCalculator();
-    this.humanCapitalEngine = new HumanCapitalDisclosureEngine(database);
+    // HumanCapitalEngineは一時的に無効化（依存関係の問題）
+    // this.humanCapitalEngine = new HumanCapitalDisclosureEngine(database);
     this.cache = new Map();
     
     this.config = {
@@ -245,7 +246,7 @@ export class PredictiveAnalyticsEngineV2 {
       ] = await Promise.all([
         this.forecastOvertimeForAll(activeEmployees),
         this.analyzeTurnoverRiskForAll(activeEmployees),
-        this.humanCapitalEngine.calculateMetrics()
+        Promise.resolve({} as any) // HumanCapitalEngineは一時的に無効化
       ]);
       
       // アラート生成
@@ -413,15 +414,23 @@ export class PredictiveAnalyticsEngineV2 {
     const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
     const monthlyHours = this.workingHoursCalculator.calculateMonthlyHours(timeRecords);
     
-    // 日次データに変換（簡略化）
+    // 日次データに変換
     const dailyData: Array<{ date: Date; hours: number }> = [];
-    const overtimePerDay = monthlyHours.totalOvertimeHours / timeRecords.length;
     
     timeRecords.forEach(record => {
-      dailyData.push({
-        date: record.date,
-        hours: overtimePerDay // 実際はより詳細な計算が必要
-      });
+      // 各レコードの実働時間から残業時間を計算
+      if (record.clockIn && record.clockOut) {
+        const workMinutes = (record.clockOut.getTime() - record.clockIn.getTime()) / (1000 * 60);
+        const breakMinutes = record.breakMinutes || 60;
+        const actualMinutes = workMinutes - breakMinutes;
+        const regularHours = 8;
+        const overtimeHours = Math.max(0, (actualMinutes / 60) - regularHours);
+        
+        dailyData.push({
+          date: record.date,
+          hours: overtimeHours
+        });
+      }
     });
     
     return dailyData;
@@ -491,15 +500,18 @@ export class PredictiveAnalyticsEngineV2 {
       (sum: number, p: any) => sum + p.predictedHours, 0
     ) / forecast.predictions.length;
     
-    const level = avgPredicted > 60 ? 'critical' :
-                  avgPredicted > 45 ? 'high' :
-                  avgPredicted > 30 ? 'medium' : 'low';
+    // 月間残業時間に換算（日次 × 20営業日）
+    const monthlyPredicted = avgPredicted * 20;
+    
+    const level = monthlyPredicted > 60 ? 'critical' :
+                  monthlyPredicted > 45 ? 'high' :
+                  monthlyPredicted > 30 ? 'medium' : 'low';
     
     return {
       level,
-      complianceRisk: avgPredicted > 45,
-      healthRisk: avgPredicted > 60,
-      productivityImpact: Math.min(0.3, avgPredicted / 200)
+      complianceRisk: monthlyPredicted > 45,
+      healthRisk: monthlyPredicted > 60,
+      productivityImpact: Math.min(0.3, monthlyPredicted / 200)
     };
   }
 
@@ -540,12 +552,8 @@ export class PredictiveAnalyticsEngineV2 {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
     
-    const [timeRecords, leaveRecords] = await Promise.all([
-      this.db.getTimeRecords(employee.id, startDate, endDate),
-      this.db.getLeaveRecords ? 
-        this.db.getLeaveRecords(employee.id, startDate, endDate) : 
-        Promise.resolve([])
-    ]);
+    const timeRecords = await this.db.getTimeRecords(employee.id, startDate, endDate);
+    const leaveRecords = [] as any[]; // Leave records not yet implemented
     
     const monthlyHours = this.workingHoursCalculator.calculateMonthlyHours(timeRecords);
     

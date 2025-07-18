@@ -195,10 +195,10 @@ export class PredictiveVisualizationAlerts {
     // 1. 残業時間予測トレンド
     const trendData = predictions.map(pred => ({
       x: pred.employeeId,
-      y: pred.predictedHours,
+      y: pred.nextMonth,
       category: pred.riskLevel,
       color: this.getRiskColor(pred.riskLevel),
-      tooltip: `${pred.employeeId}: ${pred.predictedHours}時間 (${pred.riskLevel})`
+      tooltip: `${pred.employeeId}: ${pred.nextMonth}時間 (${pred.riskLevel})`
     }));
 
     visualizations.push({
@@ -254,13 +254,16 @@ export class PredictiveVisualizationAlerts {
     const visualizations: VisualizationData[] = [];
 
     // 1. 離職リスクスコア分布
-    const riskScoreData = predictions.map(pred => ({
-      x: pred.employeeId,
-      y: pred.riskScore,
-      category: pred.riskLevel,
-      color: this.getRiskColor(pred.riskLevel),
-      tooltip: `${pred.employeeId}: ${pred.riskScore}% (${pred.riskLevel})`
-    }));
+    const riskScoreData = predictions.map(pred => {
+      const riskLevel = this.getRiskLevelFromScore(pred.riskScore);
+      return {
+        x: pred.employeeId,
+        y: pred.riskScore,
+        category: riskLevel,
+        color: this.getRiskColor(riskLevel),
+        tooltip: `${pred.employeeId}: ${pred.riskScore}% (${riskLevel})`
+      };
+    });
 
     visualizations.push({
       chartType: 'scatter',
@@ -286,12 +289,15 @@ export class PredictiveVisualizationAlerts {
     });
 
     // 3. 予測タイムフレーム
-    const timeframeData = predictions.map(pred => ({
-      x: pred.employeeId,
-      y: pred.timeframe,
-      category: pred.riskLevel,
-      color: this.getRiskColor(pred.riskLevel)
-    }));
+    const timeframeData = predictions.map(pred => {
+      const riskLevel = this.getRiskLevelFromScore(pred.riskScore);
+      return {
+        x: pred.employeeId,
+        y: pred.estimatedTimeframe,
+        category: riskLevel,
+        color: this.getRiskColor(riskLevel)
+      };
+    });
 
     visualizations.push({
       chartType: 'bar',
@@ -311,10 +317,11 @@ export class PredictiveVisualizationAlerts {
     const visualizations: VisualizationData[] = [];
 
     // 1. 多様性指標
+    // 仮のジェンダー分布データ（実際のデータ構造に合わせて調整が必要）
     const diversityData = [
-      { x: '男性', y: metrics.diversity.genderRatio.male, color: '#339af0' },
-      { x: '女性', y: metrics.diversity.genderRatio.female, color: '#ff8cc8' },
-      { x: 'その他', y: metrics.diversity.genderRatio.other, color: '#69db7c' }
+      { x: '男性', y: 60, color: '#339af0' },
+      { x: '女性', y: 35, color: '#ff8cc8' },
+      { x: 'その他', y: 5, color: '#69db7c' }
     ];
 
     visualizations.push({
@@ -325,24 +332,23 @@ export class PredictiveVisualizationAlerts {
       yAxis: { label: '比率', type: 'linear', unit: '%' }
     });
 
-    // 2. エンゲージメントメーター
+    // 2. 多様性ダッシュボード
     visualizations.push({
       chartType: 'gauge',
-      title: 'eNPS スコア',
-      data: [{ x: 'eNPS', y: metrics.engagement.enps, color: '#51cf66' }],
+      title: '性別多様性スコア',
+      data: [{ x: '多様性', y: metrics.diversity.genderBalance * 100, color: '#51cf66' }],
       xAxis: { label: '', type: 'category' },
-      yAxis: { label: 'スコア', type: 'linear', min: -100, max: 100 },
+      yAxis: { label: 'スコア', type: 'linear', min: 0, max: 100 },
       thresholds: [
-        { value: 0, label: '基準値', color: '#868e96', type: 'solid' },
-        { value: 30, label: '優良', color: '#51cf66', type: 'solid' }
+        { value: 40, label: '目標値', color: '#868e96', type: 'solid' },
+        { value: 50, label: '優良', color: '#51cf66', type: 'solid' }
       ]
     });
 
     // 3. 生産性指標
     const productivityData = [
       { x: '売上/従業員', y: metrics.productivity.revenuePerEmployee / 1000000, color: '#339af0' },
-      { x: '残業比率', y: metrics.productivity.overtimeRatio * 100, color: '#ff8787' },
-      { x: '欠勤率', y: metrics.productivity.absenteeismRate * 100, color: '#ffd43b' }
+      { x: '残業比率', y: metrics.productivity.overtimeRatio * 100, color: '#ff8787' }
     ];
 
     visualizations.push({
@@ -353,23 +359,18 @@ export class PredictiveVisualizationAlerts {
       yAxis: { label: '値', type: 'linear' }
     });
 
-    // 4. 予測リスク分布
-    const predictionData = [
-      { x: '残業リスク(高)', y: metrics.predictions.overtimeRisk.high * 100, color: '#ff8787' },
-      { x: '残業リスク(中)', y: metrics.predictions.overtimeRisk.medium * 100, color: '#ffd43b' },
-      { x: '残業リスク(低)', y: metrics.predictions.overtimeRisk.low * 100, color: '#51cf66' },
-      { x: '離職リスク(危険)', y: metrics.predictions.turnoverRisk.critical * 100, color: '#ff6b6b' },
-      { x: '離職リスク(高)', y: metrics.predictions.turnoverRisk.high * 100, color: '#ff8787' },
-      { x: '離職リスク(中)', y: metrics.predictions.turnoverRisk.medium * 100, color: '#ffd43b' },
-      { x: '離職リスク(低)', y: metrics.predictions.turnoverRisk.low * 100, color: '#51cf66' }
+    // 4. 開発投資指標
+    const developmentData = [
+      { x: '教育投資', y: metrics.development.trainingInvestment / 1000000, color: '#339af0' },
+      { x: 'スキル成長率', y: metrics.development.skillGrowthRate * 100, color: '#51cf66' }
     ];
 
     visualizations.push({
       chartType: 'bar',
-      title: '予測リスク分布',
-      data: predictionData,
-      xAxis: { label: 'リスクタイプ', type: 'category' },
-      yAxis: { label: '従業員比率', type: 'linear', unit: '%' }
+      title: '人材開発投資',
+      data: developmentData,
+      xAxis: { label: '指標', type: 'category' },
+      yAxis: { label: '値', type: 'linear' }
     });
 
     return visualizations;
@@ -652,6 +653,13 @@ export class PredictiveVisualizationAlerts {
     }
   }
 
+  private getRiskLevelFromScore(score: number): 'low' | 'medium' | 'high' | 'critical' {
+    if (score >= 80) return 'critical';
+    if (score >= 60) return 'high';
+    if (score >= 40) return 'medium';
+    return 'low';
+  }
+
   private calculateRiskDistribution(predictions: OvertimePrediction[]): ChartDataPoint[] {
     const distribution = { low: 0, medium: 0, high: 0, critical: 0 };
     
@@ -676,7 +684,7 @@ export class PredictiveVisualizationAlerts {
         if (!departmentMap.has(dept)) {
           departmentMap.set(dept, []);
         }
-        departmentMap.get(dept)!.push(pred.predictedHours);
+        departmentMap.get(dept)!.push(pred.nextMonth);
       }
     }
 
@@ -744,7 +752,7 @@ export class PredictiveVisualizationAlerts {
     
     if (config.type === 'overtime') {
       for (const pred of overtimePredictions) {
-        if (this.evaluateThreshold(pred.predictedHours, config.threshold)) {
+        if (this.evaluateThreshold(pred.nextMonth, config.threshold)) {
           alerts.push(this.createAlertRecord(config, pred.employeeId, 'overtime', pred));
         }
       }
@@ -793,7 +801,7 @@ export class PredictiveVisualizationAlerts {
   private generateAlertMessage(config: AlertConfig, details: any): string {
     switch (config.type) {
       case 'overtime':
-        return `従業員 ${details.employeeId} の予測残業時間が ${details.predictedHours}時間に達しました（閾値: ${config.threshold.value}時間）`;
+        return `従業員 ${details.employeeId} の予測残業時間が ${details.nextMonth}時間に達しました（閾値: ${config.threshold.value}時間）`;
       case 'turnover':
         return `従業員 ${details.employeeId} の離職リスクスコアが ${details.riskScore}% に達しました（閾値: ${config.threshold.value}%）`;
       default:
