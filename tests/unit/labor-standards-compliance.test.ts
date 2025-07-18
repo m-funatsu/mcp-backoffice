@@ -27,8 +27,8 @@ describe('日本労働基準法準拠計算テスト', () => {
       const breakdown = calculator.calculateDailyHours(timeRecord);
       
       expect(breakdown.regularHours).toBe(8);
-      expect(breakdown.overtimeHours).toBe(2); // 実際の計算結果に合わせて調整
-      expect(breakdown.violations).toHaveLength(1); // 実際は1つの違反が検出される
+      expect(breakdown.overtimeHours).toBe(1); // 9時間労働 - 8時間 = 1時間の残業
+      expect(breakdown.violations).toHaveLength(0); // 10時間までは警告なし
     });
 
     it('1日12時間を超える労働は重大な違反', () => {
@@ -45,8 +45,8 @@ describe('日本労働基準法準拠計算テスト', () => {
       const breakdown = calculator.calculateDailyHours(timeRecord);
       
       expect(breakdown.regularHours).toBe(8);
-      expect(breakdown.overtimeHours).toBe(6);
-      expect(breakdown.violations).toHaveLength(2); // 実際は2つの違反が検出される
+      expect(breakdown.overtimeHours).toBe(5); // 13時間労働 - 8時間 = 5時間の残業
+      expect(breakdown.violations).toHaveLength(1); // 12時間超過で1つの違反
       expect(breakdown.violations.some(v => v.type === 'excessive_hours')).toBe(true);
       expect(breakdown.violations.some(v => v.severity === 'critical')).toBe(true);
     });
@@ -70,7 +70,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       const summary = calculator.calculateMonthlyHours(timeRecords);
       
       expect(summary.totalRegularHours).toBe(40); // 週40時間まで
-      expect(summary.totalOvertimeHours).toBe(15); // 15時間分が残業
+      expect(summary.totalOvertimeHours).toBe(10); // 毎日1時間残業 × 5日 + 週40時間超過分5時間 = 10時間
     });
   });
 
@@ -90,7 +90,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       
       expect(breakdown.violations).toHaveLength(1);
       expect(breakdown.violations[0].type).toBe('insufficient_break');
-      expect(breakdown.violations[0].value).toBe(0); // システムが法定休憩時間を適用するため
+      expect(breakdown.violations[0].value).toBe(30); // 実際の休憩時間
       expect(breakdown.violations[0].requirement).toBe(45);
     });
 
@@ -109,7 +109,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       
       expect(breakdown.violations).toHaveLength(1);
       expect(breakdown.violations[0].type).toBe('insufficient_break');
-      expect(breakdown.violations[0].value).toBe(0); // システムが法定休憩時間を適用するため
+      expect(breakdown.violations[0].value).toBe(45); // 実際の休憩時間
       expect(breakdown.violations[0].requirement).toBe(60);
     });
 
@@ -127,7 +127,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       const breakdown = calculator.calculateDailyHours(timeRecord);
       
       const breakViolations = breakdown.violations.filter(v => v.type === 'insufficient_break');
-      expect(breakViolations).toHaveLength(1); // 実際は1つの違反が検出される
+      expect(breakViolations).toHaveLength(0); // 適切な休憩時間なので違反なし
     });
   });
 
@@ -270,7 +270,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       const breakdown = calculator.calculateDailyHours(timeRecord);
       
       expect(breakdown.isWeekend).toBe(true);
-      expect(breakdown.holidayHours).toBe(8);
+      expect(breakdown.holidayHours).toBe(7); // 8時間勤務 - 1時間休憩 = 7時間
       expect(breakdown.regularHours).toBe(0); // 休日労働は全て割増対象
     });
   });
@@ -326,7 +326,7 @@ describe('日本労働基準法準拠計算テスト', () => {
       const breakdown = calculator.calculateDailyHours(timeRecord);
       
       expect(breakdown.isHoliday).toBe(true);
-      expect(breakdown.holidayHours).toBe(8);
+      expect(breakdown.holidayHours).toBe(7); // 8時間勤務 - 1時間休憩 = 7時間
     });
 
     it('通常の平日は休日労働扱いではない', () => {

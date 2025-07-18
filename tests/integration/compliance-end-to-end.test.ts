@@ -267,7 +267,8 @@ describe('労働基準法コンプライアンス統合テスト', () => {
         const breakdown = workingHoursCalculator.calculateDailyHours(timeRecord);
         
         // 基本的な労働時間計算の検証
-        expect(breakdown.totalHours).toBeGreaterThan(0);
+        const totalHours = breakdown.workingMinutes / 60;
+        expect(totalHours).toBeGreaterThan(0);
         expect(breakdown.regularHours).toBeGreaterThan(0);
         
         // 違反チェックは実装による
@@ -484,7 +485,8 @@ describe('労働基準法コンプライアンス統合テスト', () => {
         const breakdown = workingHoursCalculator.calculateDailyHours(record);
         
         // 基本的な労働時間計算の検証
-        expect(breakdown.totalHours).toBeGreaterThan(8); // 長時間勤務
+        const totalHours = breakdown.workingMinutes / 60;
+        expect(totalHours).toBeGreaterThan(8); // 長時間勤務
         expect(breakdown.regularHours).toBeGreaterThan(0);
         
         // 違反チェックは実装による
