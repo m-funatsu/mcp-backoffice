@@ -650,22 +650,22 @@ export class EmployeeLifecycleManagement {
 
   private async saveLifecycleStage(stage: EmployeeLifecycleStage): Promise<void> {
     // Mock implementation - save to database
-    console.log('Saving lifecycle stage:', stage);
+    // ライフサイクルステージ保存処理（ログ出力を削除）
   }
 
   private async saveOnboardingPlan(plan: OnboardingPlan): Promise<void> {
     // Mock implementation - save to database
-    console.log('Saving onboarding plan:', plan);
+    // オンボーディングプラン保存処理（ログ出力を削除）
   }
 
   private async saveOffboardingProcess(process: OffboardingProcess): Promise<void> {
     // Mock implementation - save to database
-    console.log('Saving offboarding process:', process);
+    // オフボーディングプロセス保存処理（ログ出力を削除）
   }
 
   private async sendStageTransitionNotification(employeeId: string, fromStage: LifecycleStage, toStage: LifecycleStage): Promise<void> {
     // Mock implementation - send notifications
-    console.log(`Employee ${employeeId} transitioned from ${fromStage} to ${toStage}`);
+    // ステージ遷移通知処理（ログ出力を削除）
   }
 }
 

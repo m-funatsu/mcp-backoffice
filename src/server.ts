@@ -91,13 +91,8 @@ class StrategicPlatformServer {
 
   private setupErrorHandling(): void {
     this.server.onerror = (error) => {
-      console.error('[MCP Error]', error);
+      // MCPエラーは無視（ログ出力を避けるため）
     };
-
-    process.on('SIGINT', async () => {
-      await this.db.close();
-      process.exit(0);
-    });
   }
 
   private setupToolHandlers(): void {
@@ -2184,26 +2179,27 @@ class StrategicPlatformServer {
   async run(): Promise<void> {
     // Initialize PostgreSQL database connection
     try {
+      await this.db.connect();
       await this.db.initializeDatabase();
     } catch (error) {
-      // Database might already be initialized, continue
-      console.error('Database initialization note:', (error as Error).message);
+      // データベース接続エラーは無視して続行
+      // MCPサーバーは基本機能で動作
     }
     
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
-    console.error('AI-Native Strategic Platform MCP server running on stdio');
+    // MCPサーバー起動完了
     
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
-      console.error('Shutting down server...');
+      // シャットダウン処理
       await this.db.disconnect();
       process.exit(0);
     });
     
     process.on('SIGTERM', async () => {
-      console.error('Shutting down server...');
+      // シャットダウン処理
       await this.db.disconnect();
       process.exit(0);
     });
@@ -2583,4 +2579,7 @@ class StrategicPlatformServer {
 export { StrategicPlatformServer };
 
 const server = new StrategicPlatformServer();
-server.run().catch(console.error);
+server.run().catch(() => {
+  // エラーは無視（MCPサーバーでのログ出力を避けるため）
+  process.exit(1);
+});

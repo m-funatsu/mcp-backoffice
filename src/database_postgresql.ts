@@ -12,21 +12,28 @@ class DatabasePostgreSQL {
   private client: Client;
 
   constructor() {
-    this.client = new Client({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'attendance_db',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
-    });
+    const connectionString = process.env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+    if (connectionString) {
+      this.client = new Client({
+        connectionString,
+      });
+    } else {
+      this.client = new Client({
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME || 'attendance_db',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+      });
+    }
   }
 
   async connect(): Promise<void> {
     try {
       await this.client.connect();
-      console.error('Connected to PostgreSQL database');
+      // 接続成功
     } catch (err) {
-      console.error('Error connecting to database:', err);
+      // 接続エラー
       throw err;
     }
   }
@@ -37,9 +44,9 @@ class DatabasePostgreSQL {
       const schema = readFileSync(schemaPath, 'utf8');
       
       await this.client.query(schema);
-      console.log('Database initialized successfully');
+      // ログ出力を削除（MCPサーバーでの標準出力干渉を防ぐため）
     } catch (err) {
-      console.error('Error initializing database:', err);
+      // 初期化エラー
       throw err;
     }
   }

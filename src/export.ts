@@ -241,7 +241,7 @@ class DataExporter {
         await this.copyFilesFromDirectory(searchDir, filesDir, allowedExtensions);
       } catch (error) {
         // Directory doesn't exist, continue
-        console.log(`Directory ${searchDir} not found, skipping...`);
+        // ディレクトリが見つからない場合はスキップ
       }
     }
   }
@@ -267,7 +267,7 @@ class DataExporter {
         }
       }
     } catch (error) {
-      console.log(`Error copying files from ${sourceDir}:`, error);
+      // ファイルコピーエラーは無視
     }
   }
 
@@ -330,7 +330,7 @@ class DataExporter {
     try {
       await this.importFiles(filesDir);
     } catch (error) {
-      console.log('No files directory found or error importing files:', error);
+      // ファイルディレクトリがない場合はスキップ
     }
   }
 
@@ -350,7 +350,7 @@ class DataExporter {
         };
         await this.db.addEmployee(employeeWithId);
       } catch (error) {
-        console.log(`Error importing employee ${employee.name}:`, error);
+        // 従業員インポートエラーは無視
       }
     }
 
@@ -359,14 +359,14 @@ class DataExporter {
       try {
         await this.db.savePayrollCalculation(payroll);
       } catch (error) {
-        console.log(`Error importing payroll for ${payroll.employeeId}:`, error);
+        // 給与データインポートエラーは無視
       }
     }
   }
 
   private async importFromCSV(importPath: string): Promise<void> {
     // Implementation for CSV import would go here
-    console.log('CSV import not yet implemented');
+    // CSVインポートは未実装
   }
 
   private async importFiles(filesDir: string): Promise<void> {
@@ -385,7 +385,7 @@ class DataExporter {
         }
       }
     } catch (error) {
-      console.log('Error importing files:', error);
+      // ファイルインポートエラーは無視
     }
   }
 }

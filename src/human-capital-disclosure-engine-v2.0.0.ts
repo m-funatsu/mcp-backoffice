@@ -1012,7 +1012,7 @@ export class HumanCapitalDisclosureEngine {
 
   private async saveReport(report: HumanCapitalReport): Promise<void> {
     // Mock implementation - in production, save to database
-    console.log('Saving human capital report:', report.reportId);
+    // レポート保存処理（ログ出力を削除）
   }
 }
 

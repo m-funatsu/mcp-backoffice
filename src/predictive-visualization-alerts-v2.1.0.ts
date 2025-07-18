@@ -180,7 +180,7 @@ export class PredictiveVisualizationAlerts {
   
   constructor(database: Database) {
     this.db = database;
-    this.initializeDefaultAlerts();
+    // 初期化は明示的に呼び出すように変更
   }
 
   /**
@@ -591,7 +591,7 @@ export class PredictiveVisualizationAlerts {
   }
 
   // プライベートメソッド
-  private initializeDefaultAlerts(): void {
+  private async initializeDefaultAlerts(): Promise<void> {
     // デフォルトのアラート設定
     const defaultAlerts: Omit<AlertConfig, 'id' | 'createdAt' | 'updatedAt'>[] = [
       {
@@ -636,9 +636,10 @@ export class PredictiveVisualizationAlerts {
       }
     ];
 
-    defaultAlerts.forEach(alert => {
-      this.addAlertConfig(alert);
-    });
+    // 非同期処理を並列実行
+    await Promise.all(
+      defaultAlerts.map(alert => this.addAlertConfig(alert))
+    );
   }
 
   private getRiskColor(riskLevel: string): string {
@@ -813,17 +814,17 @@ export class PredictiveVisualizationAlerts {
 
   private async sendNotification(recipient: AlertRecipient, alert: AlertRecord): Promise<void> {
     // 通知送信の実装（メール、Slack、Teams等）
-    console.log(`Sending ${recipient.type} notification to ${recipient.address}:`, alert.message);
+    // ログ出力を削除（MCPサーバーでの標準出力干渉を防ぐため）
   }
 
   private async saveAlertConfig(config: AlertConfig): Promise<void> {
     // データベースに保存
-    console.log('Saving alert config:', config.id);
+    // ログ出力を削除（MCPサーバーでの標準出力干渉を防ぐため）
   }
 
   private async saveAlertRecord(alert: AlertRecord): Promise<void> {
     // データベースに保存
-    console.log('Saving alert record:', alert.id);
+    // ログ出力を削除（MCPサーバーでの標準出力干渉を防ぐため）
   }
 
   private isWithinPeriod(date: Date, period: 'daily' | 'weekly' | 'monthly'): boolean {

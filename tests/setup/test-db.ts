@@ -13,7 +13,9 @@ export const createMockDatabase = () => {
     getAllEmployees: vi.fn(),
     clockIn: vi.fn(),
     clockOut: vi.fn(),
+    addTimeRecords: vi.fn(),
     getTimeRecords: vi.fn(),
+    updateEmployee: vi.fn(),
     savePayrollCalculation: vi.fn(),
     getPayrollCalculation: vi.fn(),
     getPayrollRules: vi.fn(),
@@ -38,6 +40,8 @@ export const createMockDatabase = () => {
   mockDb.getEmployee.mockResolvedValue(sampleEmployee);
   mockDb.getAllEmployees.mockResolvedValue([sampleEmployee]);
   mockDb.getTimeRecords.mockResolvedValue([sampleTimeRecord]);
+  mockDb.addTimeRecords.mockResolvedValue(undefined);
+  mockDb.updateEmployee.mockResolvedValue(undefined);
   mockDb.isHoliday.mockResolvedValue(false);
   mockDb.savePayrollCalculation.mockResolvedValue(undefined);
 
@@ -67,8 +71,11 @@ export const sampleEmployee = {
   position: 'エンジニア',
   hourlyRate: 2500,
   startDate: new Date('2024-01-01'),
+  birthDate: new Date('1990-01-01'),
   managerId: null,
-  isActive: true
+  isActive: true,
+  contractType: 'full_time',
+  salaryType: 'hourly'
 };
 
 export const sampleTimeRecord = {
@@ -78,5 +85,6 @@ export const sampleTimeRecord = {
   clockIn: new Date('2024-01-15T09:00:00'),
   clockOut: new Date('2024-01-15T18:00:00'),
   breakDuration: 60,
+  breakMinutes: 60,
   recordType: 'manual' as const
 };

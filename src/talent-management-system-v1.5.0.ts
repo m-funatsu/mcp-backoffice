@@ -792,12 +792,12 @@ export class TalentManagementSystem {
 
   private async saveTalentProfile(profile: TalentProfile): Promise<void> {
     // Mock implementation
-    console.log('Saving talent profile:', profile);
+    // タレントプロファイル保存処理（ログ出力を削除）
   }
 
   private async saveDevelopmentPlan(plan: DevelopmentPlan): Promise<void> {
     // Mock implementation
-    console.log('Saving development plan:', plan);
+    // 開発計画保存処理（ログ出力を削除）
   }
 
   private async getAllTalentProfiles(): Promise<TalentProfile[]> {

@@ -708,7 +708,7 @@ export class LearningTrainingManagement {
 
   private async updateEnrollmentProgress(employeeId: string, courseId: string, progress: number): Promise<void> {
     // Mock implementation - update enrollment progress
-    console.log(`Updating progress for employee ${employeeId} in course ${courseId}: ${progress}%`);
+    // 進捗更新処理（ログ出力を削除）
   }
 
   private async generateCertificateUrl(employeeId: string, certificationId: string): Promise<string> {
@@ -807,27 +807,27 @@ export class LearningTrainingManagement {
 
   private async saveCourse(course: TrainingCourse): Promise<void> {
     // Mock implementation
-    console.log('Saving course:', course);
+    // コース保存処理（ログ出力を削除）
   }
 
   private async saveLearningPath(path: LearningPath): Promise<void> {
     // Mock implementation
-    console.log('Saving learning path:', path);
+    // 学習パス保存処理（ログ出力を削除）
   }
 
   private async saveEnrollment(enrollment: Enrollment): Promise<void> {
     // Mock implementation
-    console.log('Saving enrollment:', enrollment);
+    // 登録保存処理（ログ出力を削除）
   }
 
   private async saveLearningRecord(record: LearningRecord): Promise<void> {
     // Mock implementation
-    console.log('Saving learning record:', record);
+    // 学習記録保存処理（ログ出力を削除）
   }
 
   private async saveSkillAssessment(assessment: SkillAssessment): Promise<void> {
     // Mock implementation
-    console.log('Saving skill assessment:', assessment);
+    // スキル評価保存処理（ログ出力を削除）
   }
 
   private async getCertification(certificationId: string): Promise<Certification | null> {
@@ -837,7 +837,7 @@ export class LearningTrainingManagement {
 
   private async saveEmployeeCertification(cert: EmployeeCertification): Promise<void> {
     // Mock implementation
-    console.log('Saving employee certification:', cert);
+    // 認定保存処理（ログ出力を削除）
   }
 
   private async getActiveComplianceTrainings(): Promise<ComplianceTraining[]> {
@@ -897,7 +897,7 @@ export class LearningTrainingManagement {
 
   private async sendApprovalNotification(managerId: string, enrollment: Enrollment): Promise<void> {
     // Mock implementation
-    console.log(`Sending approval notification to manager ${managerId} for enrollment ${enrollment.id}`);
+    // 承認通知送信処理（ログ出力を削除）
   }
 }
 
