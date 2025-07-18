@@ -447,6 +447,76 @@ export interface CategoryExpense {
   percentage: number;
 }
 
+// ===== 予測分析関連の型定義（v2.1.0） =====
+
+export interface PredictionResult {
+  type: 'overtime' | 'turnover' | 'performance' | 'compliance';
+  targetId: string;
+  predictions: Array<{
+    date: Date;
+    value: number;
+    confidence: number;
+    upperBound?: number;
+    lowerBound?: number;
+  }>;
+  metadata: {
+    model: string;
+    accuracy: number;
+    lastUpdated: Date;
+  };
+}
+
+export interface HRAnalytics {
+  period: string;
+  metrics: {
+    turnoverRate: number;
+    averageOvertimeHours: number;
+    employeeEngagement: number;
+    trainingHoursPerEmployee: number;
+  };
+  predictions: {
+    nextMonthTurnover: number;
+    nextMonthOvertime: number;
+  };
+  risks: Array<{
+    type: string;
+    level: 'low' | 'medium' | 'high' | 'critical';
+    affectedCount: number;
+  }>;
+}
+
+export interface OvertimePrediction {
+  employeeId: string;
+  currentMonth: number;
+  nextMonth: number;
+  trend: 'increasing' | 'stable' | 'decreasing';
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface TurnoverPrediction {
+  employeeId: string;
+  riskScore: number;
+  probability: number;
+  estimatedTimeframe: number; // days
+  keyFactors: string[];
+}
+
+export interface HumanCapitalMetrics {
+  date: Date;
+  diversity: {
+    genderBalance: number;
+    ageDistribution: Record<string, number>;
+  };
+  productivity: {
+    revenuePerEmployee: number;
+    overtimeRatio: number;
+  };
+  development: {
+    trainingInvestment: number;
+    skillGrowthRate: number;
+  };
+}
+
 export interface MonthlyExpense {
   month: string; // YYYY-MM
   amount: number;
