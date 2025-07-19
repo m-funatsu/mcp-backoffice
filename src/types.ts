@@ -118,6 +118,7 @@ export interface TimeRecord {
   recordType: 'ic_card' | 'pc_log' | 'manual';
   notes?: string;
   approvedBy?: string;
+  type?: 'normal' | 'overtime' | 'holiday' | 'late_night';
   approvedAt?: Date;
 }
 
@@ -134,6 +135,8 @@ export interface PayrollCalculation {
   lateNightPay: number;
   holidayPay: number;
   totalPay: number;
+  netPay: number;
+  bankAccount?: string;
   calculatedAt: Date;
 }
 
@@ -528,6 +531,21 @@ export interface VendorExpense {
   amount: number;
   count: number;
   averageAmount: number;
+}
+
+// Compliance Alert Type
+export interface ComplianceAlert {
+  id: string;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  timestamp: Date;
+  employeeId?: string;
+  department?: string;
+  details?: any;
+  resolved?: boolean;
+  resolvedAt?: Date;
+  resolvedBy?: string;
 }
 
 // v2.0.0 Human Capital Disclosure System Types

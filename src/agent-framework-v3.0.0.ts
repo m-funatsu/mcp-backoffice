@@ -47,6 +47,7 @@ export interface AgentGoal {
   deadline?: Date;
   constraints?: string[];
   successCriteria: string[];
+  metadata?: any;
 }
 
 export interface AgentAction {
@@ -82,6 +83,7 @@ export interface AgentState {
   status: 'idle' | 'planning' | 'executing' | 'paused' | 'completed' | 'failed';
   currentGoal?: AgentGoal;
   currentPlan?: AgentPlan;
+  currentAction?: string;
   executionProgress: {
     completedActions: string[];
     currentAction?: string;
@@ -94,8 +96,8 @@ export interface AgentState {
 // ===== 基本エージェントクラス =====
 
 export abstract class BaseAgent {
-  protected id: string;
-  protected name: string;
+  public readonly id: string;
+  public readonly name: string;
   protected capabilities: AgentCapability;
   protected state: AgentState;
   protected db: DatabasePostgreSQL;
