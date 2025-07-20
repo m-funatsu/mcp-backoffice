@@ -7,6 +7,7 @@
 
 import { BaseAgent } from '../agent-framework-v3.0.0.js';
 import { DatabasePostgreSQL } from '../database_postgresql.js';
+import Database from '../database.js';
 import { ComplianceEngine } from '../compliance-engine.js';
 import { IntegratedAnomalyDetectionEngine } from '../integrated-anomaly-detection-v2.1.0.js';
 import type { AgentGoal, AgentAction, AgentContext } from '../agent-framework-v3.0.0.js';
@@ -37,26 +38,30 @@ export interface ComplianceAction extends AgentAction {
 
 export class ComplianceAgent extends BaseAgent {
   private db: DatabasePostgreSQL;
+  private dbAdapter: Database;
   private complianceEngine: ComplianceEngine;
   private anomalyEngine: IntegratedAnomalyDetectionEngine;
   
   constructor(config: any) {
-    super({
-      id: 'compliance_agent_001',
-      name: 'コンプライアンスエージェント',
-      type: 'compliance',
-      capabilities: [
+    const db = new DatabasePostgreSQL(config.database);
+    super('コンプライアンスエージェント', {
+      name: 'compliance_agent',
+      description: 'Autonomous compliance monitoring and remediation agent',
+      version: '3.0.0',
+      supportedActions: [
         'continuous_monitoring',
         'violation_detection',
         'auto_remediation',
         'regulatory_reporting',
         'predictive_compliance'
       ],
-      autonomyLevel: 0.9
-    });
+      requiredPermissions: ['read', 'write', 'execute']
+    }, db);
     
-    this.db = new DatabasePostgreSQL(config.database);
-    this.complianceEngine = new ComplianceEngine(this.db);
+    this.db = db;
+    // DatabasePostgreSQLをDatabaseインターフェースとして使用
+    this.dbAdapter = db as any;
+    this.complianceEngine = new ComplianceEngine(this.dbAdapter);
     this.anomalyEngine = new IntegratedAnomalyDetectionEngine(this.db);
   }
 

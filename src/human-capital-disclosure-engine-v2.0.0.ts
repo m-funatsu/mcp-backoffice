@@ -58,6 +58,17 @@ export interface ComplianceMetrics {
   ethicsHotlineCalls: number;
   ethicsTrainingHours: number;
   codeOfConductAcknowledgment: number; // %
+  
+  // Additional properties for test compatibility
+  complianceScore?: number;
+  harassmentIncidentRate?: number;
+  incidentTypes?: Record<string, number>;
+  incidentsBySeverity?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
 }
 
 export interface CostMetrics {
@@ -401,7 +412,16 @@ export class HumanCapitalDisclosureEngine {
   /**
    * Calculate comprehensive human capital metrics
    */
-  async calculateHumanCapitalMetrics(reportingPeriod: { startDate: Date; endDate: Date }): Promise<HumanCapitalMetrics> {
+  async calculateHumanCapitalMetrics(reportingPeriod?: { startDate: Date; endDate: Date }): Promise<HumanCapitalMetrics> {
+    // Default to current year if no period specified
+    if (!reportingPeriod) {
+      const now = new Date();
+      reportingPeriod = {
+        startDate: startOfYear(now),
+        endDate: endOfYear(now)
+      };
+    }
+    
     const employees = await this.db.getAllEmployees();
     const activeEmployees = employees.filter(emp => emp.isActive);
 
@@ -499,18 +519,60 @@ export class HumanCapitalDisclosureEngine {
   // Private calculation methods
 
   private async calculateComplianceMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<ComplianceMetrics> {
-    // Mock implementation - in production, integrate with actual compliance systems
+    // Get training completion data from database
+    const trainingCompletions = await this.db.query(
+      'SELECT COUNT(DISTINCT employee_id) as completed FROM trainings WHERE training_type = $1 AND completed_at IS NOT NULL',
+      ['ethics']
+    );
+    
+    const completedCount = trainingCompletions.rows?.[0]?.completed || 0;
+    const completionRate = employees.length > 0 ? completedCount / employees.length : 0;
+    
+    // Get incident data
+    const incidentData = await this.db.query(
+      'SELECT type, severity, COUNT(*) as count FROM compliance_incidents WHERE reported_at BETWEEN $1 AND $2 GROUP BY type, severity',
+      [period.startDate, period.endDate]
+    );
+    
+    // Process incident data
+    const incidentTypes: Record<string, number> = {};
+    const incidentsBySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+    let harassmentCount = 0;
+    
+    for (const row of incidentData.rows || []) {
+      // Count by type
+      incidentTypes[row.type] = (incidentTypes[row.type] || 0) + parseInt(row.count);
+      
+      // Count by severity
+      if (row.severity in incidentsBySeverity) {
+        incidentsBySeverity[row.severity as keyof typeof incidentsBySeverity] += parseInt(row.count);
+      }
+      
+      // Count harassment incidents
+      if (row.type === 'harassment') {
+        harassmentCount += parseInt(row.count);
+      }
+    }
+    
+    const harassmentIncidentRate = employees.length > 0 ? harassmentCount / employees.length : 0;
+    const complianceScore = completionRate * 0.5 + (1 - harassmentIncidentRate) * 0.5;
+    
     return {
-      ethicsTrainingCompletionRate: 95.2,
+      ethicsTrainingCompletionRate: completionRate,
       whistleblowerCases: 3,
       legalViolations: 0,
       finesAndPenalties: 0,
       complianceRating: 4.5,
-      harassmentIncidents: 1,
+      harassmentIncidents: harassmentCount,
       harassmentResolutionRate: 100,
       ethicsHotlineCalls: 12,
       ethicsTrainingHours: 2400,
-      codeOfConductAcknowledgment: 98.8
+      codeOfConductAcknowledgment: 98.8,
+      // Additional properties for test compatibility
+      complianceScore,
+      harassmentIncidentRate,
+      incidentTypes,
+      incidentsBySeverity
     };
   }
 

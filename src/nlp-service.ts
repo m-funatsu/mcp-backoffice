@@ -12,55 +12,45 @@ export class NLPService {
       confidence: 0.7
     };
 
-    // Extract amount (Japanese yen patterns)
+    // Extract amount (Japanese yen patterns with various notations)
     const amountPatterns = [
       /(\d{1,3}(?:,\d{3})*)\s*円/,
-      /¥\s*(\d{1,3}(?:,\d{3})*)/,
+      /¥\s*(\d+(?:,\d{3})*)/,
+      /￥(\d+(?:,\d{3})*)/,
       /(\d{1,3}(?:,\d{3})*)\s*えん/,
-      /(\d+)\s*円/
+      /(\d+(?:\.\d+)?)\s*万\s*(\d+)?\s*千?\s*円?/,  // 1万5千円 pattern
+      /(\d+(?:\.\d+)?)\s*万(?:円)?/,
+      /(\d+)\s*千(?:円)?/,
+      /(\d+)\s*百(?:円)?/,
+      /(\d+)円/
     ];
 
     for (const pattern of amountPatterns) {
       const match = input.match(pattern);
       if (match) {
-        parsed.amount = parseInt(match[1].replace(/,/g, ''));
+        const amountStr = match[1].replace(/,/g, '');
+        
+        // Handle special cases like 万 and 千
+        if (match[0].includes('万') && match[2]) {
+          // Handle cases like "1万5千円"
+          const man = parseFloat(amountStr) * 10000;
+          const sen = parseFloat(match[2]) * 1000;
+          parsed.amount = man + sen;
+        } else if (match[0].includes('万')) {
+          parsed.amount = parseFloat(amountStr) * 10000;
+        } else if (match[0].includes('千')) {
+          parsed.amount = parseFloat(amountStr) * 1000;
+        } else if (match[0].includes('百')) {
+          parsed.amount = parseFloat(amountStr) * 100;
+        } else {
+          parsed.amount = parseInt(amountStr);
+        }
         break;
       }
     }
 
     // Extract date patterns
-    const datePatterns = [
-      /(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})[日]?/,
-      /(\d{1,2})[月\/\-](\d{1,2})[日]?/,
-      /(今日|きょう)/,
-      /(昨日|きのう)/,
-      /(明日|あした)/
-    ];
-
-    for (const pattern of datePatterns) {
-      const match = input.match(pattern);
-      if (match) {
-        if (match[0].includes('今日') || match[0].includes('きょう')) {
-          parsed.date = new Date();
-        } else if (match[0].includes('昨日') || match[0].includes('きのう')) {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          parsed.date = yesterday;
-        } else if (match[0].includes('明日') || match[0].includes('あした')) {
-          const tomorrow = new Date();
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          parsed.date = tomorrow;
-        } else if (match[3]) {
-          // Full date with year
-          parsed.date = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
-        } else if (match[1] && match[2]) {
-          // Month and day only (assume current year)
-          const currentYear = new Date().getFullYear();
-          parsed.date = new Date(currentYear, parseInt(match[1]) - 1, parseInt(match[2]));
-        }
-        break;
-      }
-    }
+    parsed.date = this.parseComplexDate(input);
 
     // Extract category hints
     const categoryKeywords = {
@@ -114,25 +104,49 @@ export class NLPService {
     // Extract vendor (usually first few lines)
     for (let i = 0; i < Math.min(3, lines.length); i++) {
       const line = lines[i];
-      if (line.length > 2 && !line.match(/\d/) && !line.includes('TEL')) {
-        vendor = line;
+      // Skip lines with prices, dates, phone numbers, or common receipt headers
+      if (line.length > 0 && 
+          !line.match(/¥|\d+円/) && 
+          !line.match(/\d{4}年|\d{4}[\/\-]/) && 
+          !line.includes('TEL') &&
+          !line.match(/^領収書$/) && // Skip "領収書" (receipt)
+          !line.match(/^レシート$/)) { // Skip "レシート" (receipt)
+        // Clean up OCR placeholder characters in vendor name
+        vendor = line.replace(/□/g, '');
         break;
       }
     }
 
     // Extract date
     for (const line of lines) {
+      // Try standard date formats
       const dateMatch = line.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
       if (dateMatch) {
-        date = new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[3]));
+        const year = parseInt(dateMatch[1]);
+        const month = parseInt(dateMatch[2]) - 1;
+        const day = parseInt(dateMatch[3]);
+        date = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+        break;
+      }
+      
+      // Try Japanese date format (年月日)
+      const jpDateMatch = line.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+      if (jpDateMatch) {
+        const year = parseInt(jpDateMatch[1]);
+        const month = parseInt(jpDateMatch[2]) - 1;
+        const day = parseInt(jpDateMatch[3]);
+        date = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
         break;
       }
     }
 
     // Extract items and amounts
     for (const line of lines) {
+      // Handle OCR placeholder characters
+      const cleanedLine = line.replace(/□/g, '0'); // Replace □ with 0
+      
       // Look for price patterns
-      const priceMatch = line.match(/¥\s*(\d{1,3}(?:,\d{3})*)|(\d{1,3}(?:,\d{3})*)\s*円/);
+      const priceMatch = cleanedLine.match(/¥\s*(\d{1,3}(?:,\d{3})*)[-ー]?|(\d{1,3}(?:,\d{3})*)\s*円/);
       if (priceMatch) {
         const amount = parseInt((priceMatch[1] || priceMatch[2]).replace(/,/g, ''));
         
@@ -158,12 +172,22 @@ export class NLPService {
       total = items.reduce((sum, item) => sum + item.totalPrice, 0);
     }
 
+    // Extract description from "但" (purpose) line
+    let description: string | undefined;
+    for (const line of lines) {
+      if (line.includes('但')) {
+        description = line.replace('但', '').trim();
+        break;
+      }
+    }
+
     return {
       vendor: vendor || 'Unknown',
       date,
       total,
       items,
-      taxAmount
+      taxAmount,
+      description
     };
   }
 
@@ -183,6 +207,102 @@ export class NLPService {
     description = description.trim();
     const sentences = description.split('。');
     return sentences[0] || input.substring(0, 50);
+  }
+
+  private parseComplexDate(input: string): Date | undefined {
+    const now = new Date();
+    
+    // Simple date patterns
+    const simplePatterns = [
+      { pattern: /(今日|きょう)/, handler: () => new Date() },
+      { pattern: /(昨日|きのう)/, handler: () => {
+        const date = new Date();
+        date.setDate(date.getDate() - 1);
+        return date;
+      }},
+      { pattern: /(明日|あした)/, handler: () => {
+        const date = new Date();
+        date.setDate(date.getDate() + 1);
+        return date;
+      }},
+      { pattern: /(\d+)\s*日前/, handler: (match: RegExpMatchArray) => {
+        const days = parseInt(match[1]);
+        const date = new Date();
+        date.setDate(date.getDate() - days);
+        return date;
+      }}
+    ];
+    
+    // Check simple patterns first
+    for (const { pattern, handler } of simplePatterns) {
+      const match = input.match(pattern);
+      if (match) {
+        return handler(match);
+      }
+    }
+    
+    // Complex date patterns
+    if (input.includes('先月末')) {
+      const date = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
+      return date;
+    }
+    
+    if (input.includes('今月末')) {
+      const date = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+      return date;
+    }
+    
+    if (input.includes('今週月曜') || input.includes('今週の月曜')) {
+      const date = new Date();
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+      date.setDate(diff);
+      return date;
+    }
+    
+    if (input.includes('先週')) {
+      const date = new Date();
+      date.setDate(date.getDate() - 7);
+      
+      // Check for specific day of week
+      const dayMatch = input.match(/(?:月|火|水|木|金|土|日)曜/);
+      if (dayMatch) {
+        const targetDay = this.getDayOfWeekNumber(dayMatch[0]);
+        const currentDay = date.getDay();
+        const diff = targetDay - currentDay;
+        date.setDate(date.getDate() + diff);
+      }
+      return date;
+    }
+    
+    // Standard date formats
+    const datePatterns = [
+      /(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})[日]?/,
+      /(\d{1,2})[月\/\-](\d{1,2})[日]?/
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = input.match(pattern);
+      if (match) {
+        if (match[3]) {
+          // Full date with year
+          return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+        } else if (match[1] && match[2]) {
+          // Month and day only (assume current year)
+          return new Date(now.getFullYear(), parseInt(match[1]) - 1, parseInt(match[2]));
+        }
+      }
+    }
+    
+    return undefined;
+  }
+  
+  private getDayOfWeekNumber(dayName: string): number {
+    const days: { [key: string]: number } = {
+      '日曜': 0, '月曜': 1, '火曜': 2, '水曜': 3,
+      '木曜': 4, '金曜': 5, '土曜': 6
+    };
+    return days[dayName] || 0;
   }
 
   private extractPurpose(input: string): string {
@@ -233,3 +353,5 @@ export class NLPService {
   }
   */
 }
+
+export default NLPService;

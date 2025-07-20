@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import HumanCapitalDisclosureEngine from '../../src/human-capital-disclosure-v2.0.0.js';
+import HumanCapitalDisclosureEngine from '../../src/human-capital-disclosure-engine-v2.0.0.js';
 import { DatabasePostgreSQL } from '../../src/database_postgresql.js';
 import type { 
   Employee, 
@@ -8,29 +8,44 @@ import type {
   HumanCapitalReport 
 } from '../../src/types.js';
 
+
 describe('v2.0.0 人的資本開示エンジン - 網羅的テスト', () => {
   let engine: HumanCapitalDisclosureEngine;
   let mockDb: DatabasePostgreSQL;
   let testEmployees: ExtendedEmployee[];
+  let mockLifecycleManagement: any;
+  let mockTalentManagement: any;
+  let mockLearningManagement: any;
 
   beforeEach(() => {
+    // 多様なテスト従業員データ
+    testEmployees = generateDiverseEmployees(100);
+    
     mockDb = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
-      getAllEmployees: vi.fn(),
+      getAllEmployees: vi.fn().mockResolvedValue(testEmployees),
       getEmployee: vi.fn(),
-      getTimeRecords: vi.fn(),
-      getAllTimeRecords: vi.fn(),
-      getPayrollCalculations: vi.fn(),
-      getAllPayrollCalculations: vi.fn(),
+      getTimeRecords: vi.fn().mockResolvedValue([]),
+      getAllTimeRecords: vi.fn().mockResolvedValue([]),
+      getPayrollCalculations: vi.fn().mockResolvedValue([]),
+      getAllPayrollCalculations: vi.fn().mockResolvedValue([]),
       beginTransaction: vi.fn(),
       commitTransaction: vi.fn(),
       rollbackTransaction: vi.fn()
     } as any;
 
-    engine = new HumanCapitalDisclosureEngine(mockDb);
+    // Set up default mock responses for common queries
+    mockDb.query = vi.fn().mockImplementation((sql: string) => {
+      // Default empty result for all queries
+      return Promise.resolve({ rows: [] });
+    });
 
-    // 多様なテスト従業員データ
-    testEmployees = generateDiverseEmployees();
+    // Mock the other required services
+    mockLifecycleManagement = {};
+    mockTalentManagement = {};
+    mockLearningManagement = {};
+
+    engine = new HumanCapitalDisclosureEngine(mockDb, mockLifecycleManagement, mockTalentManagement, mockLearningManagement);
   });
 
   describe('ISO30414準拠指標計算', () => {
@@ -39,12 +54,10 @@ describe('v2.0.0 人的資本開示エンジン - 網羅的テスト', () => {
         mockDb.getAllEmployees = vi.fn().mockResolvedValue(testEmployees);
         mockDb.query = vi.fn()
           .mockResolvedValueOnce({ 
-            rows: testEmployees.slice(0, 80).map(e => ({
-              employee_id: e.id,
-              training_type: 'ethics',
-              completed_at: new Date()
-            }))
-          });
+            rows: [{ completed: 80 }]  // Training completions count
+          })
+          .mockResolvedValueOnce({ rows: [] })  // Incident data
+          .mockResolvedValue({ rows: [] });  // Any other queries
 
         const metrics = await engine.calculateHumanCapitalMetrics();
 
@@ -55,23 +68,14 @@ describe('v2.0.0 人的資本開示エンジン - 網羅的テスト', () => {
       it('ハラスメント事案発生率を計算する', async () => {
         mockDb.getAllEmployees = vi.fn().mockResolvedValue(testEmployees);
         mockDb.query = vi.fn()
-          .mockResolvedValueOnce({ rows: [] }) // 倫理研修
+          .mockResolvedValueOnce({ rows: [{ completed: 0 }] }) // 倫理研修
           .mockResolvedValueOnce({ 
             rows: [
-              { 
-                id: 'inc001',
-                type: 'harassment',
-                severity: 'medium',
-                reported_at: new Date()
-              },
-              { 
-                id: 'inc002',
-                type: 'harassment',
-                severity: 'low',
-                reported_at: new Date()
-              }
+              { type: 'harassment', severity: 'medium', count: 1 },
+              { type: 'harassment', severity: 'low', count: 1 }
             ]
-          });
+          })
+          .mockResolvedValue({ rows: [] });
 
         const metrics = await engine.calculateHumanCapitalMetrics();
 
@@ -82,15 +86,16 @@ describe('v2.0.0 人的資本開示エンジン - 網羅的テスト', () => {
       it('コンプライアンス違反の重大度別集計を行う', async () => {
         mockDb.getAllEmployees = vi.fn().mockResolvedValue(testEmployees);
         mockDb.query = vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [{ completed: 0 }] }) // 倫理研修
           .mockResolvedValueOnce({ 
             rows: [
-              { type: 'policy_violation', severity: 'critical' },
-              { type: 'harassment', severity: 'high' },
-              { type: 'discrimination', severity: 'medium' },
-              { type: 'safety_violation', severity: 'low' }
+              { type: 'policy_violation', severity: 'critical', count: 1 },
+              { type: 'harassment', severity: 'high', count: 1 },
+              { type: 'discrimination', severity: 'medium', count: 1 },
+              { type: 'safety_violation', severity: 'low', count: 1 }
             ]
-          });
+          })
+          .mockResolvedValue({ rows: [] });
 
         const metrics = await engine.calculateHumanCapitalMetrics();
 
@@ -755,10 +760,11 @@ function generateDiverseEmployees(count: number = 100): ExtendedEmployee[] {
       department: departments[i % departments.length],
       position: positions[Math.floor(Math.random() * positions.length)],
       hourlyWage: 2000 + Math.floor(Math.random() * 3000),
-      monthlySalary: position => {
+      monthlySalary: (() => {
+        const position = positions[Math.floor(Math.random() * positions.length)];
         const base = positions.indexOf(position || 'スタッフ');
         return 250000 + base * 150000 + Math.random() * 100000;
-      }(positions[Math.floor(Math.random() * positions.length)]),
+      })(),
       startDate: new Date(Date.now() - yearsOfService * 365 * 24 * 60 * 60 * 1000).toISOString(),
       isActive: Math.random() > 0.05,
       gender: genders[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : Math.random() > 0.9 ? 2 : i % 2],

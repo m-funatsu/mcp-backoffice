@@ -195,16 +195,18 @@ export abstract class BaseAgent {
         results.push(...groupResults);
         
         // 失敗したアクションがある場合の処理
-        const failures = groupResults.filter(r => r.status === 'failure');
-        if (failures.length > 0) {
-          await this.handleFailures(failures);
+        if (groupResults && groupResults.length > 0) {
+          const failures = groupResults.filter(r => r && r.status === 'failure');
+          if (failures.length > 0) {
+            await this.handleFailures(failures);
+          }
         }
       }
       
       this.state.status = 'completed';
       this.logger.info('Plan execution completed', { 
         totalActions: results.length,
-        successCount: results.filter(r => r.status === 'success').length 
+        successCount: results.filter(r => r && r.status === 'success').length 
       });
       
       return results;
@@ -240,7 +242,10 @@ export abstract class BaseAgent {
    * 状態のスナップショット取得
    */
   getStateSnapshot(): AgentState {
-    return JSON.parse(JSON.stringify(this.state));
+    return {
+      ...this.state,
+      memory: new Map(this.state.memory)
+    };
   }
 
   // ===== 抽象メソッド（サブクラスで実装） =====

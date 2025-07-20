@@ -521,13 +521,26 @@ export class SlackIntegration implements CommunicationIntegration {
       'Content-Type': 'application/json'
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      });
 
-    return response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Slack API error: ${response.status} - ${errorText}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      // ネットワークエラーやその他のエラーを適切に処理
+      if (error.message.includes('Network error') || error.message.includes('fetch')) {
+        throw new Error(`Network error: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   private transformToSlackFormat(notification: Notification): any {
@@ -730,9 +743,10 @@ export class TeamsIntegration implements CommunicationIntegration {
       body: data ? JSON.stringify(data) : undefined
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Teams API error: ${response.status} - ${error}`);
+    if (!response || !response.ok) {
+      const error = response ? await response.text() : 'No response';
+      const status = response?.status || 'Unknown';
+      throw new Error(`Teams API error: ${status} - ${error}`);
     }
 
     return response.json();

@@ -163,7 +163,7 @@ export class WorkingHoursCalculator {
         overtimeHours: 0,
         lateNightHours: 0,
         holidayHours: 0,
-        isHoliday: this.isHoliday(timeRecord.date),
+        isHoliday: timeRecord.isHoliday || this.isHoliday(timeRecord.date),
         isWeekend: this.isWeekend(timeRecord.date),
         violations: [{
           type: 'excessive_hours',
@@ -180,7 +180,7 @@ export class WorkingHoursCalculator {
     const workingMinutes = totalMinutes - breakMinutes;
     const workingHours = workingMinutes / 60;
 
-    const isHoliday = this.isHoliday(timeRecord.date);
+    const isHoliday = timeRecord.isHoliday || this.isHoliday(timeRecord.date);
     const isWeekend = this.isWeekend(timeRecord.date);
 
     // Calculate regular vs overtime hours

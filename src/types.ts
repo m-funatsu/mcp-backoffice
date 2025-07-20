@@ -5,9 +5,11 @@ export interface Employee {
   department: string;
   position: string;
   hourlyRate: number;
-  startDate: Date;
+  hourlyWage?: number; // 互換性のため
+  startDate: Date | string; // 文字列も受け入れる
   managerId?: string;
   isActive: boolean;
+  agreementType?: string;
   birthDate?: Date; // For age-based calculations (e.g., long-term care insurance)
   // Extended payroll fields
   employeeNumber?: string;
@@ -120,6 +122,7 @@ export interface TimeRecord {
   approvedBy?: string;
   type?: 'normal' | 'overtime' | 'holiday' | 'late_night';
   approvedAt?: Date;
+  isHoliday?: boolean; // 休日かどうか
 }
 
 export interface PayrollCalculation {
@@ -135,9 +138,15 @@ export interface PayrollCalculation {
   lateNightPay: number;
   holidayPay: number;
   totalPay: number;
-  netPay: number;
+  netPay?: number;
   bankAccount?: string;
   calculatedAt: Date;
+  // 拡張プロパティ
+  warnings?: any[];
+  complianceReport?: {
+    yearlyOvertimeTotal?: number;
+  };
+  payslip?: any;
 }
 
 export interface WorkingHours {
@@ -414,6 +423,7 @@ export interface StructuredReceiptData {
   items: ReceiptItem[];
   taxAmount?: number;
   paymentMethod?: string;
+  description?: string;
 }
 
 export interface ExpenseAnalytics {
@@ -1210,4 +1220,58 @@ export interface SkillTrend {
   trend: 'increasing' | 'decreasing' | 'stable';
   changeRate: number;
   demandLevel: 'high' | 'medium' | 'low';
+}
+
+// Extended employee interface for human capital disclosure
+export interface ExtendedEmployee extends Employee {
+  // Demographics
+  gender?: "male" | "female" | "other";
+  age?: number;
+  nationality?: string;
+  educationLevel?: string;
+  employmentType?: "full-time" | "part-time" | "contract" | "temporary";
+  disabilityStatus?: boolean;
+  workSystem?: string;
+  isManager?: boolean;
+  
+  // Management
+  managementLevel?: "executive" | "senior" | "middle" | "junior";
+  
+  // Skills
+  skills?: EmployeeSkill[];
+  
+  // Performance
+  performanceRating?: number;
+  lastReviewDate?: Date;
+  
+  // Engagement
+  engagementScore?: number;
+  lastSurveyDate?: Date;
+  
+  // Training
+  trainingHours?: number;
+  completedTrainings?: TrainingRecord[];
+  
+  // Compensation
+  baseSalary?: number;
+  totalCompensation?: number;
+}
+
+export interface EmployeeSkill {
+  skillId: string;
+  skillName: string;
+  category: "technical" | "soft" | "leadership" | "professional";
+  proficiencyLevel: number; // 1-5
+  lastAssessedDate: Date;
+  certifications?: string[];
+}
+
+export interface TrainingRecord {
+  trainingId: string;
+  trainingName: string;
+  category: string;
+  completedDate: Date;
+  hoursSpent: number;
+  score?: number;
+  certificateId?: string;
 }
