@@ -1275,3 +1275,139 @@ export interface TrainingRecord {
   score?: number;
   certificateId?: string;
 }
+
+// Talent Management Types (v2.2.0)
+export type NineBoxCategory = 
+  | 'star'                    // High Performance, High Potential
+  | 'high_performer'          // High Performance, Medium Potential
+  | 'specialist'              // High Performance, Low Potential
+  | 'high_potential'          // Medium Performance, High Potential
+  | 'core_contributor'        // Medium Performance, Medium Potential
+  | 'solid_performer'         // Medium Performance, Low Potential
+  | 'rough_diamond'           // Low Performance, High Potential
+  | 'inconsistent_performer'  // Low Performance, Medium Potential
+  | 'underperformer';         // Low Performance, Low Potential
+
+export type ReadinessLevel = 'ready_now' | '1_year' | '2_years' | '3_years_plus';
+
+export interface TalentProfile {
+  id: string;
+  employeeId: string;
+  performanceRating: number; // 1-5
+  potentialRating: number;   // 1-5
+  nineBoxCategory: NineBoxCategory;
+  assessmentDate: Date;
+  assessedBy: string;
+  
+  // Performance Details
+  goalAchievementRate?: number;
+  competencyScore?: number;
+  behaviorRating?: number;
+  
+  // Potential Details
+  learningAgility?: number;
+  leadershipPotential?: number;
+  strategicThinking?: number;
+  adaptability?: number;
+  
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SuccessionPlan {
+  id: string;
+  positionId: string;
+  positionTitle: string;
+  department: string;
+  criticality: 'critical' | 'important' | 'standard';
+  incumbentId?: string;
+  vacancyRisk?: 'immediate' | 'high' | 'medium' | 'low';
+  
+  requiredExperienceYears?: number;
+  requiredSkills?: string[];
+  requiredCompetencies?: string[];
+  
+  candidates: SuccessionCandidate[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SuccessionCandidate {
+  id: string;
+  successionPlanId: string;
+  candidateId: string;
+  readinessLevel: ReadinessLevel;
+  readinessScore: number;
+  
+  skillGaps?: string[];
+  experienceGaps?: string[];
+  developmentActions?: string[];
+  
+  lastAssessmentDate: Date;
+  assessedBy: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CareerPath {
+  id: string;
+  employeeId: string;
+  currentPosition: string;
+  targetPosition?: string;
+  pathType: 'vertical' | 'lateral' | 'expert_track';
+  
+  aiRecommended: boolean;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
+  
+  pathSteps?: CareerStep[];
+  estimatedTimelineMonths?: number;
+  
+  requiredSkills?: string[];
+  currentSkills?: string[];
+  skillGaps?: string[];
+  developmentPlan?: any[];
+  
+  status: 'planned' | 'in_progress' | 'completed' | 'abandoned';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CareerStep {
+  position: string;
+  months: number;
+  skills?: string[];
+  milestones?: string[];
+}
+
+export interface OrganizationNetwork {
+  id: string;
+  analysisDate: Date;
+  analysisType: 'collaboration' | 'communication' | 'influence';
+  
+  networkDensity: number;
+  clusteringCoefficient: number;
+  averagePathLength: number;
+  
+  keyInfluencers: any[];
+  bridgeEmployees: any[];
+  isolatedEmployees: any[];
+  collaborationClusters: any[];
+  
+  recommendations: string[];
+  createdAt: Date;
+}
+
+export interface EmployeeConnection {
+  id: string;
+  fromEmployeeId: string;
+  toEmployeeId: string;
+  connectionType: string;
+  connectionStrength: number;
+  interactionFrequency: number;
+  lastInteractionDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}

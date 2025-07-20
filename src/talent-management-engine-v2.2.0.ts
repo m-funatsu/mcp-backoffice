@@ -1,657 +1,733 @@
-/**
- * v2.2.0: Talent Management Engine
- * タレントマネジメントエンジン
- * 
- * スキル管理、研修管理、パフォーマンス評価、目標管理（MBO/OKR）の統合管理
- * 戦略的人事への進化を支援するコア機能
- */
-
 import Database from './database.js';
 import type { 
-  TalentSkill, 
-  EmployeeSkill, 
-  TrainingRecord, 
-  PerformanceEvaluationV2, 
-  GoalOKR,
-  SkillMap,
-  SkillGap,
-  TalentDashboard,
-  TalentAnalytics,
-  TrainingRecommendation,
-  CareerPathSuggestion,
-  TalentWorkflow
+  Employee,
+  TalentProfile,
+  SuccessionPlan,
+  SuccessionCandidate,
+  CareerPath,
+  OrganizationNetwork,
+  EmployeeConnection,
+  NineBoxCategory,
+  ReadinessLevel
 } from './types.js';
 
+/**
+ * タレントマネジメントエンジン v2.2.0
+ * 人材の戦略的配置・最適化による組織力最大化
+ */
 export class TalentManagementEngine {
-  private db: Database;
+  constructor(private db: Database) {}
 
-  constructor(database: Database) {
-    this.db = database;
+  /**
+   * 9ボックスグリッド評価
+   */
+  async createTalentProfile(
+    employeeId: string,
+    assessment: {
+      performanceRating: number;
+      potentialRating: number;
+      assessedBy: string;
+      details?: {
+        goalAchievementRate?: number;
+        competencyScore?: number;
+        behaviorRating?: number;
+        learningAgility?: number;
+        leadershipPotential?: number;
+        strategicThinking?: number;
+        adaptability?: number;
+      };
+      notes?: string;
+    }
+  ): Promise<TalentProfile> {
+    // 9ボックスカテゴリを判定
+    const category = this.calculateNineBoxCategory(
+      assessment.performanceRating,
+      assessment.potentialRating
+    );
+
+    const profile: TalentProfile = {
+      id: `TALENT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      employeeId,
+      performanceRating: assessment.performanceRating,
+      potentialRating: assessment.potentialRating,
+      nineBoxCategory: category,
+      assessmentDate: new Date(),
+      assessedBy: assessment.assessedBy,
+      ...assessment.details,
+      notes: assessment.notes,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // データベースに保存
+    await this.db.query(
+      `INSERT INTO talent_profiles (
+        id, employee_id, performance_rating, potential_rating,
+        nine_box_category, assessment_date, assessed_by,
+        goal_achievement_rate, competency_score, behavior_rating,
+        learning_agility, leadership_potential, strategic_thinking,
+        adaptability, notes, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+      [
+        profile.id,
+        profile.employeeId,
+        profile.performanceRating,
+        profile.potentialRating,
+        profile.nineBoxCategory,
+        profile.assessmentDate,
+        profile.assessedBy,
+        profile.goalAchievementRate,
+        profile.competencyScore,
+        profile.behaviorRating,
+        profile.learningAgility,
+        profile.leadershipPotential,
+        profile.strategicThinking,
+        profile.adaptability,
+        profile.notes,
+        profile.createdAt,
+        profile.updatedAt
+      ]
+    );
+
+    return profile;
   }
 
   /**
-   * 🧠 スキル管理システム
+   * 9ボックスカテゴリ判定
    */
+  private calculateNineBoxCategory(
+    performance: number,
+    potential: number
+  ): NineBoxCategory {
+    // パフォーマンスとポテンシャルを3段階に分類
+    const perfLevel = performance <= 2.5 ? 'low' : performance <= 3.5 ? 'medium' : 'high';
+    const potLevel = potential <= 2.5 ? 'low' : potential <= 3.5 ? 'medium' : 'high';
+
+    const categoryMap: Record<string, NineBoxCategory> = {
+      'high-high': 'star',
+      'high-medium': 'high_performer',
+      'high-low': 'specialist',
+      'medium-high': 'high_potential',
+      'medium-medium': 'core_contributor',
+      'medium-low': 'solid_performer',
+      'low-high': 'rough_diamond',
+      'low-medium': 'inconsistent_performer',
+      'low-low': 'underperformer'
+    };
+
+    return categoryMap[`${perfLevel}-${potLevel}`] as NineBoxCategory;
+  }
 
   /**
-   * スキルマップ生成
+   * 9ボックスグリッドデータ取得
    */
-  async generateSkillMap(employeeId: string): Promise<SkillMap> {
-    const employeeSkills = await this.db.getEmployeeSkills(employeeId);
-    const skillsByCategory: Record<string, EmployeeSkill[]> = {};
+  async getNineBoxGrid(departmentId?: string): Promise<{
+    grid: Record<NineBoxCategory, Employee[]>;
+    statistics: {
+      total: number;
+      byCategory: Record<NineBoxCategory, number>;
+      recommendations: string[];
+    };
+  }> {
+    let query = `
+      SELECT tp.*, e.* 
+      FROM talent_profiles tp
+      JOIN employees e ON tp.employee_id = e.id
+      WHERE tp.assessment_date = (
+        SELECT MAX(assessment_date) 
+        FROM talent_profiles tp2 
+        WHERE tp2.employee_id = tp.employee_id
+      )
+    `;
+    
+    const params: any[] = [];
+    if (departmentId) {
+      query += ' AND e.department = $1';
+      params.push(departmentId);
+    }
 
-    // カテゴリ別スキル分類
-    employeeSkills.forEach(skill => {
-      if (!skillsByCategory[skill.skill_category]) {
-        skillsByCategory[skill.skill_category] = [];
-      }
-      skillsByCategory[skill.skill_category].push({
-        id: skill.id,
-        employeeId: skill.employee_id,
-        skillId: skill.skill_id,
-        proficiencyLevel: skill.proficiency_level,
-        selfAssessedLevel: skill.self_assessed_level,
-        managerAssessedLevel: skill.manager_assessed_level,
-        assessmentDate: skill.assessment_date,
-        lastUpdated: skill.last_updated,
-        notes: skill.notes,
-        createdAt: skill.created_at,
-        updatedAt: skill.updated_at
-      });
+    const result = await this.db.query(query, params);
+    
+    // カテゴリごとにグループ化
+    const grid: Record<NineBoxCategory, Employee[]> = {
+      star: [],
+      high_performer: [],
+      specialist: [],
+      high_potential: [],
+      core_contributor: [],
+      solid_performer: [],
+      rough_diamond: [],
+      inconsistent_performer: [],
+      underperformer: []
+    };
+
+    const byCategory: Record<NineBoxCategory, number> = {
+      star: 0,
+      high_performer: 0,
+      specialist: 0,
+      high_potential: 0,
+      core_contributor: 0,
+      solid_performer: 0,
+      rough_diamond: 0,
+      inconsistent_performer: 0,
+      underperformer: 0
+    };
+
+    result.rows.forEach((row: any) => {
+      const employee: Employee = {
+        id: row.employee_id,
+        name: row.name,
+        email: row.email,
+        department: row.department,
+        position: row.position,
+        employeeNumber: row.employee_number,
+        startDate: row.start_date,
+        isActive: row.is_active
+      };
+      
+      grid[row.nine_box_category as NineBoxCategory].push(employee);
+      byCategory[row.nine_box_category as NineBoxCategory]++;
     });
 
-    // スキルギャップ分析
-    const skillGaps = await this.analyzeSkillGaps(employeeId);
-    
-    // 研修推奨の生成
-    const recommendedTraining = await this.generateTrainingRecommendations(employeeId, skillGaps);
-    
-    // キャリアパス提案
-    const careerPathSuggestions = await this.generateCareerPathSuggestions(employeeId, skillsByCategory);
+    // 推奨アクション生成
+    const recommendations = this.generateNineBoxRecommendations(byCategory);
 
     return {
-      employeeId,
-      skillsByCategory,
-      skillGaps,
-      recommendedTraining,
-      careerPathSuggestions,
-      lastUpdated: new Date()
+      grid,
+      statistics: {
+        total: result.rows.length,
+        byCategory,
+        recommendations
+      }
     };
   }
 
   /**
-   * スキルギャップ分析
+   * 9ボックスグリッドに基づく推奨アクション生成
    */
-  private async analyzeSkillGaps(employeeId: string): Promise<SkillGap[]> {
-    const employee = await this.db.getEmployee(employeeId);
-    if (!employee) return [];
+  private generateNineBoxRecommendations(
+    byCategory: Record<NineBoxCategory, number>
+  ): string[] {
+    const recommendations: string[] = [];
+    const total = Object.values(byCategory).reduce((sum, count) => sum + count, 0);
+    
+    if (total === 0) return recommendations;
 
-    // 職位に必要なスキルを取得（実装では職位別スキル要件テーブルを参照）
-    const requiredSkills = await this.getRequiredSkillsForPosition(employee.position);
-    const currentSkills = await this.db.getEmployeeSkills(employeeId);
-
-    const skillGaps: SkillGap[] = [];
-
-    for (const requiredSkill of requiredSkills) {
-      const currentSkill = currentSkills.find(s => s.skill_id === requiredSkill.skillId);
-      const currentLevel = currentSkill ? currentSkill.proficiency_level : 0;
-      const requiredLevel = requiredSkill.requiredLevel;
-
-      if (currentLevel < requiredLevel) {
-        const gapSize = requiredLevel - currentLevel;
-        skillGaps.push({
-          skillId: requiredSkill.skillId,
-          skillName: requiredSkill.skillName,
-          currentLevel,
-          requiredLevel,
-          gapSize,
-          priority: gapSize >= 3 ? 'high' : gapSize >= 2 ? 'medium' : 'low',
-          developmentActions: this.generateDevelopmentActions(requiredSkill.skillId, gapSize)
-        });
-      }
+    // スター人材の割合チェック
+    const starRatio = byCategory.star / total;
+    if (starRatio < 0.1) {
+      recommendations.push('スター人材が不足しています。ハイポテンシャル層の育成を強化してください。');
     }
 
-    return skillGaps.sort((a, b) => b.gapSize - a.gapSize);
-  }
+    // アンダーパフォーマーの割合チェック
+    const underperformerRatio = byCategory.underperformer / total;
+    if (underperformerRatio > 0.1) {
+      recommendations.push('アンダーパフォーマーが多い状況です。パフォーマンス改善プログラムの導入を検討してください。');
+    }
 
-  /**
-   * 研修推奨生成
-   */
-  private async generateTrainingRecommendations(employeeId: string, skillGaps: SkillGap[]): Promise<TrainingRecommendation[]> {
-    const recommendations: TrainingRecommendation[] = [];
-
-    for (const gap of skillGaps.slice(0, 5)) { // 上位5つのギャップに対応
-      const availableTrainings = await this.getTrainingsForSkill(gap.skillId);
-      
-      for (const training of availableTrainings) {
-        recommendations.push({
-          trainingId: training.id,
-          trainingName: training.name,
-          trainingType: training.type,
-          targetSkills: [gap.skillId],
-          priority: gap.priority,
-          estimatedDuration: training.durationHours,
-          estimatedCost: training.cost,
-          provider: training.provider
-        });
-      }
+    // ハイポテンシャル層の活用
+    if (byCategory.high_potential > byCategory.star) {
+      recommendations.push('ハイポテンシャル層が多数存在します。パフォーマンス向上のための機会提供を検討してください。');
     }
 
     return recommendations;
   }
 
   /**
-   * キャリアパス提案生成
+   * 後継者計画の作成
    */
-  private async generateCareerPathSuggestions(employeeId: string, skillsByCategory: Record<string, EmployeeSkill[]>): Promise<CareerPathSuggestion[]> {
-    const employee = await this.db.getEmployee(employeeId);
-    if (!employee) return [];
-
-    const suggestions: CareerPathSuggestion[] = [];
-    
-    // 現在のスキルレベルに基づいて次の職位を提案
-    const possiblePositions = await this.getPossibleCareerProgression(employee.position, employee.department);
-    
-    for (const position of possiblePositions) {
-      const requiredSkills = await this.getRequiredSkillsForPosition(position.title);
-      const missingSkills = requiredSkills.filter(req => {
-        const currentSkill = Object.values(skillsByCategory).flat().find(s => s.skillId === req.skillId);
-        return !currentSkill || currentSkill.proficiencyLevel < req.requiredLevel;
-      });
-
-      const readinessScore = Math.max(0, 100 - (missingSkills.length * 15));
-      const timeframe = Math.max(6, missingSkills.length * 3); // 最低6ヶ月
-
-      suggestions.push({
-        targetPosition: position.title,
-        timeframe,
-        requiredSkills: missingSkills.map(s => s.skillName),
-        recommendedExperience: position.requiredExperience,
-        developmentPlan: this.generateDevelopmentPlan(missingSkills),
-        readinessScore
-      });
+  async createSuccessionPlan(
+    position: {
+      id: string;
+      title: string;
+      department: string;
+      criticality: 'critical' | 'important' | 'standard';
+      incumbentId?: string;
+      vacancyRisk?: 'immediate' | 'high' | 'medium' | 'low';
+      requiredExperienceYears?: number;
+      requiredSkills?: string[];
+      requiredCompetencies?: string[];
     }
+  ): Promise<SuccessionPlan> {
+    const plan: SuccessionPlan = {
+      id: `SUCC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      positionId: position.id,
+      positionTitle: position.title,
+      department: position.department,
+      criticality: position.criticality,
+      incumbentId: position.incumbentId,
+      vacancyRisk: position.vacancyRisk,
+      requiredExperienceYears: position.requiredExperienceYears,
+      requiredSkills: position.requiredSkills,
+      requiredCompetencies: position.requiredCompetencies,
+      candidates: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    return suggestions.sort((a, b) => b.readinessScore - a.readinessScore);
-  }
-
-  /**
-   * 📚 研修・育成管理システム
-   */
-
-  /**
-   * 研修計画作成
-   */
-  async createTrainingPlan(employeeId: string, skillGaps: SkillGap[]): Promise<TrainingRecord[]> {
-    const trainingPlan: TrainingRecord[] = [];
-    
-    for (const gap of skillGaps) {
-      const availableTrainings = await this.getTrainingsForSkill(gap.skillId);
-      
-      // 優先度に基づいて最適な研修を選択
-      const selectedTraining = this.selectOptimalTraining(availableTrainings, gap);
-      
-      if (selectedTraining) {
-        const trainingRecord: TrainingRecord = {
-          id: `TR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          employeeId,
-          trainingName: selectedTraining.name,
-          trainingType: selectedTraining.type,
-          provider: selectedTraining.provider,
-          startDate: this.calculateOptimalStartDate(gap.priority),
-          endDate: this.calculateEndDate(selectedTraining.durationHours),
-          durationHours: selectedTraining.durationHours,
-          cost: selectedTraining.cost,
-          status: 'scheduled',
-          relatedSkills: [gap.skillId],
-          notes: `Gap size: ${gap.gapSize}, Priority: ${gap.priority}`,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-
-        trainingPlan.push(trainingRecord);
-      }
-    }
-
-    return trainingPlan;
-  }
-
-  /**
-   * 研修効果測定（カークパトリック4段階評価）
-   */
-  async evaluateTrainingEffectiveness(trainingId: string, employeeId: string): Promise<{
-    level1: number; // 反応
-    level2: number; // 学習
-    level3: number; // 行動
-    level4: number; // 結果
-    roi: number;
-  }> {
-    const training = await this.db.getTrainingHistory(employeeId).then(history => 
-      history.find(t => t.id === trainingId)
+    await this.db.query(
+      `INSERT INTO succession_plans (
+        id, position_id, position_title, department, criticality,
+        incumbent_id, vacancy_risk, required_experience_years,
+        required_skills, required_competencies, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        plan.id,
+        plan.positionId,
+        plan.positionTitle,
+        plan.department,
+        plan.criticality,
+        plan.incumbentId,
+        plan.vacancyRisk,
+        plan.requiredExperienceYears,
+        JSON.stringify(plan.requiredSkills),
+        JSON.stringify(plan.requiredCompetencies),
+        plan.createdAt,
+        plan.updatedAt
+      ]
     );
 
-    if (!training) {
-      throw new Error('Training record not found');
-    }
-
-    // Level 1: 反応（満足度）
-    const level1 = training.evaluation_score || 0;
-
-    // Level 2: 学習（スキル向上）
-    const level2 = await this.measureSkillImprovement(employeeId, training.related_skills, training.start_date);
-
-    // Level 3: 行動（職場での適用）
-    const level3 = await this.measureBehaviorChange(employeeId, training.related_skills, training.end_date);
-
-    // Level 4: 結果（ビジネス成果）
-    const level4 = await this.measureBusinessImpact(employeeId, training.start_date, training.end_date);
-
-    // ROI計算
-    const roi = this.calculateTrainingROI(training.cost, level4);
-
-    return { level1, level2, level3, level4, roi };
+    return plan;
   }
 
   /**
-   * 📊 パフォーマンス・目標管理システム
+   * 後継者候補の追加
    */
-
-  /**
-   * MBO（目標管理制度）目標設定
-   */
-  async createMBOGoals(employeeId: string, goals: Partial<GoalOKR>[]): Promise<string[]> {
-    const mboGoals: string[] = [];
-
-    for (const goal of goals) {
-      const mboGoal: GoalOKR = {
-        id: `MBO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        employeeId,
-        goalType: 'mbo',
-        title: goal.title || '',
-        description: goal.description,
-        category: goal.category || 'performance',
-        targetValue: goal.targetValue,
-        currentValue: 0,
-        unit: goal.unit,
-        weight: goal.weight || 100,
-        priority: goal.priority || 'medium',
-        startDate: goal.startDate || new Date(),
-        dueDate: goal.dueDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1年後
-        status: 'in_progress',
-        achievementRate: 0,
-        relatedSkills: goal.relatedSkills || [],
-        notes: goal.notes,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      const goalId = await this.db.createGoal(mboGoal);
-      mboGoals.push(goalId);
+  async addSuccessionCandidate(
+    planId: string,
+    candidateId: string,
+    assessment: {
+      readinessLevel: ReadinessLevel;
+      assessedBy: string;
+      skillGaps?: string[];
+      experienceGaps?: string[];
+      developmentActions?: string[];
+      notes?: string;
     }
+  ): Promise<SuccessionCandidate> {
+    // レディネススコアを計算
+    const readinessScore = this.calculateReadinessScore(
+      assessment.readinessLevel,
+      assessment.skillGaps?.length || 0,
+      assessment.experienceGaps?.length || 0
+    );
 
-    return mboGoals;
+    const candidate: SuccessionCandidate = {
+      id: `CAND_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      successionPlanId: planId,
+      candidateId,
+      readinessLevel: assessment.readinessLevel,
+      readinessScore,
+      skillGaps: assessment.skillGaps,
+      experienceGaps: assessment.experienceGaps,
+      developmentActions: assessment.developmentActions,
+      lastAssessmentDate: new Date(),
+      assessedBy: assessment.assessedBy,
+      notes: assessment.notes,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await this.db.query(
+      `INSERT INTO succession_candidates (
+        id, succession_plan_id, candidate_id, readiness_level,
+        readiness_score, skill_gaps, experience_gaps, development_actions,
+        last_assessment_date, assessed_by, notes, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [
+        candidate.id,
+        candidate.successionPlanId,
+        candidate.candidateId,
+        candidate.readinessLevel,
+        candidate.readinessScore,
+        JSON.stringify(candidate.skillGaps),
+        JSON.stringify(candidate.experienceGaps),
+        JSON.stringify(candidate.developmentActions),
+        candidate.lastAssessmentDate,
+        candidate.assessedBy,
+        candidate.notes,
+        candidate.createdAt,
+        candidate.updatedAt
+      ]
+    );
+
+    return candidate;
   }
 
   /**
-   * OKR（目標と主要な成果）設定
+   * レディネススコア計算
    */
-  async createOKRGoals(employeeId: string, objectives: Partial<GoalOKR>[]): Promise<string[]> {
-    const okrGoals: string[] = [];
+  private calculateReadinessScore(
+    readinessLevel: ReadinessLevel,
+    skillGapCount: number,
+    experienceGapCount: number
+  ): number {
+    const baseScores: Record<ReadinessLevel, number> = {
+      'ready_now': 1.0,
+      '1_year': 0.75,
+      '2_years': 0.5,
+      '3_years_plus': 0.25
+    };
 
-    for (const objective of objectives) {
-      const okrGoal: GoalOKR = {
-        id: `OKR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        employeeId,
-        goalType: 'okr',
-        title: objective.title || '',
-        description: objective.description,
-        category: objective.category || 'strategic',
-        targetValue: objective.targetValue,
-        currentValue: 0,
-        unit: objective.unit,
-        weight: objective.weight || 100,
-        priority: objective.priority || 'high',
-        startDate: objective.startDate || new Date(),
-        dueDate: objective.dueDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 四半期
-        status: 'in_progress',
-        achievementRate: 0,
-        keyResults: objective.keyResults || [],
-        milestones: objective.milestones || [],
-        relatedSkills: objective.relatedSkills || [],
-        notes: objective.notes,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      const goalId = await this.db.createGoal(okrGoal);
-      okrGoals.push(goalId);
-    }
-
-    return okrGoals;
+    let score = baseScores[readinessLevel];
+    
+    // ギャップに基づいてスコアを調整
+    score -= (skillGapCount * 0.05);
+    score -= (experienceGapCount * 0.05);
+    
+    return Math.max(0, Math.min(1, score));
   }
 
   /**
-   * 360度フィードバック収集
+   * AI駆動キャリアパス推奨
    */
-  async collect360Feedback(employeeId: string, feedbackProviders: string[]): Promise<Record<string, any>> {
-    const feedback: Record<string, any> = {};
-
-    for (const providerId of feedbackProviders) {
-      const provider = await this.db.getEmployee(providerId);
-      if (provider) {
-        feedback[providerId] = {
-          providerName: provider.name,
-          relationship: this.determineRelationship(employeeId, providerId),
-          competencyRatings: await this.generateCompetencyRatings(employeeId, providerId),
-          qualitativeComments: await this.generateQualitativeComments(employeeId, providerId),
-          submissionDate: new Date()
-        };
-      }
+  async recommendCareerPaths(
+    employeeId: string
+  ): Promise<CareerPath[]> {
+    // 従業員情報取得
+    const employee = await this.db.getEmployee(employeeId);
+    if (!employee) {
+      throw new Error('Employee not found');
     }
 
-    return feedback;
+    // 現在のスキルとパフォーマンス評価を取得
+    const currentProfile = await this.getLatestTalentProfile(employeeId);
+    const currentSkills = await this.getEmployeeSkills(employeeId);
+
+    // 可能なキャリアパスを生成
+    const paths: CareerPath[] = [];
+
+    // 1. 垂直キャリアパス（昇進）
+    if (currentProfile && currentProfile.performanceRating >= 4.0) {
+      const verticalPath = await this.generateVerticalPath(employee, currentProfile, currentSkills);
+      if (verticalPath) paths.push(verticalPath);
+    }
+
+    // 2. 水平キャリアパス（横移動）
+    const lateralPaths = await this.generateLateralPaths(employee, currentSkills);
+    paths.push(...lateralPaths);
+
+    // 3. エキスパートトラック
+    if (currentProfile && currentProfile.performanceRating >= 4.5) {
+      const expertPath = await this.generateExpertPath(employee, currentSkills);
+      if (expertPath) paths.push(expertPath);
+    }
+
+    // スコアリングとソート
+    paths.sort((a, b) => (b.recommendationScore || 0) - (a.recommendationScore || 0));
+
+    return paths.slice(0, 5); // Top 5パスを返す
   }
 
   /**
-   * 📈 タレントダッシュボード生成
+   * 最新のタレントプロファイル取得
    */
-  async generateTalentDashboard(employeeId: string): Promise<TalentDashboard> {
-    const skills = await this.db.getEmployeeSkills(employeeId);
-    const goals = await this.db.getGoals(employeeId);
-    const trainings = await this.db.getTrainingHistory(employeeId);
-    const evaluations = await this.db.getPerformanceEvaluations(employeeId);
+  private async getLatestTalentProfile(employeeId: string): Promise<TalentProfile | null> {
+    const result = await this.db.query(
+      `SELECT * FROM talent_profiles 
+       WHERE employee_id = $1 
+       ORDER BY assessment_date DESC 
+       LIMIT 1`,
+      [employeeId]
+    );
 
-    // スキル概要
-    const skillsOverview = {
-      totalSkills: skills.length,
-      masterSkills: skills.filter(s => s.proficiency_level >= 4).length,
-      developingSkills: skills.filter(s => s.proficiency_level < 3).length,
-      skillsByCategory: skills.reduce((acc, skill) => {
-        acc[skill.skill_category] = (acc[skill.skill_category] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    };
-
-    // 目標進捗
-    const goalsProgress = {
-      totalGoals: goals.length,
-      completedGoals: goals.filter(g => g.status === 'completed').length,
-      overallProgress: goals.reduce((sum, g) => sum + g.achievement_rate, 0) / (goals.length || 1),
-      goalsByType: goals.reduce((acc, goal) => {
-        acc[goal.goal_type] = (acc[goal.goal_type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    };
-
-    // 研修進捗
-    const trainingProgress = {
-      totalTrainings: trainings.length,
-      completedTrainings: trainings.filter(t => t.status === 'completed').length,
-      scheduledTrainings: trainings.filter(t => t.status === 'scheduled').length,
-      totalHours: trainings.reduce((sum, t) => sum + t.duration_hours, 0)
-    };
-
-    // パフォーマンス指標
-    const latestEvaluation = evaluations[0];
-    const performanceMetrics = {
-      latestRating: latestEvaluation?.overall_rating,
-      averageRating: evaluations.reduce((sum, e) => sum + e.overall_rating, 0) / (evaluations.length || 1),
-      promotionReadiness: latestEvaluation?.promotion_readiness,
-      retentionRisk: latestEvaluation?.retention_risk
-    };
-
-    // 今後のイベント・推奨事項
-    const upcomingEvents = await this.generateUpcomingEvents(employeeId);
-    const recommendations = await this.generateRecommendations(employeeId);
-
+    if (result.rows.length === 0) return null;
+    
+    const row = result.rows[0];
     return {
-      employeeId,
-      skillsOverview,
-      goalsProgress,
-      trainingProgress,
-      performanceMetrics,
-      upcomingEvents,
-      recommendations
+      id: row.id,
+      employeeId: row.employee_id,
+      performanceRating: row.performance_rating,
+      potentialRating: row.potential_rating,
+      nineBoxCategory: row.nine_box_category,
+      assessmentDate: row.assessment_date,
+      assessedBy: row.assessed_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
   }
 
   /**
-   * 📊 タレントアナリティクス
+   * 従業員スキル取得
    */
-  async generateTalentAnalytics(): Promise<TalentAnalytics> {
-    const employees = await this.db.getAllEmployees();
-    const activeEmployees = employees.filter(e => e.isActive);
+  private async getEmployeeSkills(employeeId: string): Promise<string[]> {
+    const result = await this.db.query(
+      `SELECT skill_name FROM employee_skills 
+       WHERE employee_id = $1 AND proficiency_level >= 3`,
+      [employeeId]
+    );
 
-    // 組織概要
-    const organizationOverview = {
-      totalEmployees: activeEmployees.length,
-      avgSkillLevel: await this.calculateAverageSkillLevel(),
-      skillCoverage: await this.calculateSkillCoverage(),
-      trainingUtilization: await this.calculateTrainingUtilization(),
-      goalCompletionRate: await this.calculateGoalCompletionRate()
-    };
-
-    // スキル分析
-    const skillAnalytics = {
-      mostInDemandSkills: await this.getMostInDemandSkills(),
-      skillGapsByDepartment: await this.getSkillGapsByDepartment(),
-      skillDevelopmentTrends: await this.getSkillDevelopmentTrends()
-    };
-
-    // パフォーマンス分析
-    const performanceAnalytics = {
-      averageRating: await this.calculateAveragePerformanceRating(),
-      promotionReadiness: await this.getPromotionReadinessDistribution(),
-      retentionRisk: await this.getRetentionRiskDistribution(),
-      successionPipeline: await this.calculateSuccessionPipelineStrength()
-    };
-
-    // 研修分析
-    const trainingAnalytics = {
-      totalTrainingHours: await this.calculateTotalTrainingHours(),
-      trainingROI: await this.calculateOverallTrainingROI(),
-      completionRate: await this.calculateTrainingCompletionRate(),
-      trainingCostPerEmployee: await this.calculateTrainingCostPerEmployee()
-    };
-
-    return {
-      organizationOverview,
-      skillAnalytics,
-      performanceAnalytics,
-      trainingAnalytics
-    };
+    return result.rows.map((row: any) => row.skill_name);
   }
 
   /**
-   * 💡 ISO30414指標自動算出
+   * 垂直キャリアパス生成
    */
-  async calculateISO30414Metrics(startDate: Date, endDate: Date): Promise<Record<string, any>> {
-    const trainingMetrics = await this.db.calculateTrainingMetrics(startDate, endDate);
-    const employees = await this.db.getAllEmployees();
-    const activeEmployees = employees.filter(e => e.isActive);
+  private async generateVerticalPath(
+    employee: Employee,
+    profile: TalentProfile,
+    currentSkills: string[]
+  ): Promise<CareerPath | null> {
+    // 次のレベルのポジションを特定
+    const nextPosition = this.getNextLevelPosition(employee.position || '');
+    if (!nextPosition) return null;
 
-    return {
-      // 人材開発指標
-      development: {
-        trainingHoursPerEmployee: trainingMetrics.avgTrainingHoursPerEmployee,
-        trainingCostPerEmployee: trainingMetrics.totalTrainingCost / (trainingMetrics.totalEmployees || 1),
-        trainingCompletionRate: await this.calculateTrainingCompletionRate(),
-        skillDevelopmentParticipation: await this.calculateSkillDevelopmentParticipation()
-      },
-      // パフォーマンス指標
-      performance: {
-        averagePerformanceRating: await this.calculateAveragePerformanceRating(),
-        goalAchievementRate: await this.calculateGoalAchievementRate(),
-        promotionRate: await this.calculatePromotionRate(startDate, endDate)
-      },
-      // 人材確保指標
-      retention: {
-        retentionRate: await this.calculateRetentionRate(startDate, endDate),
-        successionPipelineStrength: await this.calculateSuccessionPipelineStrength(),
-        criticalRolesCovered: await this.calculateCriticalRolesCoverage()
-      },
-      // 最終更新日
-      lastUpdated: new Date(),
-      reportingPeriod: `${startDate.toISOString().split('T')[0]} - ${endDate.toISOString().split('T')[0]}`
-    };
-  }
+    // 必要なスキルとギャップ分析
+    const requiredSkills = await this.getPositionRequiredSkills(nextPosition);
+    const skillGaps = requiredSkills.filter(skill => !currentSkills.includes(skill));
 
-  // プライベートヘルパーメソッド
-  private async getRequiredSkillsForPosition(position: string): Promise<Array<{skillId: string, skillName: string, requiredLevel: number}>> {
-    // 職位別必要スキル要件（実装では専用テーブルから取得）
-    const positionSkillRequirements: Record<string, Array<{skillId: string, skillName: string, requiredLevel: number}>> = {
-      'エンジニア': [
-        { skillId: 'SKILL_001', skillName: 'JavaScript', requiredLevel: 3 },
-        { skillId: 'SKILL_002', skillName: 'TypeScript', requiredLevel: 3 },
-        { skillId: 'SKILL_003', skillName: 'React', requiredLevel: 2 }
+    const path: CareerPath = {
+      id: `PATH_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      employeeId: employee.id,
+      currentPosition: employee.position || '',
+      targetPosition: nextPosition,
+      pathType: 'vertical',
+      aiRecommended: true,
+      recommendationScore: this.calculatePathScore(profile, skillGaps.length),
+      recommendationReasons: [
+        'High performance rating',
+        'Strong leadership potential',
+        `${skillGaps.length} skills to develop`
       ],
-      'シニアエンジニア': [
-        { skillId: 'SKILL_001', skillName: 'JavaScript', requiredLevel: 4 },
-        { skillId: 'SKILL_002', skillName: 'TypeScript', requiredLevel: 4 },
-        { skillId: 'SKILL_003', skillName: 'React', requiredLevel: 3 },
-        { skillId: 'SKILL_004', skillName: 'リーダーシップ', requiredLevel: 3 }
-      ]
+      pathSteps: [
+        { position: employee.position || '', months: 0 },
+        { position: nextPosition, months: 12 }
+      ],
+      estimatedTimelineMonths: 12,
+      requiredSkills,
+      currentSkills,
+      skillGaps,
+      developmentPlan: this.generateDevelopmentPlan(skillGaps),
+      status: 'planned',
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
-    return positionSkillRequirements[position] || [];
+    return path;
   }
 
-  private generateDevelopmentActions(skillId: string, gapSize: number): string[] {
-    const actions: string[] = [];
-    
-    if (gapSize >= 3) {
-      actions.push('専門研修の受講');
-      actions.push('メンタリングプログラムの参加');
-    }
-    if (gapSize >= 2) {
-      actions.push('実践的なプロジェクトへの参加');
-    }
-    actions.push('自主学習の実施');
-    
-    return actions;
-  }
-
-  private async getTrainingsForSkill(skillId: string): Promise<Array<{id: string, name: string, type: string, durationHours: number, cost: number, provider?: string}>> {
-    // スキル別研修リスト（実装では専用テーブルから取得）
-    return [
-      {
-        id: 'TRAINING_001',
-        name: 'JavaScript基礎',
-        type: 'elearning',
-        durationHours: 40,
-        cost: 50000,
-        provider: 'TechAcademy'
-      }
-    ];
-  }
-
-  private selectOptimalTraining(trainings: any[], gap: SkillGap): any {
-    // 優先度とコストパフォーマンスに基づいて最適な研修を選択
-    return trainings.sort((a, b) => {
-      const scoreA = (a.durationHours / a.cost) * (gap.priority === 'high' ? 3 : gap.priority === 'medium' ? 2 : 1);
-      const scoreB = (b.durationHours / b.cost) * (gap.priority === 'high' ? 3 : gap.priority === 'medium' ? 2 : 1);
-      return scoreB - scoreA;
-    })[0];
-  }
-
-  private calculateOptimalStartDate(priority: string): Date {
-    const now = new Date();
-    const daysToAdd = priority === 'high' ? 7 : priority === 'medium' ? 30 : 60;
-    return new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-  }
-
-  private calculateEndDate(durationHours: number): Date {
-    const startDate = new Date();
-    const daysToComplete = Math.ceil(durationHours / 8); // 1日8時間想定
-    return new Date(startDate.getTime() + daysToComplete * 24 * 60 * 60 * 1000);
-  }
-
-  private async getPossibleCareerProgression(currentPosition: string, department: string): Promise<Array<{title: string, requiredExperience: string[]}>> {
-    // キャリアパス定義（実装では専用テーブルから取得）
-    const careerPaths: Record<string, Array<{title: string, requiredExperience: string[]}>> = {
-      'エンジニア': [
-        { title: 'シニアエンジニア', requiredExperience: ['プロジェクトリーダー経験', 'メンタリング経験'] },
-        { title: 'テックリード', requiredExperience: ['技術選定経験', 'チームマネジメント経験'] }
-      ]
-    };
-
-    return careerPaths[currentPosition] || [];
-  }
-
-  private generateDevelopmentPlan(missingSkills: any[]): string {
-    return `以下のスキル習得を推奨します：${missingSkills.map(s => s.skillName).join(', ')}`;
-  }
-
-  private async measureSkillImprovement(employeeId: string, skillIds: string[], baselineDate: Date): Promise<number> {
-    // スキル向上度測定（実装では評価前後の比較）
-    return 3.5; // 仮の値
-  }
-
-  private async measureBehaviorChange(employeeId: string, skillIds: string[], baselineDate: Date): Promise<number> {
-    // 行動変化測定（実装では360度フィードバック等）
-    return 3.2; // 仮の値
-  }
-
-  private async measureBusinessImpact(employeeId: string, startDate: Date, endDate: Date): Promise<number> {
-    // ビジネスインパクト測定（実装では生産性指標等）
-    return 150000; // 仮の値（円）
-  }
-
-  private calculateTrainingROI(cost: number, businessImpact: number): number {
-    return ((businessImpact - cost) / cost) * 100;
-  }
-
-  private determineRelationship(employeeId: string, providerId: string): string {
-    // 関係性判定（実装では組織構造から判定）
-    return 'colleague'; // 仮の値
-  }
-
-  private async generateCompetencyRatings(employeeId: string, providerId: string): Promise<Record<string, number>> {
-    // コンピテンシー評価生成
-    return {
-      'communication': 4.0,
-      'teamwork': 3.8,
-      'leadership': 3.5,
-      'technical': 4.2
-    };
-  }
-
-  private async generateQualitativeComments(employeeId: string, providerId: string): Promise<string> {
-    // 定性的コメント生成
-    return '優れた技術力と協調性を持つ';
-  }
-
-  private async generateUpcomingEvents(employeeId: string): Promise<any[]> {
-    // 今後のイベント生成
+  /**
+   * 水平キャリアパス生成
+   */
+  private async generateLateralPaths(
+    employee: Employee,
+    currentSkills: string[]
+  ): Promise<CareerPath[]> {
+    // 実装は簡略化
     return [];
   }
 
-  private async generateRecommendations(employeeId: string): Promise<any[]> {
+  /**
+   * エキスパートパス生成
+   */
+  private async generateExpertPath(
+    employee: Employee,
+    currentSkills: string[]
+  ): Promise<CareerPath | null> {
+    // 実装は簡略化
+    return null;
+  }
+
+  /**
+   * 次レベルポジション取得
+   */
+  private getNextLevelPosition(currentPosition: string): string | null {
+    const positionHierarchy: Record<string, string> = {
+      'スタッフ': 'シニアスタッフ',
+      'シニアスタッフ': 'リーダー',
+      'リーダー': 'マネージャー',
+      'マネージャー': 'シニアマネージャー',
+      'シニアマネージャー': '部長'
+    };
+
+    return positionHierarchy[currentPosition] || null;
+  }
+
+  /**
+   * ポジション必要スキル取得
+   */
+  private async getPositionRequiredSkills(position: string): Promise<string[]> {
+    // 実装は簡略化
+    const skillMap: Record<string, string[]> = {
+      'シニアスタッフ': ['プロジェクト参加', '業務改善', 'チームワーク'],
+      'リーダー': ['チーム管理', 'タスク割り当て', 'メンタリング'],
+      'マネージャー': ['リーダーシップ', 'プロジェクト管理', '予算管理', 'コミュニケーション'],
+      'シニアマネージャー': ['戦略立案', '組織開発', 'ビジネス開発', 'エグゼクティブコミュニケーション']
+    };
+
+    return skillMap[position] || [];
+  }
+
+  /**
+   * パススコア計算
+   */
+  private calculatePathScore(profile: TalentProfile, skillGapCount: number): number {
+    let score = 0.5;
+    
+    // パフォーマンスとポテンシャルに基づいてスコア調整
+    score += (profile.performanceRating - 3) * 0.1;
+    score += (profile.potentialRating - 3) * 0.1;
+    
+    // スキルギャップに基づいて調整
+    score -= skillGapCount * 0.05;
+    
+    return Math.max(0, Math.min(1, score));
+  }
+
+  /**
+   * 育成計画生成
+   */
+  private generateDevelopmentPlan(skillGaps: string[]): any[] {
+    return skillGaps.map(skill => ({
+      skill,
+      actions: [
+        `${skill}に関する研修を受講`,
+        `${skill}を活用するプロジェクトへの参加`,
+        `${skill}のメンターを見つける`
+      ],
+      timeline: '3-6ヶ月'
+    }));
+  }
+
+  /**
+   * 組織ネットワーク分析
+   */
+  async analyzeOrganizationNetwork(
+    analysisType: 'collaboration' | 'communication' | 'influence'
+  ): Promise<OrganizationNetwork> {
+    // コネクションデータを取得
+    const connections = await this.getEmployeeConnections();
+    
+    // ネットワーク分析実行
+    const metrics = this.calculateNetworkMetrics(connections);
+    const influencers = this.identifyKeyInfluencers(connections);
+    const bridges = this.identifyBridgeEmployees(connections);
+    const clusters = this.identifyCollaborationClusters(connections);
+    
     // 推奨事項生成
+    const recommendations = this.generateNetworkRecommendations(
+      metrics,
+      influencers,
+      bridges,
+      clusters
+    );
+
+    const network: OrganizationNetwork = {
+      id: `NET_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      analysisDate: new Date(),
+      analysisType,
+      networkDensity: metrics.density,
+      clusteringCoefficient: metrics.clustering,
+      averagePathLength: metrics.avgPathLength,
+      keyInfluencers: influencers,
+      bridgeEmployees: bridges,
+      isolatedEmployees: metrics.isolated,
+      collaborationClusters: clusters,
+      recommendations,
+      createdAt: new Date()
+    };
+
+    // 結果を保存
+    await this.saveNetworkAnalysis(network);
+
+    return network;
+  }
+
+  /**
+   * 従業員間コネクション取得
+   */
+  private async getEmployeeConnections(): Promise<EmployeeConnection[]> {
+    // 実装は簡略化 - 実際はメール、チャット、プロジェクト参加データから生成
     return [];
   }
 
-  // 分析系メソッド群
-  private async calculateAverageSkillLevel(): Promise<number> { return 3.2; }
-  private async calculateSkillCoverage(): Promise<number> { return 0.75; }
-  private async calculateTrainingUtilization(): Promise<number> { return 0.85; }
-  private async calculateGoalCompletionRate(): Promise<number> { return 0.72; }
-  private async getMostInDemandSkills(): Promise<string[]> { return ['JavaScript', 'リーダーシップ', 'コミュニケーション']; }
-  private async getSkillGapsByDepartment(): Promise<Record<string, SkillGap[]>> { return {}; }
-  private async getSkillDevelopmentTrends(): Promise<any[]> { return []; }
-  private async calculateAveragePerformanceRating(): Promise<number> { return 3.8; }
-  private async getPromotionReadinessDistribution(): Promise<Record<string, number>> { return { ready: 20, developing: 50, not_ready: 30 }; }
-  private async getRetentionRiskDistribution(): Promise<Record<string, number>> { return { high: 10, medium: 30, low: 60 }; }
-  private async calculateSuccessionPipelineStrength(): Promise<number> { return 0.65; }
-  private async calculateTotalTrainingHours(): Promise<number> { return 2400; }
-  private async calculateOverallTrainingROI(): Promise<number> { return 3.2; }
-  private async calculateTrainingCompletionRate(): Promise<number> { return 0.88; }
-  private async calculateTrainingCostPerEmployee(): Promise<number> { return 120000; }
-  private async calculateSkillDevelopmentParticipation(): Promise<number> { return 0.82; }
-  private async calculateGoalAchievementRate(): Promise<number> { return 0.76; }
-  private async calculatePromotionRate(startDate: Date, endDate: Date): Promise<number> { return 0.15; }
-  private async calculateRetentionRate(startDate: Date, endDate: Date): Promise<number> { return 0.92; }
-  private async calculateCriticalRolesCoverage(): Promise<number> { return 0.85; }
+  /**
+   * ネットワークメトリクス計算
+   */
+  private calculateNetworkMetrics(connections: EmployeeConnection[]): any {
+    // 実装は簡略化
+    return {
+      density: 0.65,
+      clustering: 0.72,
+      avgPathLength: 2.8,
+      isolated: []
+    };
+  }
+
+  /**
+   * キーインフルエンサー特定
+   */
+  private identifyKeyInfluencers(connections: EmployeeConnection[]): any[] {
+    // 実装は簡略化
+    return [];
+  }
+
+  /**
+   * ブリッジ従業員特定
+   */
+  private identifyBridgeEmployees(connections: EmployeeConnection[]): any[] {
+    // 実装は簡略化
+    return [];
+  }
+
+  /**
+   * コラボレーションクラスター特定
+   */
+  private identifyCollaborationClusters(connections: EmployeeConnection[]): any[] {
+    // 実装は簡略化
+    return [];
+  }
+
+  /**
+   * ネットワーク推奨事項生成
+   */
+  private generateNetworkRecommendations(
+    metrics: any,
+    influencers: any[],
+    bridges: any[],
+    clusters: any[]
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (metrics.density < 0.5) {
+      recommendations.push('組織内のコラボレーションが不足しています。部門横断プロジェクトの導入を検討してください。');
+    }
+
+    if (bridges.length < 5) {
+      recommendations.push('部門間の橋渡し役が不足しています。クロスファンクショナルチームの形成を推奨します。');
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * ネットワーク分析結果保存
+   */
+  private async saveNetworkAnalysis(network: OrganizationNetwork): Promise<void> {
+    await this.db.query(
+      `INSERT INTO organization_networks (
+        id, analysis_date, analysis_type, network_density,
+        clustering_coefficient, average_path_length, key_influencers,
+        bridge_employees, isolated_employees, collaboration_clusters,
+        recommendations, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        network.id,
+        network.analysisDate,
+        network.analysisType,
+        network.networkDensity,
+        network.clusteringCoefficient,
+        network.averagePathLength,
+        JSON.stringify(network.keyInfluencers),
+        JSON.stringify(network.bridgeEmployees),
+        JSON.stringify(network.isolatedEmployees),
+        JSON.stringify(network.collaborationClusters),
+        JSON.stringify(network.recommendations),
+        network.createdAt
+      ]
+    );
+  }
 }
 
+// エクスポート
 export default TalentManagementEngine;
