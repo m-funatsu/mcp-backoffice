@@ -1411,3 +1411,174 @@ export interface EmployeeConnection {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ==============================================
+// スキル管理システム v2.3.0 型定義
+// ==============================================
+
+export interface SkillOntology {
+  id: string;
+  skillName: string;
+  skillCode?: string;
+  category: string;
+  subcategory?: string;
+  level: number; // 階層レベル 1-5
+  skillType: 'technical' | 'soft' | 'leadership' | 'business' | 'certification';
+  complexityLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  marketDemandScore?: number; // 1-5
+  growthTrend?: 'declining' | 'stable' | 'growing' | 'high_growth';
+  averageLearningHours?: number;
+  description?: string;
+  prerequisites?: string[]; // Array of prerequisite skill IDs
+  relatedSkills?: string[]; // Array of related skill IDs
+  obsolescenceRisk?: number; // 1-5
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmployeeSkillAssessment {
+  id: string;
+  employeeId: string;
+  skillId: string;
+  proficiencyLevel: number; // 1-5
+  confidenceScore?: number; // 1-5
+  assessmentMethod: 'self_assessment' | 'manager_review' | 'peer_review' | 'objective_test' | 'certification' | 'project_demonstration';
+  assessedBy: string;
+  assessmentDate: Date;
+  evidenceType?: string;
+  evidenceDetails?: any;
+  verificationStatus: 'pending' | 'verified' | 'disputed' | 'expired';
+  learningHours?: number;
+  lastUsedDate?: Date;
+  skillAcquiredDate?: Date;
+  nextReviewDate?: Date;
+  weightedScore?: number; // 複数評価の加重平均
+  reliabilityScore?: number; // 評価の信頼性 1-5
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  provider: string;
+  resourceType: 'course' | 'certification' | 'book' | 'video' | 'workshop' | 'mentoring' | 'project' | 'conference';
+  durationHours?: number;
+  difficultyLevel?: 'beginner' | 'intermediate' | 'advanced';
+  cost?: number;
+  language?: string;
+  format?: string; // 'online', 'classroom', 'hybrid', 'self_paced'
+  rating?: number; // 1-5
+  completionRate?: number; // percentage
+  effectivenessScore?: number; // 1-5
+  targetSkills?: string[]; // Array of skill IDs
+  prerequisites?: string[]; // Array of prerequisite skill IDs
+  learningOutcomes?: string[];
+  url?: string;
+  accessRequirements?: string;
+  availabilityStatus?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LearningPlan {
+  id: string;
+  employeeId: string;
+  planName: string;
+  planType: 'career_development' | 'skill_gap_closure' | 'certification_prep' | 'role_transition' | 'performance_improvement';
+  targetSkills?: Array<{skillId: string, targetLevel: number}>;
+  estimatedDurationMonths?: number;
+  budgetAllocated?: number;
+  priorityLevel?: 'low' | 'medium' | 'high' | 'critical';
+  status: 'draft' | 'approved' | 'in_progress' | 'completed' | 'cancelled';
+  progressPercentage?: number;
+  startDate?: Date;
+  targetCompletionDate?: Date;
+  actualCompletionDate?: Date;
+  approvedBy?: string;
+  approvedDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LearningPlanResource {
+  id: string;
+  learningPlanId: string;
+  resourceId: string;
+  sequenceOrder?: number;
+  completionStatus: 'not_started' | 'in_progress' | 'completed' | 'skipped';
+  completionDate?: Date;
+  rating?: number; // 1-5
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SkillRequest {
+  id: string;
+  requesterId: string;
+  projectId?: string;
+  requiredSkills: Array<{skillId: string, minLevel: number, importance: 'low' | 'medium' | 'high'}>;
+  requestTitle: string;
+  description: string;
+  durationEstimate: string;
+  timeCommitment: string;
+  urgency: 'low' | 'medium' | 'high' | 'urgent';
+  locationRequirements?: string;
+  remoteWorkAllowed?: boolean;
+  status: 'open' | 'matched' | 'in_progress' | 'completed' | 'cancelled';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SkillOffer {
+  id: string;
+  skillRequestId: string;
+  providerId: string;
+  offeredSkills: Array<{skillId: string, level: number, confidence: number}>;
+  availability: string;
+  rateType?: 'hourly' | 'daily' | 'project' | 'free';
+  proposedRate?: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SkillTrendAnalysis {
+  skillId: string;
+  skillName: string;
+  category: string;
+  trendType: 'trending' | 'declining' | 'emerging';
+  growthRate?: number; // percentage
+  demandIncrease?: number;
+  declineRate?: number;
+  obsolescenceRisk?: number;
+  marketPotential?: number;
+  timeToMainstream?: number; // months
+  futureProjections?: Array<{period: string, demandScore: number}>;
+  replacementSkills?: string[];
+  earlyAdopters?: number;
+  analysisDate: Date;
+}
+
+export interface LearningROI {
+  learningPlanId: string;
+  employeeId: string;
+  measurementPeriod: number; // months
+  totalInvestment: number;
+  measurableReturns: number;
+  roiPercentage: number;
+  paybackPeriod: number; // months
+  preTrainingPerformance: number;
+  postTrainingPerformance: number;
+  performanceGain: number;
+  statisticalSignificance: number;
+  skillsAcquired: number;
+  skillLevelImprovement: number;
+  skillUtilization: number;
+  skillRetention: number;
+  productivityIncrease: number;
+  qualityImprovement: number;
+  innovationContribution: number;
+  customerSatisfactionImpact: number;
+  calculatedAt: Date;
+}
