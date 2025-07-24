@@ -41,6 +41,9 @@
     "console:dev": "vite --config src/v3.2.0/enterprise-console/vite.config.ts",
     "console:build": "vite build --config src/v3.2.0/enterprise-console/vite.config.ts",
     "console:preview": "vite preview --config src/v3.2.0/enterprise-console/vite.config.ts",
+    "settings:dev": "vite --config src/settings/vite.config.ts",
+    "settings:build": "vite build --config src/settings/vite.config.ts",
+    "settings:preview": "vite preview --config src/settings/vite.config.ts",
     "api:dev": "tsx watch src/api-server.ts",
     "api:start": "tsx src/api-server.ts",
     "dev:all": "concurrently \"npm run console:dev\" \"npm run api:dev\""
@@ -99,7 +102,7 @@
     "@types/express": "^5.0.1",
     "@types/cors": "^2.8.18",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/bcrypt": "^5.0.3",
+    "@types/bcrypt": "^5.0.2",
     "concurrently": "^9.1.2"
   }
 }
