@@ -91,8 +91,9 @@ export interface AIAgent {
   displayName: string;
   description?: string;
   agentType: AgentType;
+  type?: string; // 後方互換性のため
   version: string;
-  capabilities: AgentCapabilities;
+  capabilities: AgentCapabilities | string[]; // 両方のフォーマットをサポート
   defaultConfig: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
@@ -432,11 +433,24 @@ export interface ApiMeta {
 // ========================================
 
 export interface ConsoleState {
-  user: AuthenticatedUser;
-  permissions: UserPermission[];
-  agents: AgentState[];
-  integrations: IntegrationState[];
-  notifications: Notification[];
+  systemHealth: {
+    status: 'healthy' | 'degraded' | 'critical';
+    uptime: number;
+    lastChecked: Date;
+  };
+  activeAgents: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    lastActivity: Date;
+  }[];
+  recentActivities: any[];
+  user?: AuthenticatedUser;
+  permissions?: UserPermission[];
+  agents?: AgentState[];
+  integrations?: IntegrationState[];
+  notifications?: Notification[];
 }
 
 export interface AuthenticatedUser {
@@ -458,7 +472,9 @@ export interface UserPermission {
 export interface AgentState {
   agent: AIAgent;
   config?: AgentConfiguration;
-  status: 'running' | 'stopped' | 'error' | 'configuring';
+  status: 'active' | 'idle' | 'running' | 'stopped' | 'error' | 'configuring';
+  enabled: boolean;
+  lastActivity: Date;
   lastExecution?: Date;
   metrics?: AgentMetrics;
 }
@@ -500,8 +516,11 @@ export interface UserPreferences {
 }
 
 export interface AgentMetrics {
-  executionCount: number;
+  executionCount?: number;
   successRate: number;
+  tasksCompleted?: number;
+  averageTime?: number;
+  errors?: number;
   averageExecutionTime: number;
   lastError?: string;
   resourceUsage: {

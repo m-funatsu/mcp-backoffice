@@ -36,6 +36,7 @@ import AuditLogPanel from './AuditLogPanel';
 import DataGovernancePanel from './DataGovernancePanel';
 import SystemOverview from './SystemOverview';
 import NotificationCenter from './NotificationCenter';
+import apiClient from '../services/ApiClient';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -74,7 +75,17 @@ const Dashboard: React.FC = () => {
   const loadConsoleState = async () => {
     try {
       setLoading(true);
-      // モックデータを使用（実際はAPIから取得）
+      
+      // APIから実際のデータを取得しようとする
+      const apiResponse = await apiClient.getConsoleState();
+      
+      if (apiResponse.data) {
+        setConsoleState(apiResponse.data);
+        setLoading(false);
+        return;
+      }
+      
+      // APIが利用できない場合はモックデータを使用
       const mockData: ConsoleState = {
         systemHealth: {
           status: 'healthy',
