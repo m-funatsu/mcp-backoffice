@@ -461,3 +461,18 @@ export class AuditLogService {
     return anomalies;
   }
 }
+
+// サンプル実装用のモック
+const mockService = {
+  async getLogs(params: any) {
+    return {
+      logs: [],
+      total: 0
+    };
+  },
+  async exportLogs(filters: any) {
+    return 'exported data';
+  }
+};
+
+export default mockService;

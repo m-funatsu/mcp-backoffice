@@ -1,0 +1,253 @@
+# AI-OS Prometheus アラートルール設定
+# 本番環境監視用のアラート定義
+
+groups:
+  # システム可用性アラート
+  - name: availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="ai-os"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "AI-OSサービスがダウンしています"
+          description: "{{ $labels.instance }} のAI-OSサービスが2分以上応答していません"
+          runbook_url: https://wiki.ai-os.com/runbooks/service-down
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "エラー率が高くなっています"
+          description: "過去5分間のエラー率が1%を超えています (現在: {{ $value | humanizePercentage }})"
+
+      - alert: SLAViolation
+        expr: |
+          avg_over_time(up{job="ai-os"}[30d]) < 0.999
+        for: 5m
+        labels:
+          severity: warning
+          team: management
+        annotations:
+          summary: "月間稼働率がSLAを下回る可能性があります"
+          description: "30日間の稼働率が99.9%を下回っています (現在: {{ $value | humanizePercentage }})"
+
+  # パフォーマンスアラート
+  - name: performance
+    interval: 30s
+    rules:
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API応答時間が遅くなっています"
+          description: "95パーセンタイルの応答時間が500msを超えています (現在: {{ $value | humanizeDuration }})"
+
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率が高くなっています"
+          description: "{{ $labels.instance }} のCPU使用率が80%を超えています (現在: {{ $value | humanize }}%)"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "メモリ使用率が高くなっています"
+          description: "{{ $labels.instance }} のメモリ使用率が85%を超えています (現在: {{ $value | humanize }}%)"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ディスク容量が不足しています"
+          description: "{{ $labels.instance }} の空きディスク容量が15%未満です (残り: {{ $value | humanize }}%)"
+
+  # データベースアラート
+  - name: database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "データベース接続プールが枯渇しそうです"
+          description: "接続数が最大接続数の80%を超えています ({{ $value | humanizePercentage }})"
+
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "データベースレプリケーション遅延"
+          description: "レプリケーション遅延が10秒を超えています (現在: {{ $value | humanizeDuration }})"
+
+      - alert: DatabaseSlowQueries
+        expr: rate(pg_stat_statements_mean_time_seconds[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "データベースのクエリが遅くなっています"
+          description: "平均クエリ実行時間が1秒を超えています"
+
+  # AIエージェントアラート
+  - name: ai_agents
+    interval: 30s
+    rules:
+      - alert: AIAgentDown
+        expr: ai_os_agent_status{status="error"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "AIエージェントがエラー状態です"
+          description: "{{ $labels.agent_name }} エージェントがエラー状態になっています"
+
+      - alert: AIAgentHighErrorRate
+        expr: |
+          rate(ai_os_agent_errors_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIエージェントのエラー率が高い"
+          description: "{{ $labels.agent_name }} のエラー率が高くなっています ({{ $value | humanize }} errors/sec)"
+
+      - alert: AIAgentProcessingBacklog
+        expr: ai_os_agent_queue_size > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AIエージェントの処理待ちが溜まっています"
+          description: "{{ $labels.agent_name }} の処理待ちキューが1000を超えています (現在: {{ $value }})"
+
+  # ビジネスメトリクスアラート
+  - name: business_metrics
+    interval: 1m
+    rules:
+      - alert: PayrollProcessingFailure
+        expr: increase(ai_os_payroll_failures_total[1h]) > 0
+        labels:
+          severity: critical
+          team: business
+        annotations:
+          summary: "給与計算処理が失敗しました"
+          description: "過去1時間で{{ $value }}件の給与計算が失敗しています"
+
+      - alert: ComplianceViolationDetected
+        expr: increase(ai_os_compliance_violations_total[1h]) > 0
+        labels:
+          severity: critical
+          team: compliance
+        annotations:
+          summary: "コンプライアンス違反を検出"
+          description: "{{ $labels.violation_type }} の違反を検出しました (過去1時間: {{ $value }}件)"
+
+      - alert: HighExpenseRejectionRate
+        expr: |
+          rate(ai_os_expense_rejections_total[1h]) 
+          / rate(ai_os_expense_submissions_total[1h]) > 0.2
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "経費申請の却下率が高い"
+          description: "経費申請の却下率が20%を超えています (現在: {{ $value | humanizePercentage }})"
+
+  # セキュリティアラート
+  - name: security
+    interval: 30s
+    rules:
+      - alert: SuspiciousLoginActivity
+        expr: |
+          rate(ai_os_failed_login_attempts_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "不審なログイン試行を検出"
+          description: "{{ $labels.source_ip }} から異常な数のログイン失敗があります"
+
+      - alert: UnauthorizedAPIAccess
+        expr: |
+          rate(http_requests_total{status="403"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "不正なAPIアクセスを検出"
+          description: "403エラーが増加しています ({{ $value | humanize }} req/sec)"
+
+      - alert: DataExfiltrationAttempt
+        expr: |
+          ai_os_large_data_export_bytes > 1073741824
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "大量データのエクスポートを検出"
+          description: "{{ $labels.user }} が1GB以上のデータをエクスポートしようとしています"
+
+  # インフラストラクチャアラート
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: CertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL証明書の有効期限が近づいています"
+          description: "{{ $labels.instance }} の証明書が{{ $value | humanize }}日後に期限切れになります"
+
+      - alert: BackupFailure
+        expr: |
+          time() - ai_os_last_successful_backup_timestamp > 86400
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "バックアップが失敗しています"
+          description: "24時間以上バックアップが成功していません"
+
+      - alert: RedisMemoryFull
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redisメモリが不足しています"
+          description: "Redisのメモリ使用率が90%を超えています"

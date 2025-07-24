@@ -491,3 +491,36 @@ export class RBACService {
     return false;
   }
 }
+
+// サンプル実装用のモック
+const mockRBACService = {
+  async getRoles() {
+    return [
+      { id: '1', name: 'admin', description: '管理者', permissions: [] },
+      { id: '2', name: 'user', description: 'ユーザー', permissions: [] }
+    ];
+  },
+  async getPermissions() {
+    return [
+      { id: '1', name: '読み取り', resource: 'employee', action: 'read', description: '従業員データの読み取り' },
+      { id: '2', name: '書き込み', resource: 'employee', action: 'write', description: '従業員データの書き込み' }
+    ];
+  },
+  async getUsers() {
+    return [
+      { id: '1', name: '山田太郎', email: 'yamada@example.com', roles: ['1'] },
+      { id: '2', name: '佐藤花子', email: 'sato@example.com', roles: ['2'] }
+    ];
+  },
+  async updateRole(id: string, role: any) {
+    return role;
+  },
+  async createRole(role: any) {
+    return { id: '3', ...role };
+  },
+  async deleteRole(id: string) {
+    return true;
+  }
+};
+
+export default mockRBACService;

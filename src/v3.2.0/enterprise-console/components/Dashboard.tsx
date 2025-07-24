@@ -29,13 +29,13 @@ import {
   Help as HelpIcon,
 } from '@mui/icons-material';
 import { ConsoleState, Notification } from '../types';
-import { RoleManagementPanel } from './RoleManagementPanel';
+import RoleManagementPanel from './RoleManagementPanel';
 import { AIAgentPanel } from './AIAgentPanel';
-import { IntegrationPanel } from './IntegrationPanel';
-import { AuditLogPanel } from './AuditLogPanel';
-import { DataGovernancePanel } from './DataGovernancePanel';
-import { SystemOverview } from './SystemOverview';
-import { NotificationCenter } from './NotificationCenter';
+import IntegrationPanel from './IntegrationPanel';
+import AuditLogPanel from './AuditLogPanel';
+import DataGovernancePanel from './DataGovernancePanel';
+import SystemOverview from './SystemOverview';
+import NotificationCenter from './NotificationCenter';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -57,7 +57,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other })
   );
 };
 
-export const EnterpriseConsole: React.FC = () => {
+const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [consoleState, setConsoleState] = useState<ConsoleState | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -74,13 +74,67 @@ export const EnterpriseConsole: React.FC = () => {
   const loadConsoleState = async () => {
     try {
       setLoading(true);
-      // APIからコンソール状態を取得
-      const response = await fetch('/api/v3.2.0/console/state');
-      if (!response.ok) throw new Error('コンソール状態の取得に失敗しました');
+      // モックデータを使用（実際はAPIから取得）
+      const mockData: ConsoleState = {
+        systemHealth: {
+          status: 'healthy',
+          uptime: 99.99,
+          lastChecked: new Date(),
+        },
+        activeAgents: [
+          {
+            id: '1',
+            name: '給与計算エージェント',
+            type: 'payroll',
+            status: 'active',
+            lastActivity: new Date(),
+          },
+          {
+            id: '2',
+            name: 'コンプライアンス監視エージェント',
+            type: 'compliance',
+            status: 'active',
+            lastActivity: new Date(),
+          },
+        ],
+        recentActivities: [
+          {
+            id: '1',
+            action: '給与計算完了',
+            timestamp: new Date(),
+            user: 'システム',
+            details: '150名分の給与計算を完了しました',
+          },
+        ],
+        statistics: {
+          totalUsers: 150,
+          activeUsers: 142,
+          totalTransactions: 1250,
+          processingTime: 2.5,
+        },
+      };
       
-      const data = await response.json();
-      setConsoleState(data);
-      setNotifications(data.notifications || []);
+      const mockNotifications: Notification[] = [
+        {
+          id: '1',
+          type: 'warning',
+          title: '残業時間警告',
+          message: '5名の従業員が月間残業時間の上限に近づいています',
+          timestamp: new Date(),
+          read: false,
+        },
+        {
+          id: '2',
+          type: 'success',
+          title: '経費精算完了',
+          message: '営業部の経費精算が完了しました',
+          timestamp: new Date(Date.now() - 3600000),
+          read: true,
+        },
+      ];
+      
+      setConsoleState(mockData);
+      setNotifications(mockNotifications);
     } catch (err) {
       setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
     } finally {
@@ -123,7 +177,7 @@ export const EnterpriseConsole: React.FC = () => {
       {/* ヘッダー */}
       <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
         <Grid container alignItems="center" spacing={2}>
-          <Grid item xs>
+          <Grid size="grow">
             <Typography variant="h4" component="h1" sx={{ display: 'flex', alignItems: 'center' }}>
               <DashboardIcon sx={{ mr: 1 }} />
               AI-OS エンタープライズ設定管理コンソール
@@ -132,7 +186,7 @@ export const EnterpriseConsole: React.FC = () => {
               v3.2.0 - 企業全体のAIエージェントと統合を一元管理
             </Typography>
           </Grid>
-          <Grid item>
+          <Grid size="auto">
             <Tooltip title="通知">
               <IconButton onClick={handleNotificationClick} color="inherit">
                 <Badge badgeContent={unreadNotifications} color="error">
@@ -216,26 +270,15 @@ export const EnterpriseConsole: React.FC = () => {
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <RoleManagementPanel
-                onSuccess={handleSuccessMessage}
-                currentUser={consoleState?.user}
-              />
+              <RoleManagementPanel />
             </TabPanel>
 
             <TabPanel value={activeTab} index={2}>
-              <AIAgentPanel
-                agents={consoleState?.agents || []}
-                onSuccess={handleSuccessMessage}
-                onRefresh={loadConsoleState}
-              />
+              <AIAgentPanel />
             </TabPanel>
 
             <TabPanel value={activeTab} index={3}>
-              <IntegrationPanel
-                integrations={consoleState?.integrations || []}
-                onSuccess={handleSuccessMessage}
-                onRefresh={loadConsoleState}
-              />
+              <IntegrationPanel />
             </TabPanel>
 
             <TabPanel value={activeTab} index={4}>
@@ -243,10 +286,7 @@ export const EnterpriseConsole: React.FC = () => {
             </TabPanel>
 
             <TabPanel value={activeTab} index={5}>
-              <DataGovernancePanel
-                companyId={consoleState?.user.id || ''}
-                onSuccess={handleSuccessMessage}
-              />
+              <DataGovernancePanel />
             </TabPanel>
           </Box>
         </Paper>
@@ -282,3 +322,5 @@ export const EnterpriseConsole: React.FC = () => {
     </Box>
   );
 };
+
+export default Dashboard;

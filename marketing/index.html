@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-OS | 次世代エンタープライズオペレーティングシステム</title>
+    <meta name="description" content="AI-Native Enterprise Operating System - 人事・給与・勤怠を統合し、AIで企業の未来を創造する">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .feature-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <!-- ヘッダー -->
+    <header class="fixed w-full top-0 z-50 bg-white shadow-sm">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold text-purple-600">AI-OS</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="text-gray-700 hover:text-purple-600">機能</a>
+                    <a href="#benefits" class="text-gray-700 hover:text-purple-600">導入効果</a>
+                    <a href="#pricing" class="text-gray-700 hover:text-purple-600">料金</a>
+                    <a href="#contact" class="text-gray-700 hover:text-purple-600">お問い合わせ</a>
+                    <button class="bg-purple-600 text-white px-6 py-2 rounded-full hover:bg-purple-700">
+                        無料デモを予約
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- ヒーローセクション -->
+    <section class="gradient-bg text-white pt-32 pb-20">
+        <div class="container mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 mb-10 md:mb-0">
+                    <h1 class="text-4xl md:text-6xl font-bold mb-6">
+                        企業の知的パートナー<br>
+                        <span class="text-3xl md:text-5xl">AI-Native Enterprise OS</span>
+                    </h1>
+                    <p class="text-xl mb-8 opacity-90">
+                        勤怠管理から始まり、給与計算、経費精算、人的資本分析まで。<br>
+                        AIが企業のあらゆる業務を最適化し、未来を創造します。
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button class="bg-white text-purple-600 px-8 py-4 rounded-full font-bold hover:bg-gray-100">
+                            無料デモを予約
+                        </button>
+                        <button class="border-2 border-white text-white px-8 py-4 rounded-full font-bold hover:bg-white hover:text-purple-600">
+                            資料ダウンロード
+                        </button>
+                    </div>
+                </div>
+                <div class="md:w-1/2 animate-float">
+                    <img src="hero-dashboard.png" alt="AI-OS Dashboard" class="rounded-lg shadow-2xl">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 数値で見る効果 -->
+    <section class="py-16 bg-gray-50">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+                <div>
+                    <div class="text-4xl font-bold text-purple-600 mb-2">60%</div>
+                    <p class="text-gray-600">業務効率改善</p>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-purple-600 mb-2">99%</div>
+                    <p class="text-gray-600">コンプライアンス遵守率</p>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-purple-600 mb-2">80%</div>
+                    <p class="text-gray-600">意思決定時間短縮</p>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-purple-600 mb-2">24/7</div>
+                    <p class="text-gray-600">AIエージェント稼働</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 主要機能 -->
+    <section id="features" class="py-20">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">
+                統合されたインテリジェントな機能
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- 勤怠管理 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">AI駆動勤怠管理</h3>
+                    <p class="text-gray-600 mb-4">
+                        労働基準法完全準拠。36協定監視、残業予測、
+                        健康管理まで自動化。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ リアルタイム36協定監視</li>
+                        <li>✓ 客観的記録の自動収集</li>
+                        <li>✓ 残業時間予測アラート</li>
+                    </ul>
+                </div>
+
+                <!-- 給与計算 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">統合給与計算エンジン</h3>
+                    <p class="text-gray-600 mb-4">
+                        複雑な割増計算も完全自動化。
+                        税制改正にも即座に対応。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ 深夜・休日割増自動計算</li>
+                        <li>✓ 社会保険・税金自動計算</li>
+                        <li>✓ 給与明細自動生成</li>
+                    </ul>
+                </div>
+
+                <!-- 経費精算 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">AI経費精算</h3>
+                    <p class="text-gray-600 mb-4">
+                        レシートを撮影するだけ。
+                        AIが内容を解析し、自動承認。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ 高精度OCR自動読取</li>
+                        <li>✓ 不正検知AI</li>
+                        <li>✓ 会計システム自動連携</li>
+                    </ul>
+                </div>
+
+                <!-- 人的資本分析 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">人的資本可視化</h3>
+                    <p class="text-gray-600 mb-4">
+                        金融庁指針・ISO30414準拠。
+                        人材の価値を数値化。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ 40+指標自動算出</li>
+                        <li>✓ 離職リスク予測</li>
+                        <li>✓ ROI最適化提案</li>
+                    </ul>
+                </div>
+
+                <!-- AIエージェント -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">自律型AIエージェント</h3>
+                    <p class="text-gray-600 mb-4">
+                        目標を設定するだけで、
+                        AIが最適な施策を自動実行。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ 24/7自動監視・対応</li>
+                        <li>✓ マルチエージェント協調</li>
+                        <li>✓ 継続的な学習・最適化</li>
+                    </ul>
+                </div>
+
+                <!-- エンタープライズ統合 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">シームレス統合</h3>
+                    <p class="text-gray-600 mb-4">
+                        既存システムとの完全統合。
+                        レガシーシステムも活用。
+                    </p>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li>✓ SAP/Oracle連携</li>
+                        <li>✓ freee/マネーフォワード</li>
+                        <li>✓ Slack/Teams統合</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 導入効果 -->
+    <section id="benefits" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">
+                導入企業の声
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-gray-200 rounded-full mr-4"></div>
+                        <div>
+                            <h4 class="font-bold">山田太郎 様</h4>
+                            <p class="text-gray-600">IT企業 人事部長</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">
+                        "AI-OS導入後、月末の給与計算が3日から3時間に短縮。
+                        36協定違反も事前に防げるようになり、
+                        労務管理の不安が解消されました。"
+                    </p>
+                    <div class="flex items-center">
+                        <span class="text-yellow-400">★★★★★</span>
+                        <span class="ml-2 text-sm text-gray-600">5.0</span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-xl shadow-lg">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-gray-200 rounded-full mr-4"></div>
+                        <div>
+                            <h4 class="font-bold">鈴木花子 様</h4>
+                            <p class="text-gray-600">製造業 経営企画室長</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">
+                        "人的資本の可視化により、投資家への説明が
+                        格段に楽になりました。離職予測機能で
+                        優秀な人材の流出も防げています。"
+                    </p>
+                    <div class="flex items-center">
+                        <span class="text-yellow-400">★★★★★</span>
+                        <span class="ml-2 text-sm text-gray-600">5.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 料金プラン -->
+    <section id="pricing" class="py-20">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">
+                シンプルな料金体系
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- スターター -->
+                <div class="bg-white p-8 rounded-xl shadow-lg border-2 border-gray-200">
+                    <h3 class="text-2xl font-bold mb-4">スターター</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">¥1,000</span>
+                        <span class="text-gray-600">/月/従業員</span>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            勤怠管理
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            給与計算
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            基本レポート
+                        </li>
+                    </ul>
+                    <button class="w-full bg-gray-600 text-white py-3 rounded-full hover:bg-gray-700">
+                        無料トライアル開始
+                    </button>
+                </div>
+
+                <!-- プロフェッショナル -->
+                <div class="bg-white p-8 rounded-xl shadow-lg border-2 border-purple-600 relative">
+                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                        <span class="bg-purple-600 text-white px-4 py-1 rounded-full text-sm">
+                            おすすめ
+                        </span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">プロフェッショナル</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">¥1,500</span>
+                        <span class="text-gray-600">/月/従業員</span>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            スターターの全機能
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            経費精算
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            予測分析
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            外部システム連携
+                        </li>
+                    </ul>
+                    <button class="w-full bg-purple-600 text-white py-3 rounded-full hover:bg-purple-700">
+                        無料トライアル開始
+                    </button>
+                </div>
+
+                <!-- エンタープライズ -->
+                <div class="bg-white p-8 rounded-xl shadow-lg border-2 border-gray-200">
+                    <h3 class="text-2xl font-bold mb-4">エンタープライズ</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">要相談</span>
+                    </div>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            全機能利用可能
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            AIエージェント
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            カスタマイズ開発
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            専任サポート
+                        </li>
+                    </ul>
+                    <button class="w-full bg-gray-600 text-white py-3 rounded-full hover:bg-gray-700">
+                        お問い合わせ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-20 gradient-bg text-white">
+        <div class="container mx-auto px-6 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold mb-6">
+                今すぐAI-OSで企業の未来を創造しましょう
+            </h2>
+            <p class="text-xl mb-8 opacity-90">
+                30日間の無料トライアル。クレジットカード不要。
+            </p>
+            <button class="bg-white text-purple-600 px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100">
+                無料デモを予約する
+            </button>
+        </div>
+    </section>
+
+    <!-- フッター -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <h3 class="text-2xl font-bold mb-4">AI-OS</h3>
+                    <p class="text-gray-400">
+                        次世代エンタープライズ<br>
+                        オペレーティングシステム
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">製品</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white">機能一覧</a></li>
+                        <li><a href="#" class="hover:text-white">料金プラン</a></li>
+                        <li><a href="#" class="hover:text-white">導入事例</a></li>
+                        <li><a href="#" class="hover:text-white">更新情報</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">サポート</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white">ヘルプセンター</a></li>
+                        <li><a href="#" class="hover:text-white">API仕様書</a></li>
+                        <li><a href="#" class="hover:text-white">システム状態</a></li>
+                        <li><a href="#" class="hover:text-white">お問い合わせ</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">会社情報</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white">会社概要</a></li>
+                        <li><a href="#" class="hover:text-white">採用情報</a></li>
+                        <li><a href="#" class="hover:text-white">プライバシーポリシー</a></li>
+                        <li><a href="#" class="hover:text-white">利用規約</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2025 AI-OS Corporation. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクリプト -->
+    <script>
+        // スムーススクロール
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // ヘッダーのスクロール効果
+        window.addEventListener('scroll', function() {
+            const header = document.querySelector('header');
+            if (window.scrollY > 10) {
+                header.classList.add('shadow-lg');
+            } else {
+                header.classList.remove('shadow-lg');
+            }
+        });
+    </script>
+</body>
+</html>

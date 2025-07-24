@@ -68,11 +68,74 @@ interface AIAgentPanelProps {
   onRefresh: () => void;
 }
 
-export const AIAgentPanel: React.FC<AIAgentPanelProps> = ({
-  agents,
-  onSuccess,
-  onRefresh,
+export const AIAgentPanel: React.FC<Partial<AIAgentPanelProps>> = ({
+  agents: propAgents,
+  onSuccess = () => {},
+  onRefresh = () => {},
 }) => {
+  // モックデータ
+  const mockAgents: AgentState[] = [
+    {
+      agent: {
+        id: '1',
+        name: '給与計算エージェント',
+        type: 'payroll',
+        description: '給与計算と税金計算を自動化',
+        capabilities: ['給与計算', '税金計算', '明細生成'],
+        version: '1.2.0',
+      },
+      status: 'active',
+      enabled: true,
+      lastActivity: new Date(),
+      metrics: {
+        tasksCompleted: 1250,
+        successRate: 99.8,
+        averageTime: 2.5,
+        errors: 3,
+      },
+    },
+    {
+      agent: {
+        id: '2',
+        name: 'コンプライアンス監視エージェント',
+        type: 'compliance',
+        description: '労働法規制の遵守を24/7監視',
+        capabilities: ['36協定監視', '残業時間チェック', 'アラート生成'],
+        version: '1.1.0',
+      },
+      status: 'active',
+      enabled: true,
+      lastActivity: new Date(),
+      metrics: {
+        tasksCompleted: 8500,
+        successRate: 100,
+        averageTime: 0.8,
+        errors: 0,
+      },
+    },
+    {
+      agent: {
+        id: '3',
+        name: '経費処理エージェント',
+        type: 'expense',
+        description: '経費申請の自動処理と承認',
+        capabilities: ['OCR処理', '自動仕訳', '承認ワークフロー'],
+        version: '1.0.5',
+      },
+      status: 'idle',
+      enabled: false,
+      lastActivity: new Date(Date.now() - 3600000),
+      metrics: {
+        tasksCompleted: 450,
+        successRate: 97.5,
+        averageTime: 3.2,
+        errors: 12,
+      },
+    },
+  ];
+
+  const agents = propAgents && propAgents.length > 0 ? propAgents : mockAgents;
+  
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
