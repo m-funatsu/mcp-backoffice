@@ -27,6 +27,7 @@ import {
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Help as HelpIcon,
+  SmartToy,
 } from '@mui/icons-material';
 import { ConsoleState, Notification } from '../types';
 import RoleManagementPanel from './RoleManagementPanel';
@@ -36,6 +37,7 @@ import AuditLogPanel from './AuditLogPanel';
 import DataGovernancePanel from './DataGovernancePanel';
 import SystemOverview from './SystemOverview';
 import NotificationCenter from './NotificationCenter';
+import AIConfigurationPanel from './AIConfigurationPanel';
 import apiClient from '../services/ApiClient';
 
 interface TabPanelProps {
@@ -268,6 +270,13 @@ const Dashboard: React.FC = () => {
                 id="console-tab-5"
                 aria-controls="console-tabpanel-5"
               />
+              <Tab
+                icon={<SmartToy />}
+                label="AI設定"
+                iconPosition="start"
+                id="console-tab-6"
+                aria-controls="console-tabpanel-6"
+              />
             </Tabs>
           </Box>
 
@@ -298,6 +307,10 @@ const Dashboard: React.FC = () => {
 
             <TabPanel value={activeTab} index={5}>
               <DataGovernancePanel />
+            </TabPanel>
+
+            <TabPanel value={activeTab} index={6}>
+              <AIConfigurationPanel />
             </TabPanel>
           </Box>
         </Paper>

@@ -528,3 +528,52 @@ export interface AgentMetrics {
     memory: number;
   };
 }
+
+// ========================================
+// 8. AI会話型設定インターフェース
+// ========================================
+
+export interface ConfigurationIntent {
+  originalInput: string;
+  normalizedInput: string;
+  detectedIntent: string;
+  confidence: number;
+  parameters: any;
+  actions: ConfigurationAction[];
+  riskLevel: 'low' | 'medium' | 'high';
+  suggestedAlternatives?: string[];
+}
+
+export interface ConfigurationAction {
+  id: string;
+  type: 'update_threshold' | 'toggle_feature' | 'update_schedule' | 'update_policy';
+  target: string;
+  value: any;
+  description?: string;
+  validationRules: any[];
+}
+
+export interface ActionResult {
+  action: ConfigurationAction;
+  success: boolean;
+  result?: any;
+  error?: string;
+  timestamp: Date;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  status?: 'success' | 'warning' | 'error' | 'info';
+  actions?: ConfigurationAction[];
+  requiresConfirmation?: boolean;
+}
+
+export interface ConfigurationContext {
+  currentSettings: Record<string, any>;
+  availableFeatures: string[];
+  userRole: string;
+  organizationSize: string;
+}

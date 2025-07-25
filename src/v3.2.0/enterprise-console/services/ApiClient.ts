@@ -292,6 +292,24 @@ class ApiClient {
   async getOrganizationOptimization() {
     return this.get('/integrations/optimization');
   }
+
+  // ========================================
+  // AI設定API
+  // ========================================
+
+  /**
+   * 設定アクションを実行
+   */
+  async executeConfigurationAction(action: any) {
+    return this.post('/configuration/execute', action);
+  }
+
+  /**
+   * 設定履歴を取得
+   */
+  async getConfigurationHistory(params?: any) {
+    return this.get('/configuration/history', params);
+  }
 }
 
 // デフォルトのAPIクライアントインスタンス

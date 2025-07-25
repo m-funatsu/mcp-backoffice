@@ -316,24 +316,273 @@ export class GoalBasedPlanningEngine {
    * 最適化戦略のステップを生成
    */
   private generateOptimizationSteps(goal: Goal, resources: any): ActionStep[] {
-    // 実装は省略（自動化戦略と同様のパターン）
-    return [];
+    const steps: ActionStep[] = [];
+    
+    // ステップ1: データ収集と分析
+    steps.push({
+      id: `step_opt_${Date.now()}_1`,
+      name: 'パフォーマンスデータ収集',
+      description: '最適化対象のパフォーマンスデータを包括的に収集',
+      agentId: 'analytics',
+      action: {
+        type: 'analyze',
+        target: 'performance_metrics',
+        method: 'comprehensive_collection',
+      },
+      parameters: {
+        metrics: [goal.targetMetrics.kpi, 'related_metrics'],
+        period: 'last_90_days',
+        granularity: 'detailed',
+      },
+      expectedOutcome: 'ベースラインデータとトレンド分析',
+      successCriteria: [
+        'データ収集完了',
+        'トレンド分析完了',
+        '改善機会特定',
+      ],
+      order: 1,
+      status: 'pending',
+    });
+
+    // ステップ2: 最適化ポイント特定
+    steps.push({
+      id: `step_opt_${Date.now()}_2`,
+      name: '最適化ポイントの特定',
+      description: 'AIを使用して最も効果的な最適化ポイントを特定',
+      agentId: 'optimization',
+      action: {
+        type: 'optimize',
+        target: 'optimization_points',
+        method: 'ai_analysis',
+      },
+      parameters: {
+        data: 'performance_data',
+        optimizationGoal: goal.targetMetrics,
+        constraints: goal.constraints,
+      },
+      expectedOutcome: '優先順位付けされた最適化ポイントリスト',
+      successCriteria: [
+        '最適化ポイント特定',
+        'ROI予測完了',
+        '実装計画策定',
+      ],
+      order: 2,
+      status: 'pending',
+    });
+
+    // ステップ3: 最適化実施
+    steps.push({
+      id: `step_opt_${Date.now()}_3`,
+      name: '最適化の実施',
+      description: '特定されたポイントの最適化を段階的に実施',
+      agentId: 'execution',
+      action: {
+        type: 'execute',
+        target: 'optimization_implementation',
+        method: 'incremental_optimization',
+      },
+      parameters: {
+        optimizationPoints: 'identified_points',
+        validationRequired: true,
+        rollbackEnabled: true,
+      },
+      expectedOutcome: 'パフォーマンス向上の実現',
+      successCriteria: [
+        `${goal.targetMetrics.kpi}の改善確認`,
+        '副作用なし確認',
+        '安定性維持',
+      ],
+      order: 3,
+      status: 'pending',
+    });
+
+    return steps;
   }
 
   /**
    * モニタリング戦略のステップを生成
    */
   private generateMonitoringSteps(goal: Goal, resources: any): ActionStep[] {
-    // 実装は省略（自動化戦略と同様のパターン）
-    return [];
+    const steps: ActionStep[] = [];
+    
+    // ステップ1: モニタリング設定
+    steps.push({
+      id: `step_mon_${Date.now()}_1`,
+      name: 'モニタリングシステムの設定',
+      description: '包括的なモニタリング体制の構築',
+      agentId: 'monitoring',
+      action: {
+        type: 'monitor',
+        target: 'monitoring_setup',
+        method: 'comprehensive_setup',
+      },
+      parameters: {
+        metrics: [goal.targetMetrics.kpi],
+        thresholds: {
+          warning: goal.targetMetrics.targetValue * 0.8,
+          critical: goal.targetMetrics.targetValue * 0.6,
+        },
+        frequency: 'real-time',
+      },
+      expectedOutcome: 'リアルタイムモニタリング体制の確立',
+      successCriteria: [
+        'モニタリング設定完了',
+        'アラート設定完了',
+        'ダッシュボード構築',
+      ],
+      order: 1,
+      status: 'pending',
+    });
+
+    // ステップ2: アラートと対応ルール設定
+    steps.push({
+      id: `step_mon_${Date.now()}_2`,
+      name: 'アラートルールの設定',
+      description: '状況に応じた自動対応ルールの設定',
+      agentId: 'alert_manager',
+      action: {
+        type: 'alert',
+        target: 'alert_rules',
+        method: 'rule_configuration',
+      },
+      parameters: {
+        rules: [
+          {
+            condition: 'threshold_breach',
+            action: 'notify_and_escalate',
+            severity: 'high',
+          },
+          {
+            condition: 'trend_deterioration',
+            action: 'preventive_action',
+            severity: 'medium',
+          },
+        ],
+      },
+      expectedOutcome: '自動対応システムの稼働',
+      successCriteria: [
+        'ルール設定完了',
+        'エスカレーション設定',
+        '自動対応テスト合格',
+      ],
+      order: 2,
+      status: 'pending',
+    });
+
+    // ステップ3: 継続的改善
+    steps.push({
+      id: `step_mon_${Date.now()}_3`,
+      name: '継続的改善サイクル',
+      description: 'モニタリング結果に基づく継続的改善',
+      agentId: 'improvement',
+      action: {
+        type: 'optimize',
+        target: 'continuous_improvement',
+        method: 'adaptive_optimization',
+      },
+      parameters: {
+        learningEnabled: true,
+        improvementFrequency: 'weekly',
+        reportGeneration: true,
+      },
+      expectedOutcome: '継続的な目標達成と改善',
+      successCriteria: [
+        '目標達成維持',
+        '改善提案生成',
+        '実装サイクル確立',
+      ],
+      order: 3,
+      status: 'pending',
+    });
+
+    return steps;
   }
 
   /**
    * 汎用ステップを生成
    */
   private generateGenericSteps(goal: Goal, resources: any): ActionStep[] {
-    // 実装は省略（自動化戦略と同様のパターン）
-    return [];
+    const steps: ActionStep[] = [];
+    
+    // ステップ1: 現状評価
+    steps.push({
+      id: `step_gen_${Date.now()}_1`,
+      name: '現状評価と目標設定',
+      description: '現在の状況を評価し、具体的な行動目標を設定',
+      agentId: 'analytics',
+      action: {
+        type: 'analyze',
+        target: 'current_state',
+        method: 'baseline_assessment',
+      },
+      parameters: {
+        scope: 'comprehensive',
+        metrics: [goal.targetMetrics.kpi],
+        includeContext: true,
+      },
+      expectedOutcome: 'ベースライン確立と改善ポイント特定',
+      successCriteria: [
+        '現状分析完了',
+        'ギャップ分析完了',
+        '行動計画立案',
+      ],
+      order: 1,
+      status: 'pending',
+    });
+
+    // ステップ2: アクション実行
+    steps.push({
+      id: `step_gen_${Date.now()}_2`,
+      name: '改善アクションの実行',
+      description: '特定された改善ポイントに対するアクション実行',
+      agentId: 'execution',
+      action: {
+        type: 'execute',
+        target: 'improvement_actions',
+        method: 'systematic_execution',
+      },
+      parameters: {
+        actions: 'identified_actions',
+        priority: 'by_impact',
+        tracking: true,
+      },
+      expectedOutcome: '段階的な改善の実現',
+      successCriteria: [
+        'アクション実行',
+        '進捗追跡',
+        '効果測定',
+      ],
+      order: 2,
+      status: 'pending',
+    });
+
+    // ステップ3: 結果評価とフィードバック
+    steps.push({
+      id: `step_gen_${Date.now()}_3`,
+      name: '結果評価とフィードバック',
+      description: '実行結果を評価し、次のサイクルへフィードバック',
+      agentId: 'evaluation',
+      action: {
+        type: 'report',
+        target: 'execution_results',
+        method: 'comprehensive_evaluation',
+      },
+      parameters: {
+        compareToBaseline: true,
+        generateInsights: true,
+        recommendNextSteps: true,
+      },
+      expectedOutcome: '目標達成と次回への学習',
+      successCriteria: [
+        '目標達成評価',
+        '学習抽出',
+        '次期計画策定',
+      ],
+      order: 3,
+      status: 'pending',
+    });
+
+    return steps;
   }
 
   /**
