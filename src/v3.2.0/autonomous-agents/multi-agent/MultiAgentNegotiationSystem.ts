@@ -508,12 +508,249 @@ class TaskDelegationProtocol extends NegotiationProtocol {
     context: NegotiationContext,
     system: MultiAgentNegotiationSystem
   ): Promise<CoordinationResponse> {
-    // 実装は省略（ResourceNegotiationProtocolと同様のパターン）
+    const { request, participants, constraints } = context;
+    const task = request.payload.task;
+    
+    // タスクを実行可能なエージェントを特定
+    const capableAgents = participants.filter(agent => 
+      agent.id !== request.fromAgent &&
+      this.canExecuteTask(agent, task)
+    );
+
+    if (capableAgents.length === 0) {
+      return {
+        success: false,
+        message: 'タスクを実行可能なエージェントが見つかりません',
+        respondedAt: new Date(),
+      };
+    }
+
+    // 各エージェントの適性スコアを計算
+    const suitabilityScores = capableAgents.map(agent => ({
+      agent,
+      score: this.calculateSuitability(agent, task, system),
+    })).sort((a, b) => b.score - a.score);
+
+    // 最適なエージェントに委譲を提案
+    for (const candidate of suitabilityScores) {
+      const proposal = this.createDelegationProposal(
+        this.findAgent(participants, request.fromAgent)!,
+        candidate.agent,
+        task
+      );
+
+      // エージェントの受諾判断
+      const acceptanceScore = system.calculateUtility(candidate.agent, proposal.terms);
+      if (acceptanceScore > 0) {
+        // 委譲の合意を形成
+        const agreement = this.formDelegationAgreement(
+          this.findAgent(participants, request.fromAgent)!,
+          candidate.agent,
+          task,
+          proposal
+        );
+
+        // 信頼度を更新
+        system.updateTrust(request.fromAgent, candidate.agent.id, 'success');
+        system.updateTrust(candidate.agent.id, request.fromAgent, 'success');
+
+        return {
+          success: true,
+          message: `タスクが${candidate.agent.name}に委譲されました`,
+          data: agreement,
+          respondedAt: new Date(),
+        };
+      }
+    }
+
+    // 条件付き委譲の交渉
+    if (constraints.allowCounterProposals) {
+      const negotiatedAgreement = await this.negotiateConditions(
+        suitabilityScores[0].agent,
+        task,
+        system,
+        context
+      );
+      
+      if (negotiatedAgreement) {
+        return {
+          success: true,
+          message: '条件付きでタスク委譲が成立しました',
+          data: negotiatedAgreement,
+          respondedAt: new Date(),
+        };
+      }
+    }
+
     return {
-      success: true,
-      message: 'タスク委譲が成功しました',
+      success: false,
+      message: 'タスク委譲の交渉が不成立に終わりました',
       respondedAt: new Date(),
     };
+  }
+
+  private canExecuteTask(agent: Agent, task: any): boolean {
+    // エージェントの能力とタスク要件をマッチング
+    const requiredCapabilities = task.requiredCapabilities || [];
+    return requiredCapabilities.every((cap: string) => 
+      agent.capabilities.includes(cap)
+    );
+  }
+
+  private calculateSuitability(agent: Agent, task: any, system: MultiAgentNegotiationSystem): number {
+    let score = 0;
+    
+    // 能力の一致度
+    const capabilityMatch = task.requiredCapabilities.filter((cap: string) =>
+      agent.capabilities.includes(cap)
+    ).length / task.requiredCapabilities.length;
+    score += capabilityMatch * 40;
+    
+    // 現在の負荷
+    score += (1 - agent.currentLoad) * 30;
+    
+    // 優先度の適合性
+    const priorityScore = this.getPriorityScore(task.priority, agent.preferences.priorityThreshold);
+    score += priorityScore * 20;
+    
+    // 過去の実績
+    const successRate = this.calculateHistoricalSuccessRate(agent);
+    score += successRate * 10;
+    
+    return score;
+  }
+
+  private getPriorityScore(taskPriority: Priority, agentThreshold: Priority): number {
+    const priorityValues: Record<Priority, number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+    
+    const taskValue = priorityValues[taskPriority];
+    const thresholdValue = priorityValues[agentThreshold];
+    
+    if (taskValue >= thresholdValue) return 1;
+    return 0.5;
+  }
+
+  private calculateHistoricalSuccessRate(agent: Agent): number {
+    if (agent.negotiationHistory.length === 0) return 0.5;
+    
+    const successCount = agent.negotiationHistory.filter(
+      record => record.outcome === 'success'
+    ).length;
+    
+    return successCount / agent.negotiationHistory.length;
+  }
+
+  private createDelegationProposal(
+    delegator: Agent,
+    delegatee: Agent,
+    task: any
+  ): Proposal {
+    const estimatedLoad = this.estimateTaskLoad(task);
+    
+    return {
+      fromAgent: delegator.id,
+      toAgent: delegatee.id,
+      type: 'task_assignment',
+      terms: {
+        task,
+        estimatedLoad,
+        deadline: task.deadline || new Date(Date.now() + 86400000), // 24時間後
+        compensation: this.calculateTaskCompensation(task, estimatedLoad),
+        supportProvided: task.supportLevel || 'standard',
+      },
+      utility: 0,
+    };
+  }
+
+  private estimateTaskLoad(task: any): number {
+    // タスクの複雑さと所要時間から負荷を推定
+    const complexity = task.complexity || 'medium';
+    const complexityFactors: Record<string, number> = {
+      simple: 0.1,
+      medium: 0.3,
+      complex: 0.5,
+      critical: 0.7,
+    };
+    
+    return complexityFactors[complexity] || 0.3;
+  }
+
+  private calculateTaskCompensation(task: any, load: number): any {
+    return {
+      type: 'credit',
+      amount: load * 100 * (task.priority === 'critical' ? 2 : 1),
+      description: 'タスク実行に対するクレジット',
+    };
+  }
+
+  private formDelegationAgreement(
+    delegator: Agent,
+    delegatee: Agent,
+    task: any,
+    proposal: Proposal
+  ): Agreement {
+    return {
+      participants: [delegator.id, delegatee.id],
+      terms: {
+        ...proposal.terms,
+        agreedAt: new Date(),
+      },
+      commitments: [
+        {
+          agentId: delegatee.id,
+          action: `タスク「${task.name}」を実行`,
+          deadline: proposal.terms.deadline,
+          conditions: ['必要なリソースの提供', 'サポートの利用可能性'],
+        },
+        {
+          agentId: delegator.id,
+          action: 'タスク実行のサポートを提供',
+          deadline: proposal.terms.deadline,
+          conditions: ['進捗の定期報告'],
+        },
+      ],
+    };
+  }
+
+  private async negotiateConditions(
+    agent: Agent,
+    task: any,
+    system: MultiAgentNegotiationSystem,
+    context: NegotiationContext
+  ): Promise<Agreement | null> {
+    // 条件交渉のロジック（簡略版）
+    const modifiedTerms = {
+      ...task,
+      deadline: new Date(task.deadline.getTime() + 86400000), // 期限を1日延長
+      supportLevel: 'enhanced',
+    };
+
+    const modifiedProposal = this.createDelegationProposal(
+      this.findAgent(context.participants, context.request.fromAgent)!,
+      agent,
+      modifiedTerms
+    );
+
+    const utility = system.calculateUtility(agent, modifiedProposal.terms);
+    if (utility > 0) {
+      return this.formDelegationAgreement(
+        this.findAgent(context.participants, context.request.fromAgent)!,
+        agent,
+        modifiedTerms,
+        modifiedProposal
+      );
+    }
+
+    return null;
+  }
+
+  private findAgent(agents: Agent[], id: string): Agent | undefined {
+    return agents.find(a => a.id === id);
   }
 }
 
@@ -525,11 +762,230 @@ class ApprovalProtocol extends NegotiationProtocol {
     context: NegotiationContext,
     system: MultiAgentNegotiationSystem
   ): Promise<CoordinationResponse> {
-    // 実装は省略（シンプルな承認ロジック）
+    const { request, participants } = context;
+    const approvalRequest = request.payload;
+    
+    // 承認者を特定
+    const approvers = participants.filter(agent => 
+      agent.id !== request.fromAgent &&
+      this.hasApprovalAuthority(agent, approvalRequest)
+    );
+
+    if (approvers.length === 0) {
+      return {
+        success: false,
+        message: '承認権限を持つエージェントが見つかりません',
+        respondedAt: new Date(),
+      };
+    }
+
+    // 承認基準を評価
+    const approvalCriteria = this.evaluateApprovalCriteria(approvalRequest);
+    
+    // 各承認者の判断を収集
+    const approvalDecisions = await Promise.all(
+      approvers.map(async approver => ({
+        approver,
+        decision: await this.makeApprovalDecision(approver, approvalRequest, approvalCriteria, system),
+      }))
+    );
+
+    // 承認ルールに基づいて最終決定
+    const finalDecision = this.aggregateDecisions(approvalDecisions, approvalRequest.approvalRule);
+
+    if (finalDecision.approved) {
+      // 承認記録を作成
+      const approvalRecord = this.createApprovalRecord(
+        request,
+        approvalDecisions,
+        finalDecision
+      );
+
+      // 信頼度を更新（承認した場合）
+      approvalDecisions
+        .filter(d => d.decision.approved)
+        .forEach(d => {
+          system.updateTrust(request.fromAgent, d.approver.id, 'success');
+          system.updateTrust(d.approver.id, request.fromAgent, 'success');
+        });
+
+      return {
+        success: true,
+        message: finalDecision.reason || '承認されました',
+        data: approvalRecord,
+        respondedAt: new Date(),
+      };
+    }
+
     return {
-      success: true,
-      message: '承認されました',
+      success: false,
+      message: finalDecision.reason || '承認が却下されました',
+      data: {
+        decisions: approvalDecisions.map(d => ({
+          approver: d.approver.name,
+          approved: d.decision.approved,
+          reason: d.decision.reason,
+        })),
+      },
       respondedAt: new Date(),
+    };
+  }
+
+  private hasApprovalAuthority(agent: Agent, approvalRequest: any): boolean {
+    // エージェントの能力に基づいて承認権限をチェック
+    const requiredAuthority = approvalRequest.requiredAuthority || 'general_approval';
+    return agent.capabilities.includes(requiredAuthority) ||
+           agent.capabilities.includes('approval_authority');
+  }
+
+  private evaluateApprovalCriteria(approvalRequest: any): any {
+    return {
+      amount: approvalRequest.amount || 0,
+      riskLevel: approvalRequest.riskLevel || 'medium',
+      urgency: approvalRequest.urgency || 'normal',
+      category: approvalRequest.category || 'general',
+      compliance: approvalRequest.complianceChecked || false,
+      documentation: approvalRequest.documentationComplete || false,
+    };
+  }
+
+  private async makeApprovalDecision(
+    approver: Agent,
+    approvalRequest: any,
+    criteria: any,
+    system: MultiAgentNegotiationSystem
+  ): Promise<{ approved: boolean; reason?: string; confidence: number }> {
+    // 承認者のリスク許容度を考慮
+    const riskTolerance = this.getAgentRiskTolerance(approver);
+    
+    // 各基準を評価
+    let approvalScore = 0;
+    let reasons: string[] = [];
+
+    // 金額チェック
+    if (criteria.amount > 0) {
+      const amountScore = this.evaluateAmount(criteria.amount, approver);
+      approvalScore += amountScore;
+      if (amountScore < 0.5) {
+        reasons.push('金額が承認限度を超えています');
+      }
+    }
+
+    // リスクレベルチェック
+    const riskScore = this.evaluateRisk(criteria.riskLevel, riskTolerance);
+    approvalScore += riskScore;
+    if (riskScore < 0.5) {
+      reasons.push('リスクレベルが許容範囲を超えています');
+    }
+
+    // コンプライアンスチェック
+    if (!criteria.compliance) {
+      approvalScore -= 0.5;
+      reasons.push('コンプライアンスチェックが完了していません');
+    }
+
+    // ドキュメンテーションチェック
+    if (!criteria.documentation) {
+      approvalScore -= 0.3;
+      reasons.push('必要な文書が不足しています');
+    }
+
+    // 信頼度を考慮
+    const requesterTrust = approver.preferences.trustScores.get(approvalRequest.requesterId) || 0.5;
+    approvalScore += requesterTrust * 0.2;
+
+    // 最終的な承認判断
+    const approved = approvalScore >= 0.6;
+    const confidence = Math.min(1, Math.max(0, approvalScore));
+
+    return {
+      approved,
+      reason: reasons.length > 0 ? reasons.join(', ') : undefined,
+      confidence,
+    };
+  }
+
+  private getAgentRiskTolerance(agent: Agent): number {
+    // エージェントの協力戦略からリスク許容度を推定
+    const toleranceMap = {
+      collaborative: 0.7,
+      balanced: 0.5,
+      competitive: 0.3,
+    };
+    return toleranceMap[agent.preferences.cooperationStrategy];
+  }
+
+  private evaluateAmount(amount: number, approver: Agent): number {
+    // 金額の妥当性を評価（簡略版）
+    const maxApprovalAmount = 1000000; // 100万円
+    if (amount > maxApprovalAmount) return 0;
+    return 1 - (amount / maxApprovalAmount);
+  }
+
+  private evaluateRisk(riskLevel: string, tolerance: number): number {
+    const riskValues = {
+      low: 0.2,
+      medium: 0.5,
+      high: 0.8,
+      critical: 1.0,
+    };
+    const risk = riskValues[riskLevel] || 0.5;
+    return risk <= tolerance ? 1 : 1 - (risk - tolerance);
+  }
+
+  private aggregateDecisions(
+    decisions: Array<{ approver: Agent; decision: any }>,
+    rule: string = 'majority'
+  ): { approved: boolean; reason?: string } {
+    const approvedCount = decisions.filter(d => d.decision.approved).length;
+    const totalCount = decisions.length;
+
+    switch (rule) {
+      case 'unanimous':
+        return {
+          approved: approvedCount === totalCount,
+          reason: approvedCount === totalCount ? '全員一致で承認' : '全員一致が必要です',
+        };
+      
+      case 'majority':
+        return {
+          approved: approvedCount > totalCount / 2,
+          reason: `${approvedCount}/${totalCount}の承認者が承認`,
+        };
+      
+      case 'any':
+        return {
+          approved: approvedCount > 0,
+          reason: approvedCount > 0 ? '承認者による承認' : '承認者が見つかりません',
+        };
+      
+      default:
+        return {
+          approved: approvedCount > totalCount / 2,
+          reason: `${approvedCount}/${totalCount}の承認者が承認`,
+        };
+    }
+  }
+
+  private createApprovalRecord(
+    request: CoordinationRequest,
+    decisions: Array<{ approver: Agent; decision: any }>,
+    finalDecision: any
+  ): any {
+    return {
+      requestId: request.id,
+      requestType: request.payload.type,
+      requestedAt: request.timestamp,
+      approvedAt: new Date(),
+      approved: finalDecision.approved,
+      approvers: decisions.map(d => ({
+        id: d.approver.id,
+        name: d.approver.name,
+        decision: d.decision.approved,
+        confidence: d.decision.confidence,
+        reason: d.decision.reason,
+      })),
+      finalReason: finalDecision.reason,
     };
   }
 }
@@ -598,8 +1054,65 @@ class ConflictResolutionProtocol extends NegotiationProtocol {
     participants: Agent[],
     request: CoordinationRequest
   ): any[] {
-    // 解決案の生成ロジック
-    return [];
+    const resolutions: any[] = [];
+    const conflictDetails = request.payload;
+
+    switch (strategy) {
+      case 'win-win':
+        // 全員が利益を得られる解決案を生成
+        resolutions.push({
+          type: 'resource_sharing',
+          description: 'リソースの時分割共有',
+          terms: {
+            schedule: this.generateTimeSharingSchedule(participants, conflictDetails),
+            compensation: 'mutual_priority_boost',
+          },
+        });
+        
+        resolutions.push({
+          type: 'collaborative_execution',
+          description: '共同実行による相乗効果',
+          terms: {
+            taskDivision: this.generateTaskDivision(participants, conflictDetails),
+            benefitSharing: 'proportional',
+          },
+        });
+        break;
+
+      case 'compromise':
+        // 妥協案を生成
+        resolutions.push({
+          type: 'partial_allocation',
+          description: '部分的なリソース割り当て',
+          terms: {
+            allocation: this.generatePartialAllocation(participants, conflictDetails),
+            priority: 'rotating',
+          },
+        });
+        
+        resolutions.push({
+          type: 'alternative_resource',
+          description: '代替リソースの活用',
+          terms: {
+            alternativeResources: this.identifyAlternatives(conflictDetails),
+            compensationMechanism: 'credit_based',
+          },
+        });
+        break;
+
+      default:
+        // デフォルトの解決案
+        resolutions.push({
+          type: 'priority_based',
+          description: '優先度に基づく割り当て',
+          terms: {
+            allocationRule: 'highest_priority_first',
+            waitingCompensation: true,
+          },
+        });
+    }
+
+    return resolutions;
   }
 
   private async conductVoting(
@@ -607,8 +1120,145 @@ class ConflictResolutionProtocol extends NegotiationProtocol {
     participants: Agent[],
     system: MultiAgentNegotiationSystem
   ): Promise<{ accepted: boolean; resolution?: any }> {
-    // 投票ロジック
+    const votes: Map<number, number> = new Map();
+    
+    // 各参加者が解決案に投票
+    for (const participant of participants) {
+      const rankings = resolutions.map((resolution, index) => ({
+        index,
+        score: this.evaluateResolution(resolution, participant, system),
+      })).sort((a, b) => b.score - a.score);
+
+      // 最高スコアの解決案に投票
+      if (rankings.length > 0 && rankings[0].score > 0) {
+        const currentVotes = votes.get(rankings[0].index) || 0;
+        votes.set(rankings[0].index, currentVotes + 1);
+      }
+    }
+
+    // 最多票を獲得した解決案を選択
+    let maxVotes = 0;
+    let selectedIndex = -1;
+    
+    votes.forEach((voteCount, index) => {
+      if (voteCount > maxVotes) {
+        maxVotes = voteCount;
+        selectedIndex = index;
+      }
+    });
+
+    // 過半数の支持があれば承認
+    const acceptanceThreshold = participants.length / 2;
+    if (maxVotes > acceptanceThreshold) {
+      return {
+        accepted: true,
+        resolution: {
+          ...resolutions[selectedIndex],
+          votes: maxVotes,
+          totalParticipants: participants.length,
+        },
+      };
+    }
+
     return { accepted: false };
+  }
+
+  private generateTimeSharingSchedule(participants: Agent[], conflictDetails: any): any {
+    const totalSlots = 24; // 24時間
+    const slotPerParticipant = Math.floor(totalSlots / participants.length);
+    
+    return participants.map((participant, index) => ({
+      agentId: participant.id,
+      startHour: index * slotPerParticipant,
+      endHour: (index + 1) * slotPerParticipant,
+      priority: participant.preferences.priorityThreshold,
+    }));
+  }
+
+  private generateTaskDivision(participants: Agent[], conflictDetails: any): any {
+    // タスクを参加者の能力に基づいて分割
+    const subtasks = conflictDetails.subtasks || [];
+    const assignments: any[] = [];
+
+    subtasks.forEach((subtask: any, index: number) => {
+      const bestAgent = participants.reduce((best, current) => {
+        const currentScore = this.calculateTaskFitness(current, subtask);
+        const bestScore = this.calculateTaskFitness(best, subtask);
+        return currentScore > bestScore ? current : best;
+      });
+
+      assignments.push({
+        subtaskId: subtask.id || `subtask_${index}`,
+        assignedTo: bestAgent.id,
+        estimatedEffort: subtask.effort || 1,
+      });
+    });
+
+    return assignments;
+  }
+
+  private generatePartialAllocation(participants: Agent[], conflictDetails: any): any {
+    const totalResource = conflictDetails.resourceAmount || 100;
+    const equalShare = totalResource / participants.length;
+    
+    // 優先度に基づいて調整
+    return participants.map(participant => {
+      const priorityMultiplier = {
+        critical: 1.5,
+        high: 1.2,
+        medium: 1.0,
+        low: 0.8,
+      };
+      const multiplier = priorityMultiplier[participant.preferences.priorityThreshold] || 1.0;
+      
+      return {
+        agentId: participant.id,
+        allocation: Math.floor(equalShare * multiplier),
+      };
+    });
+  }
+
+  private identifyAlternatives(conflictDetails: any): any[] {
+    // 代替リソースの候補を生成（簡略版）
+    return [
+      {
+        resourceType: 'compute_alternative',
+        availability: 0.8,
+        performanceRatio: 0.9,
+      },
+      {
+        resourceType: 'external_service',
+        availability: 0.6,
+        performanceRatio: 0.7,
+      },
+    ];
+  }
+
+  private evaluateResolution(resolution: any, participant: Agent, system: MultiAgentNegotiationSystem): number {
+    let score = 0;
+
+    // 解決案のタイプに基づく基本スコア
+    const typePreferences = {
+      win_win: participant.preferences.cooperationStrategy === 'collaborative' ? 1.0 : 0.6,
+      compromise: 0.7,
+      priority_based: participant.preferences.cooperationStrategy === 'competitive' ? 0.8 : 0.5,
+    };
+    score += (typePreferences[resolution.type] || 0.5) * 50;
+
+    // 効用計算
+    const utility = system.calculateUtility(participant, resolution.terms);
+    score += utility;
+
+    return score;
+  }
+
+  private calculateTaskFitness(agent: Agent, subtask: any): number {
+    const requiredCapabilities = subtask.requiredCapabilities || [];
+    const matchCount = requiredCapabilities.filter((cap: string) => 
+      agent.capabilities.includes(cap)
+    ).length;
+    
+    return matchCount / Math.max(requiredCapabilities.length, 1);
   }
 
   private generateCompromise(participants: Agent[], request: CoordinationRequest): any {
