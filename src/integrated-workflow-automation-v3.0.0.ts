@@ -17,7 +17,7 @@
 import { EventEmitter } from 'events';
 import { DatabasePostgreSQL } from './database_postgresql.js';
 import { AgentCollaborationManager } from './agent-collaboration-protocol-v3.0.0.js';
-import { PayrollEngine } from './payroll-engine.js';
+import { IntegratedPayrollEngine } from './payroll-engine.js';
 import { ComplianceEngine } from './compliance-engine.js';
 import { ExpenseEngine } from './expense-engine.js';
 import { TalentManagementEngine } from './talent-management-engine-v2.2.0.js';
@@ -136,7 +136,7 @@ export class IntegratedWorkflowAutomationEngine extends EventEmitter {
     
     // エンジン初期化
     this.engines = {
-      payroll: new PayrollEngine(db),
+      payroll: new IntegratedPayrollEngine(db),
       compliance: new ComplianceEngine(db),
       expense: new ExpenseEngine(db),
       talent: new TalentManagementEngine(db),

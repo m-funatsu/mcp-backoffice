@@ -687,7 +687,7 @@ export class IntelligentExpenseEngine {
       // Factor 1: Amount
       if (expense.amount > 100000) {
         riskFactors.push('高額経費');
-        riskScore += 0.5; // 高額経費のリスクを上げる
+        riskScore += 0.4; // 0.4に調整（接待交際費と合わせて0.5以上になるように）
       } else if (expense.amount > 50000) {
         riskScore += 0.3;
       } else if (expense.amount > 10000) {

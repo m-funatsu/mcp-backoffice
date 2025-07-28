@@ -437,6 +437,9 @@ export class SuccessionPlanningEngine {
       profile.performanceRating * performanceWeight +
       profile.potentialRating * potentialWeight;
 
+    // スター人材（高パフォーマンス・高ポテンシャル）は即座準備完了
+    if (profile.category === 'stars' && readinessScore >= 4.0) return 'ready_now';
+    
     if (readinessScore >= 4.5) return 'ready_now';
     if (readinessScore >= 4.0) return '1_year';
     if (readinessScore >= 3.5) return '2_years';
