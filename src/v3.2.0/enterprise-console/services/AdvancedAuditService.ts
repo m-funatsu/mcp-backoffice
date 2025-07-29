@@ -189,6 +189,15 @@ class AnomalyDetector {
     const hour = event.timestamp.getHours();
     const dayOfWeek = event.timestamp.getDay();
 
+    // 深夜〜早朝のアクセスは即座に異常とみなす
+    if (hour >= 0 && hour < 6) {
+      return {
+        isAnomaly: true,
+        score: 80,
+        reasons: [`Unusual access time: ${hour}:00 (late night/early morning)`]
+      };
+    }
+
     // ユーザーの通常のアクセスパターンを分析
     const userHistory = historicalData.filter(e => e.userId === event.userId);
     if (userHistory.length < 10) {
@@ -201,7 +210,10 @@ class AnomalyDetector {
       accessHours.reduce((sum, h) => sum + Math.pow(h - avgHour, 2), 0) / accessHours.length
     );
 
-    const zScore = Math.abs((hour - avgHour) / stdDev);
+    // 標準偏差が0の場合（全てのアクセスが同じ時間）のケースを処理
+    const zScore = stdDev === 0 ? 
+      (hour !== avgHour ? 5 : 0) : // 異なる時間なら異常とみなす
+      Math.abs((hour - avgHour) / stdDev);
     const isAnomaly = zScore > 3;
     
     return {
