@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import IntegratedAnomalyDetectionEngine from '../../src/integrated-anomaly-detection-v2.1.0.js';
+import IntegratedAnomalyDetectionEngine, { AnomalyType } from '../../src/integrated-anomaly-detection-v2.1.0.js';
 import { DatabasePostgreSQL } from '../../src/database_postgresql.js';
 import type { Employee, TimeRecord, ExpenseRequest, PayrollCalculation } from '../../src/types.js';
 
@@ -109,7 +109,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['expense']
       });
       
-      const duplicateAnomalies = anomalies.filter(a => a.type === 'DUPLICATE_EXPENSE');
+      const duplicateAnomalies = anomalies.filter(a => a.type === AnomalyType.DUPLICATE_EXPENSE);
       expect(duplicateAnomalies.length).toBeGreaterThan(0);
       expect(duplicateAnomalies[0].severity).toBe('high');
     });
@@ -134,7 +134,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['expense']
       });
       
-      const excessiveAnomalies = anomalies.filter(a => a.type === 'EXCESSIVE_EXPENSE');
+      const excessiveAnomalies = anomalies.filter(a => a.type === AnomalyType.EXCESSIVE_EXPENSE);
       expect(excessiveAnomalies.length).toBeGreaterThan(0);
       expect(excessiveAnomalies[0].confidence).toBeGreaterThan(0.8);
     });
@@ -164,7 +164,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['expense']
       });
       
-      const patternAnomalies = anomalies.filter(a => a.type === 'SUSPICIOUS_PATTERN');
+      const patternAnomalies = anomalies.filter(a => a.type === AnomalyType.SUSPICIOUS_PATTERN);
       expect(patternAnomalies.length).toBeGreaterThan(0);
     });
 
@@ -222,7 +222,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['payroll']
       });
       
-      expect(anomalies.some(a => a.type === 'PAYROLL_CALCULATION_ERROR')).toBe(true);
+      expect(anomalies.some(a => a.type === AnomalyType.PAYROLL_CALCULATION_ERROR)).toBe(true);
     });
 
     it('不正な給与変更を検出できる', async () => {
@@ -251,7 +251,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['payroll']
       });
       
-      expect(anomalies.some(a => a.type === 'UNAUTHORIZED_CHANGE')).toBe(true);
+      expect(anomalies.some(a => a.type === AnomalyType.UNAUTHORIZED_CHANGE)).toBe(true);
     });
 
     it('残業スパイクを検出できる', async () => {
@@ -280,7 +280,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['payroll']
       });
       
-      const overtimeAnomalies = anomalies.filter(a => a.type === 'OVERTIME_SPIKE');
+      const overtimeAnomalies = anomalies.filter(a => a.type === AnomalyType.OVERTIME_SPIKE);
       expect(overtimeAnomalies.length).toBeGreaterThan(0);
       expect(overtimeAnomalies[0].severity).toMatch(/^(high|critical)$/);
     });
@@ -311,7 +311,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['attendance']
       });
       
-      expect(anomalies.some(a => a.type === 'ATTENDANCE_FRAUD')).toBe(true);
+      expect(anomalies.some(a => a.type === AnomalyType.ATTENDANCE_FRAUD)).toBe(true);
     });
 
     it('休憩時間違反を検出できる', async () => {
@@ -331,7 +331,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         domains: ['attendance']
       });
       
-      expect(anomalies.some(a => a.type === 'BREAK_VIOLATION')).toBe(true);
+      expect(anomalies.some(a => a.type === AnomalyType.BREAK_VIOLATION)).toBe(true);
     });
   });
 
@@ -411,7 +411,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
       
       const anomalies = await engine.detectAnomalies();
       
-      expect(anomalies.some(a => a.type === 'DATA_INCONSISTENCY')).toBe(true);
+      expect(anomalies.some(a => a.type === AnomalyType.DATA_INCONSISTENCY)).toBe(true);
     });
   });
 
@@ -646,7 +646,7 @@ describe('IntegratedAnomalyDetectionEngine v2.1.0', () => {
         realtime: true
       });
       
-      const excessiveExpenseAnomaly = anomalies.find(a => a.type === 'EXCESSIVE_EXPENSE');
+      const excessiveExpenseAnomaly = anomalies.find(a => a.type === AnomalyType.EXCESSIVE_EXPENSE);
       expect(excessiveExpenseAnomaly?.autoRemediation).toBeDefined();
       expect(excessiveExpenseAnomaly?.autoRemediation?.type).toBe('flag');
     });
