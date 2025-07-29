@@ -5,24 +5,26 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom';
 import { AIConfigurationPanel } from '../components/AIConfigurationPanel';
 import { AIConfigurationService } from '../services/AIConfigurationService';
 
 // モックの設定
-jest.mock('../services/AIConfigurationService');
-jest.mock('../services/ApiClient', () => ({
+vi.mock('../services/AIConfigurationService');
+vi.mock('../services/ApiClient', () => ({
   default: {
-    executeConfigurationAction: jest.fn(),
-    getConfigurationHistory: jest.fn(),
+    executeConfigurationAction: vi.fn(),
+    getConfigurationHistory: vi.fn(),
   },
 }));
 
 describe('AIConfigurationPanel', () => {
-  let mockService: jest.Mocked<AIConfigurationService>;
+  let mockService: any;
   
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockService = new AIConfigurationService() as jest.Mocked<AIConfigurationService>;
+    vi.clearAllMocks();
+    mockService = new AIConfigurationService();
   });
 
   describe('基本的なUI要素', () => {
@@ -73,7 +75,7 @@ describe('AIConfigurationPanel', () => {
         riskLevel: 'medium' as const,
       };
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
       
       render(<AIConfigurationPanel />);
       
@@ -133,8 +135,8 @@ describe('AIConfigurationPanel', () => {
         timestamp: new Date(),
       }];
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
-      mockService.executeActions = jest.fn().mockResolvedValue(mockResults);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
+      mockService.executeActions = vi.fn().mockResolvedValue(mockResults);
       
       render(<AIConfigurationPanel />);
       
@@ -160,7 +162,7 @@ describe('AIConfigurationPanel', () => {
         suggestedAlternatives: ['もう少し具体的に指定していただけますか？'],
       };
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
       
       render(<AIConfigurationPanel />);
       
@@ -190,7 +192,7 @@ describe('AIConfigurationPanel', () => {
         riskLevel: 'high' as const,
       };
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
       
       render(<AIConfigurationPanel />);
       
@@ -223,7 +225,7 @@ describe('AIConfigurationPanel', () => {
         riskLevel: 'high' as const,
       };
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
       
       render(<AIConfigurationPanel />);
       
@@ -238,7 +240,7 @@ describe('AIConfigurationPanel', () => {
 
   describe('エラーハンドリング', () => {
     it('APIエラーが適切に表示される', async () => {
-      mockService.analyzeIntent = jest.fn().mockRejectedValue(new Error('ネットワークエラー'));
+      mockService.analyzeIntent = vi.fn().mockRejectedValue(new Error('ネットワークエラー'));
       
       render(<AIConfigurationPanel />);
       
@@ -274,8 +276,8 @@ describe('AIConfigurationPanel', () => {
         timestamp: new Date(),
       }];
 
-      mockService.analyzeIntent = jest.fn().mockResolvedValue(mockIntent);
-      mockService.executeActions = jest.fn().mockResolvedValue(mockResults);
+      mockService.analyzeIntent = vi.fn().mockResolvedValue(mockIntent);
+      mockService.executeActions = vi.fn().mockResolvedValue(mockResults);
       
       render(<AIConfigurationPanel />);
       
@@ -296,7 +298,7 @@ describe('AIConfigurationPanel', () => {
         resolveAnalyze = resolve;
       });
       
-      mockService.analyzeIntent = jest.fn().mockReturnValue(analyzePromise);
+      mockService.analyzeIntent = vi.fn().mockReturnValue(analyzePromise);
       
       render(<AIConfigurationPanel />);
       

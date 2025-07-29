@@ -19,8 +19,16 @@ export default defineConfig({
         'coverage/',
       ],
     },
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
+    maxConcurrency: 1,
+    reporter: 'basic',
   },
   resolve: {
     alias: {

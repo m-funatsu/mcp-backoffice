@@ -3,6 +3,7 @@
  * 監査ログシステムテストスイート
  */
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Pool } from 'pg';
 import { AuditLogService } from '../services/AuditLogService';
 import {
@@ -14,7 +15,7 @@ import {
 
 // モックデータベース接続
 const mockDb = {
-  query: jest.fn(),
+  query: vi.fn(),
 } as unknown as Pool;
 
 describe('AuditLogService', () => {
@@ -22,7 +23,7 @@ describe('AuditLogService', () => {
 
   beforeEach(() => {
     auditService = new AuditLogService(mockDb);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('log', () => {
@@ -48,7 +49,7 @@ describe('AuditLogService', () => {
         createdAt: new Date(),
       };
 
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [expectedLog],
       });
 
@@ -98,7 +99,7 @@ describe('AuditLogService', () => {
       ];
 
       // カウントクエリのモック
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({ rows: [{ count: '1' }] })
         .mockResolvedValueOnce({ rows: mockLogs });
 
@@ -115,7 +116,7 @@ describe('AuditLogService', () => {
         offset: 20,
       };
 
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({ rows: [{ count: '100' }] })
         .mockResolvedValueOnce({ rows: [] });
 
@@ -160,7 +161,7 @@ describe('AuditLogService', () => {
         },
       ];
 
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockHistory });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockHistory });
 
       const history = await auditService.getEntityHistory(entityType, entityId);
 
@@ -199,7 +200,7 @@ describe('AuditLogService', () => {
         },
       ];
 
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockCriticalLogs });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockCriticalLogs });
 
       const criticalChanges = await auditService.detectCriticalChanges(3600000);
 
@@ -218,7 +219,7 @@ describe('AuditLogService', () => {
         { key: 'agent_config', count: '10' },
       ];
 
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockStats });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockStats });
 
       const stats = await auditService.getStatistics({
         startDate: new Date('2024-01-01'),
@@ -238,7 +239,7 @@ describe('AuditLogService', () => {
         { key: '2024-06-03', count: '8' },
       ];
 
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockStats });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockStats });
 
       const stats = await auditService.getStatistics({
         startDate: new Date('2024-06-01'),
@@ -253,7 +254,7 @@ describe('AuditLogService', () => {
 
   describe('checkForAnomalies', () => {
     it('should detect unusual nighttime activity', async () => {
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({
           rows: [{
             user_id: 'user1',
@@ -273,7 +274,7 @@ describe('AuditLogService', () => {
     });
 
     it('should detect permission escalation', async () => {
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({
           rows: [{
@@ -297,7 +298,7 @@ describe('AuditLogService', () => {
     });
 
     it('should detect mass deletion', async () => {
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({
@@ -335,7 +336,7 @@ describe('AuditLogService', () => {
     ];
 
     it('should export logs as JSON', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockExportData });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockExportData });
 
       const exported = await auditService.exportLogs({
         startDate: new Date('2024-01-01'),
@@ -349,7 +350,7 @@ describe('AuditLogService', () => {
     });
 
     it('should export logs as CSV', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({ rows: mockExportData });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: mockExportData });
 
       const exported = await auditService.exportLogs({
         startDate: new Date('2024-01-01'),
@@ -364,7 +365,7 @@ describe('AuditLogService', () => {
 
   describe('cleanupOldLogs', () => {
     it('should delete old logs based on retention policy', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({ rowCount: 150 });
+      mockDb.query = vi.fn().mockResolvedValue({ rowCount: 150 });
 
       const deletedCount = await auditService.cleanupOldLogs(365);
 
@@ -420,7 +421,7 @@ describe('Audit Log Integration Tests', () => {
 
     // 各アクションをログに記録
     for (const trail of auditTrail) {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: `log_${trail.action}`,
           entity_type: 'role',
@@ -442,7 +443,7 @@ describe('Audit Log Integration Tests', () => {
     }
 
     // 履歴の取得と検証
-    mockDb.query = jest.fn().mockResolvedValue({
+    mockDb.query = vi.fn().mockResolvedValue({
       rows: auditTrail.map((trail, index) => ({
         id: `log_${index}`,
         entity_type: 'role',

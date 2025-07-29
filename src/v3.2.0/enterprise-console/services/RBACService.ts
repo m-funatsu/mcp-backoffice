@@ -180,7 +180,17 @@ export class RBACService {
     ];
     
     const result = await this.db.query(query, values);
-    return result.rows[0];
+    const createdRole = result.rows[0];
+    return {
+      id: createdRole.id,
+      name: createdRole.name,
+      displayName: createdRole.display_name,
+      description: createdRole.description,
+      systemRole: createdRole.system_role,
+      priority: createdRole.priority,
+      createdAt: createdRole.created_at,
+      updatedAt: createdRole.updated_at,
+    };
   }
 
   /**
@@ -217,7 +227,18 @@ export class RBACService {
       throw new Error('Role not found');
     }
     
-    return result.rows[0];
+    // データベースのスネークケースをキャメルケースに変換
+    const role = result.rows[0];
+    return {
+      id: role.id,
+      name: role.name,
+      displayName: role.display_name,
+      description: role.description,
+      systemRole: role.system_role,
+      priority: role.priority,
+      createdAt: role.created_at,
+      updatedAt: role.updated_at,
+    };
   }
 
   /**
@@ -295,7 +316,16 @@ export class RBACService {
     ];
     
     const result = await this.db.query(query, values);
-    return result.rows[0];
+    const userRole = result.rows[0];
+    return {
+      userId: userRole.user_id,
+      roleId: userRole.role_id,
+      departmentId: userRole.department_id,
+      effectiveFrom: userRole.effective_from,
+      effectiveUntil: userRole.effective_until,
+      assignedBy: userRole.assigned_by,
+      createdAt: userRole.created_at,
+    };
   }
 
   /**
@@ -404,7 +434,15 @@ export class RBACService {
     ];
     
     const result = await this.db.query(query, values);
-    return result.rows[0];
+    const perm = result.rows[0];
+    return {
+      id: perm.id,
+      resource: perm.resource,
+      action: perm.action,
+      scope: perm.scope,
+      description: perm.description,
+      createdAt: perm.created_at,
+    };
   }
 
   /**

@@ -4,6 +4,7 @@
  */
 
 import { Pool } from 'pg';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RBACService } from '../services/RBACService';
 import {
   Role,
@@ -16,7 +17,7 @@ import {
 
 // モックデータベース接続
 const mockDb = {
-  query: jest.fn(),
+  query: vi.fn(),
 } as unknown as Pool;
 
 describe('RBACService', () => {
@@ -24,13 +25,13 @@ describe('RBACService', () => {
 
   beforeEach(() => {
     rbacService = new RBACService(mockDb);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('checkPermission', () => {
     it('should allow access when user has exact permission', async () => {
       // ユーザー権限をモック
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           resource: 'payroll',
@@ -50,7 +51,7 @@ describe('RBACService', () => {
     });
 
     it('should deny access when user lacks permission', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({ rows: [] });
+      mockDb.query = vi.fn().mockResolvedValue({ rows: [] });
 
       const hasPermission = await rbacService.checkPermission(
         'user1',
@@ -62,7 +63,7 @@ describe('RBACService', () => {
     });
 
     it('should respect scope limitations', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           resource: 'expense',
@@ -94,12 +95,13 @@ describe('RBACService', () => {
     });
 
     it('should apply permission conditions', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           resource: 'expense',
           action: 'approve',
           scope: 'department',
+          department_id: 'dept1',
           conditions: {
             maxAmount: 50000,
           },
@@ -111,7 +113,7 @@ describe('RBACService', () => {
         'user1',
         'expense',
         'approve',
-        { amount: 100000 }
+        { amount: 100000, departmentId: 'dept1' }
       );
 
       expect(hasPermissionHigh).toBe(false);
@@ -121,7 +123,7 @@ describe('RBACService', () => {
         'user1',
         'expense',
         'approve',
-        { amount: 30000 }
+        { amount: 30000, departmentId: 'dept1' }
       );
 
       expect(hasPermissionLow).toBe(true);
@@ -138,7 +140,7 @@ describe('RBACService', () => {
         priority: 100,
       };
 
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'role1',
           ...newRole,
@@ -164,7 +166,7 @@ describe('RBACService', () => {
     });
 
     it('should prevent deletion of system roles', async () => {
-      mockDb.query = jest.fn()
+      mockDb.query = vi.fn()
         .mockResolvedValueOnce({
           rows: [{ system_role: true }],
         });
@@ -179,7 +181,7 @@ describe('RBACService', () => {
         priority: 50,
       };
 
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'role1',
           name: 'test_role',
@@ -198,7 +200,7 @@ describe('RBACService', () => {
 
   describe('User Role Assignment', () => {
     it('should assign role to user', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           user_id: 'user1',
           role_id: 'role1',
@@ -222,7 +224,7 @@ describe('RBACService', () => {
     });
 
     it('should retrieve user roles with details', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           user_id: 'user1',
           role_id: 'role1',
@@ -256,7 +258,7 @@ describe('RBACService', () => {
         description: '部門内の給与承認',
       };
 
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           ...permission,
@@ -272,7 +274,7 @@ describe('RBACService', () => {
     });
 
     it('should filter permissions by criteria', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [
           {
             id: 'perm1',
@@ -300,7 +302,7 @@ describe('RBACService', () => {
 
   describe('Hierarchical Permissions', () => {
     it('should grant access with higher scope', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           resource: 'expense',
@@ -321,7 +323,7 @@ describe('RBACService', () => {
     });
 
     it('should deny access with lower scope', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [{
           id: 'perm1',
           resource: 'expense',
@@ -344,7 +346,7 @@ describe('RBACService', () => {
 
   describe('Bulk Permission Check', () => {
     it('should check multiple permissions efficiently', async () => {
-      mockDb.query = jest.fn().mockResolvedValue({
+      mockDb.query = vi.fn().mockResolvedValue({
         rows: [
           {
             id: 'perm1',
@@ -363,7 +365,7 @@ describe('RBACService', () => {
 
       const permissionsToCheck = [
         { resource: 'payroll' as ResourceType, action: 'read' as ActionType },
-        { resource: 'expense' as ResourceType, action: 'create' as ActionType },
+        { resource: 'expense' as ResourceType, action: 'create' as ActionType, targetData: { ownerId: 'user1' } },
         { resource: 'analytics' as ResourceType, action: 'read' as ActionType },
       ];
 
@@ -381,10 +383,14 @@ describe('RBACService', () => {
 
 describe('RBAC Integration Tests', () => {
   it('should handle complex permission scenarios', async () => {
+    // 現在時刻をモック（テスト用に営業時間内に設定）
+    const originalDate = Date;
+    const mockDate = new Date('2024-06-15T10:00:00+09:00'); // 土曜日10:00 JST
+    vi.spyOn(global, 'Date').mockImplementation(() => mockDate);
     const rbacService = new RBACService(mockDb);
 
     // 複雑なシナリオ: 部門マネージャーが自部門の経費を承認
-    mockDb.query = jest.fn().mockResolvedValue({
+    mockDb.query = vi.fn().mockResolvedValue({
       rows: [{
         id: 'perm1',
         resource: 'expense',
@@ -427,5 +433,8 @@ describe('RBAC Integration Tests', () => {
     );
 
     expect(invalidAmount).toBe(false);
+
+    // DateオブジェクトをリストアFix
+    vi.restoreAllMocks();
   });
 });

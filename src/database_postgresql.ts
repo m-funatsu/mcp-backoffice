@@ -363,6 +363,92 @@ class DatabasePostgreSQL {
       earlyLeaveCount: 0 // TODO: Calculate early leave count
     };
   }
+
+  // 経費管理関連メソッド - 統合異常検知エンジン用
+  async getAllExpenseRequests(): Promise<any[]> {
+    try {
+      const result = await this.client.query(`
+        SELECT id, employee_id as "employeeId", amount, category_id as "categoryId", 
+               description, expense_date as "expenseDate", receipt_image_url as "receiptImageUrl",
+               status, created_at as "createdAt", updated_at as "updatedAt"
+        FROM expense_requests 
+        WHERE status != 'deleted'
+        ORDER BY created_at DESC
+      `);
+      return result.rows.map(row => ({
+        ...row,
+        expenseDate: new Date(row.expenseDate),
+        createdAt: new Date(row.createdAt),
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : undefined
+      }));
+    } catch (error) {
+      console.error('Error getting all expense requests:', error);
+      return [];
+    }
+  }
+
+  async getAllPayrollCalculations(): Promise<any[]> {
+    try {
+      const result = await this.client.query(`
+        SELECT id, employee_id as "employeeId", month, regular_hours as "regularHours",
+               overtime_hours as "overtimeHours", late_night_hours as "lateNightHours",
+               holiday_hours as "holidayHours", regular_pay as "regularPay",
+               overtime_pay as "overtimePay", late_night_pay as "lateNightPay",
+               holiday_pay as "holidayPay", total_pay as "totalPay",
+               net_pay as "netPay", calculated_at as "calculatedAt"
+        FROM payroll_calculations
+        ORDER BY calculated_at DESC
+      `);
+      return result.rows.map(row => ({
+        ...row,
+        calculatedAt: new Date(row.calculatedAt)
+      }));
+    } catch (error) {
+      console.error('Error getting all payroll calculations:', error);
+      return [];
+    }
+  }
+
+  async getAllTimeRecords(): Promise<any[]> {
+    try {
+      const result = await this.client.query(`
+        SELECT id, employee_id as "employeeId", clock_in as "clockIn",
+               clock_out as "clockOut", break_duration as "breakDuration",
+               status, created_at as "createdAt"
+        FROM time_records
+        ORDER BY clock_in DESC
+      `);
+      return result.rows.map(row => ({
+        ...row,
+        clockIn: new Date(row.clockIn),
+        clockOut: row.clockOut ? new Date(row.clockOut) : null,
+        createdAt: new Date(row.createdAt)
+      }));
+    } catch (error) {
+      console.error('Error getting all time records:', error);
+      return [];
+    }
+  }
+
+  async getAllExpenseRequests(): Promise<any[]> {
+    try {
+      const result = await this.client.query(`
+        SELECT id, employee_id as "employeeId", amount, category_id as "categoryId",
+               description, expense_date as "expenseDate", status,
+               created_at as "createdAt"
+        FROM expense_requests
+        ORDER BY expense_date DESC
+      `);
+      return result.rows.map(row => ({
+        ...row,
+        expenseDate: new Date(row.expenseDate),
+        createdAt: new Date(row.createdAt)
+      }));
+    } catch (error) {
+      console.error('Error getting all expense requests:', error);
+      return [];
+    }
+  }
 }
 
 export { DatabasePostgreSQL };
