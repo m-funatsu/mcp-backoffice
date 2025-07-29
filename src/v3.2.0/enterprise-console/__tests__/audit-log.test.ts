@@ -229,7 +229,7 @@ describe('AuditLogService', () => {
 
       expect(stats).toHaveLength(3);
       expect(stats[0].key).toBe('role');
-      expect(stats[0].count).toBe(25);
+      expect(Number(stats[0].count)).toBe(25);
     });
 
     it('should group statistics by day', async () => {
