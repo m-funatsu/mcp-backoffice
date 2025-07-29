@@ -181,7 +181,7 @@ export class ContinuousSecuritySystem extends EventEmitter {
   /**
    * 脆弱性スキャン実行
    */
-  public async runVulnerabilityS​can(): Promise<Vulnerability[]> {
+  public async runVulnerabilityScan(): Promise<Vulnerability[]> {
     try {
       logger.info('Starting vulnerability scan');
       const vulnerabilities: Vulnerability[] = [];
@@ -682,7 +682,7 @@ export class ContinuousSecuritySystem extends EventEmitter {
   private scheduleSecurityScans(): void {
     // 日次脆弱性スキャン
     const dailyScan = setInterval(() => {
-      this.runVulnerabilityS​can();
+      this.runVulnerabilityScan();
     }, 86400000); // 24時間
     this.scanSchedules.set('daily_vulnerability', dailyScan);
 

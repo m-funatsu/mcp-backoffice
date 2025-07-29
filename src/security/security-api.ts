@@ -77,7 +77,7 @@ router.post('/scan/vulnerabilities',
       const { scanType = 'full', targets = [] } = req.body;
 
       // スキャンを非同期で実行
-      securitySystem.runVulnerabilityS​can()
+      securitySystem.runVulnerabilityScan()
         .then(vulnerabilities => {
           logger.info(`Vulnerability scan completed: ${vulnerabilities.length} issues found`);
         })
@@ -497,7 +497,7 @@ router.get('/threat-intelligence',
       const intelligence = await securitySystem.getThreatIntelligence();
 
       res.json({
-        threats: intelligence.activeTh​reats,
+        threats: intelligence.activeThreats,
         indicators: intelligence.indicators,
         recommendations: intelligence.recommendations,
         lastUpdated: intelligence.lastUpdated
