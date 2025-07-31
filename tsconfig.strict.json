@@ -1,0 +1,29 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    /* 最も厳格な型チェック設定 */
+    
+    /* 未使用コードの完全排除 */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    
+    /* 型の厳密性 */
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    
+    /* コンパイラチェック */
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    
+    /* エラー報告の詳細度 */
+    "pretty": true,
+    "preserveWatchOutput": true,
+    
+    /* ビルド最適化 */
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  }
+}

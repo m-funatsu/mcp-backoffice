@@ -33,7 +33,11 @@ export interface ExpenseAction extends AgentAction {
   batchIds?: string[];
   actionType: 'approve' | 'reject' | 'investigate' | 'process' | 'sync';
   reason?: string;
-  evidence?: any;
+  evidence?: {
+    type: string;
+    description: string;
+    attachments?: string[];
+  };
 }
 
 export class ExpenseAgent extends BaseAgent {
@@ -41,9 +45,16 @@ export class ExpenseAgent extends BaseAgent {
   private anomalyEngine: IntegratedAnomalyDetectionEngine;
   private accountingIntegration: FreeeIntegration;
   private processingQueue: ExpenseRequest[];
-  private fraudDetectionModel: any;
+  private fraudDetectionModel: {
+    predict: (expense: ExpenseRequest) => Promise<number>;
+    train: (data: ExpenseRequest[]) => Promise<void>;
+  };
   
-  constructor(config: any) {
+  constructor(config: {
+    db: DatabasePostgreSQL;
+    anomalyEngine?: IntegratedAnomalyDetectionEngine;
+    accountingIntegration?: FreeeIntegration;
+  }) {
     super({
       id: 'expense_agent_001',
       name: '経費管理エージェント',
@@ -182,7 +193,14 @@ export class ExpenseAgent extends BaseAgent {
     return actions;
   }
 
-  protected async execute(action: ExpenseAction): Promise<any> {
+  protected async execute(action: ExpenseAction): Promise<{
+    success: boolean;
+    processedCount: number;
+    approvedCount?: number;
+    rejectedCount?: number;
+    syncedCount?: number;
+    errors?: string[];
+  }> {
     this.logger.info(`Executing expense action: ${action.description}`);
     
     try {
@@ -285,7 +303,16 @@ export class ExpenseAgent extends BaseAgent {
     return result.rows;
   }
 
-  private async processBatch(expenses: ExpenseRequest[], rules: any): Promise<any[]> {
+  private async processBatch(expenses: ExpenseRequest[], rules: {
+    autoApprovalLimit: number;
+    requireReceiptThreshold: number;
+    fraudDetectionSensitivity: 'low' | 'medium' | 'high';
+  }): Promise<Array<{
+    expense: ExpenseRequest;
+    status: 'approved' | 'rejected' | 'pending';
+    reason?: string;
+    fraudScore?: number;
+  }>> {
     const results = [];
     
     for (const expense of expenses) {
@@ -323,7 +350,14 @@ export class ExpenseAgent extends BaseAgent {
     return results;
   }
 
-  private async detectFraud(expenses: ExpenseRequest[], sensitivity: string): Promise<any> {
+  private async detectFraud(expenses: ExpenseRequest[], sensitivity: string): Promise<{
+    suspicious: Array<{
+      expense: ExpenseRequest;
+      score: number;
+      reasons: string[];
+    }>;
+    clean: ExpenseRequest[];
+  }> {
     const suspicious = [];
     const clean = [];
     
@@ -344,7 +378,19 @@ export class ExpenseAgent extends BaseAgent {
     return { suspicious, clean };
   }
 
-  private async processApprovals(batchResults: any[], rules: any): Promise<any> {
+  private async processApprovals(batchResults: Array<{
+    expense: ExpenseRequest;
+    status: 'approved' | 'rejected' | 'pending';
+    reason?: string;
+    fraudScore?: number;
+  }>, rules: {
+    autoApprovalLimit: number;
+    requireReceiptThreshold: number;
+  }): Promise<{
+    approved: ExpenseRequest[];
+    rejected: ExpenseRequest[];
+    pending: ExpenseRequest[];
+  }> {
     const approved = [];
     const rejected = [];
     const pending = [];
@@ -427,7 +473,26 @@ export class ExpenseAgent extends BaseAgent {
     }
   }
 
-  private async generateExpenseReport(data: any): Promise<any> {
+  private async generateExpenseReport(data: {
+    period: { start: Date; end: Date };
+  }): Promise<{
+    generatedAt: Date;
+    period: { start: Date; end: Date };
+    summary: {
+      totalExpenses: number;
+      totalApproved: number;
+      totalRejected: number;
+      totalPending: number;
+    };
+    categoryBreakdown: Array<{ categoryId: string; count: number; total: number }>;
+    departmentBreakdown: Array<{ department: string; count: number; total: number }>;
+    topSpenders: Array<{ employeeId: string; count: number; total: number }>;
+    trends: {
+      monthOverMonth: number;
+      yearOverYear: number;
+    };
+    recommendations: string[];
+  }> {
     const report = {
       generatedAt: new Date(),
       period: data.period,
@@ -455,7 +520,16 @@ export class ExpenseAgent extends BaseAgent {
     return report;
   }
 
-  private async processReceiptOCR(expenses: ExpenseRequest[]): Promise<any[]> {
+  private async processReceiptOCR(expenses: ExpenseRequest[]): Promise<Array<{
+    expenseId: string;
+    ocrResult: {
+      vendor?: string;
+      amount?: number;
+      date?: Date;
+      items?: string[];
+    };
+    confidence: number;
+  }>> {
     const results = [];
     
     for (const expense of expenses) {
@@ -500,7 +574,19 @@ export class ExpenseAgent extends BaseAgent {
     return results;
   }
 
-  private async runFraudDetection(expenses: ExpenseRequest[]): Promise<any> {
+  private async runFraudDetection(expenses: ExpenseRequest[]): Promise<{
+    suspiciousExpenses: Array<{
+      expense: ExpenseRequest;
+      fraudScore: number;
+      checks: {
+        amount: boolean;
+        frequency: boolean;
+        vendor: boolean;
+        pattern: boolean;
+      };
+    }>;
+    cleanExpenses: ExpenseRequest[];
+  }> {
     const fraudResults = [];
     
     for (const expense of expenses) {
@@ -526,7 +612,10 @@ export class ExpenseAgent extends BaseAgent {
     return fraudResults;
   }
 
-  private filterAutoApprovable(expenses: ExpenseRequest[], rules: any): ExpenseRequest[] {
+  private filterAutoApprovable(expenses: ExpenseRequest[], rules: {
+    autoApprovalLimit: number;
+    restrictedCategories?: string[];
+  }): ExpenseRequest[] {
     return expenses.filter(expense => {
       // 金額制限チェック
       if (expense.amount > rules.autoApprovalLimit) return false;
@@ -544,7 +633,11 @@ export class ExpenseAgent extends BaseAgent {
     });
   }
 
-  private async autoApprove(expenses: ExpenseRequest[]): Promise<any[]> {
+  private async autoApprove(expenses: ExpenseRequest[]): Promise<Array<{
+    expenseId: string;
+    approved: boolean;
+    reason?: string;
+  }>> {
     const results = [];
     
     for (const expense of expenses) {
@@ -567,7 +660,11 @@ export class ExpenseAgent extends BaseAgent {
     return results;
   }
 
-  private async syncExpensesToAccounting(expenses: ExpenseRequest[]): Promise<any> {
+  private async syncExpensesToAccounting(expenses: ExpenseRequest[]): Promise<{
+    success: boolean;
+    syncedCount: number;
+    errors?: string[];
+  }> {
     try {
       const syncResult = await this.accountingIntegration.syncExpenseData(expenses);
       
@@ -598,7 +695,7 @@ export class ExpenseAgent extends BaseAgent {
     }
   }
 
-  private async recordActionResult(action: ExpenseAction, result: any): Promise<void> {
+  private async recordActionResult(action: ExpenseAction, result: unknown): Promise<void> {
     await this.db.query(
       `INSERT INTO expense_action_log 
        (action_id, action_type, description, result, executed_at)
@@ -607,7 +704,7 @@ export class ExpenseAgent extends BaseAgent {
     );
   }
 
-  private async notifyRelevantParties(action: ExpenseAction, result: any): Promise<void> {
+  private async notifyRelevantParties(action: ExpenseAction, result: unknown): Promise<void> {
     // 却下通知
     if (action.actionType === 'reject') {
       await this.sendNotification(action.expenseId!, {
@@ -629,10 +726,13 @@ export class ExpenseAgent extends BaseAgent {
 
   // ヘルパーメソッド
 
-  private async validateExpense(expense: ExpenseRequest): Promise<any> {
+  private async validateExpense(expense: ExpenseRequest): Promise<{
+    isValid: boolean;
+    errors: string[];
+  }> {
     const validation = {
       isValid: true,
-      errors: []
+      errors: [] as string[]
     };
     
     // 必須フィールドチェック
@@ -716,12 +816,12 @@ export class ExpenseAgent extends BaseAgent {
     return reasons;
   }
 
-  private canAutoApprove(expense: ExpenseRequest, rules: any): boolean {
+  private canAutoApprove(expense: ExpenseRequest, rules: ExpenseGoal['processingRules']): boolean {
     return expense.amount <= rules.autoApprovalLimit && 
            !rules.restrictedCategories?.includes(expense.categoryId);
   }
 
-  private shouldAutoReject(expense: ExpenseRequest, rules: any): boolean {
+  private shouldAutoReject(expense: ExpenseRequest, rules: ExpenseGoal['processingRules']): boolean {
     // ポリシー違反の自動却下条件
     return false; // 実装簡略化
   }
@@ -762,7 +862,7 @@ export class ExpenseAgent extends BaseAgent {
     return expenses.reduce((sum, expense) => sum + expense.amount, 0);
   }
 
-  private async completeGoal(goalId: string, report: any): Promise<void> {
+  private async completeGoal(goalId: string, report: unknown): Promise<void> {
     await this.updateGoalStatus(goalId, 'completed', report);
   }
 
@@ -785,7 +885,14 @@ export class ExpenseAgent extends BaseAgent {
     }
   }
 
-  private async checkBudgetStatus(): Promise<any> {
+  private async checkBudgetStatus(): Promise<{
+    exceededDepartments: Array<{
+      department: string;
+      spent: number;
+      budget_limit: number;
+      usage_ratio: number;
+    }>;
+  }> {
     const result = await this.db.query(
       `SELECT department, 
               SUM(amount) as spent,
@@ -804,7 +911,14 @@ export class ExpenseAgent extends BaseAgent {
     };
   }
 
-  private async handleBudgetExcess(budgetStatus: any): Promise<void> {
+  private async handleBudgetExcess(budgetStatus: {
+    exceededDepartments: Array<{
+      department: string;
+      spent: number;
+      budget_limit: number;
+      usage_ratio: number;
+    }>;
+  }): Promise<void> {
     for (const dept of budgetStatus.exceededDepartments) {
       await this.sendNotification(null, {
         type: 'budget_exceeded',
@@ -815,12 +929,20 @@ export class ExpenseAgent extends BaseAgent {
     }
   }
 
-  private async detectPolicyViolations(): Promise<any[]> {
+  private async detectPolicyViolations(): Promise<Array<{
+    type: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high';
+  }>> {
     // ポリシー違反検出ロジック
     return [];
   }
 
-  private async handlePolicyViolations(violations: any[]): Promise<void> {
+  private async handlePolicyViolations(violations: Array<{
+    type: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high';
+  }>): Promise<void> {
     // ポリシー違反処理
   }
 
@@ -842,7 +964,11 @@ export class ExpenseAgent extends BaseAgent {
     }
   }
 
-  private analyzeApprovalPatterns(historicalData: ExpenseRequest[]): any {
+  private analyzeApprovalPatterns(historicalData: ExpenseRequest[]): {
+    averageApprovalTime: number;
+    approvalRate: number;
+    commonRejectionReasons: string[];
+  } {
     // 承認パターンの分析
     return {
       autoApprovalRate: 0.65,
@@ -851,7 +977,11 @@ export class ExpenseAgent extends BaseAgent {
     };
   }
 
-  private analyzeSpendingTrends(historicalData: ExpenseRequest[]): any {
+  private analyzeSpendingTrends(historicalData: ExpenseRequest[]): {
+    trend: 'increasing' | 'stable' | 'decreasing';
+    averageMonthlySpend: number;
+    topCategories: string[];
+  } {
     // 支出トレンドの分析
     return {
       monthlyGrowth: 0.05,
@@ -860,12 +990,21 @@ export class ExpenseAgent extends BaseAgent {
     };
   }
 
-  private async applyLearnings(learnings: any): Promise<void> {
+  private async applyLearnings(learnings: {
+    approvalPatterns: ReturnType<typeof this.analyzeApprovalPatterns>;
+    spendingTrends: ReturnType<typeof this.analyzeSpendingTrends>;
+  }): Promise<void> {
     // 学習結果の適用
     console.log('Applying learnings:', learnings);
   }
 
-  private async performOCR(imageUrl: string): Promise<any> {
+  private async performOCR(imageUrl: string): Promise<{
+    text: string;
+    amount?: number;
+    date?: Date;
+    vendor?: string;
+    confidence: number;
+  }> {
     // OCR処理（実際はOCRサービスを呼び出す）
     return {
       vendor: 'サンプル店舗',
@@ -916,7 +1055,13 @@ export class ExpenseAgent extends BaseAgent {
     return false; // 実装簡略化
   }
 
-  private calculateOverallFraudScore(checks: any): number {
+  private calculateOverallFraudScore(checks: {
+    duplicateCheck: { isDuplicate: boolean; matchScore: number };
+    amountAnomaly: { isAnomaly: boolean; zscore: number };
+    vendorCheck: { isNew: boolean; riskScore: number };
+    timingAnomaly: { isAnomaly: boolean; score: number };
+    patternMatch: { matchesPattern: boolean; patternScore: number };
+  }): number {
     let score = 0;
     let weight = 0;
     
@@ -950,7 +1095,13 @@ export class ExpenseAgent extends BaseAgent {
     return 'low';
   }
 
-  private generateFraudRecommendation(score: number, checks: any): string {
+  private generateFraudRecommendation(score: number, checks: {
+    duplicateCheck: { isDuplicate: boolean; matchScore: number };
+    amountAnomaly: { isAnomaly: boolean; zscore: number };
+    vendorCheck: { isNew: boolean; riskScore: number };
+    timingAnomaly: { isAnomaly: boolean; score: number };
+    patternMatch: { matchesPattern: boolean; patternScore: number };
+  }): string {
     if (score > 0.8) {
       return '即座に調査が必要です';
     } else if (score > 0.6) {
@@ -965,11 +1116,20 @@ export class ExpenseAgent extends BaseAgent {
     return false;
   }
 
-  private async sendBudgetAlert(dept: any): Promise<void> {
+  private async sendBudgetAlert(dept: {
+    department: string;
+    spent: number;
+    budget_limit: number;
+    usage_percentage: number;
+  }): Promise<void> {
     console.log(`Budget alert for ${dept.department}: ${dept.usage_percentage}% used`);
   }
 
-  private async getCategoryBreakdown(period: any): Promise<any> {
+  private async getCategoryBreakdown(period: { start: Date; end: Date }): Promise<Array<{
+    category_id: string;
+    count: number;
+    total: number;
+  }>> {
     const result = await this.db.query(
       `SELECT category_id, COUNT(*) as count, SUM(amount) as total
        FROM expense_requests
@@ -982,7 +1142,11 @@ export class ExpenseAgent extends BaseAgent {
     return result.rows;
   }
 
-  private async getDepartmentBreakdown(period: any): Promise<any> {
+  private async getDepartmentBreakdown(period: { start: Date; end: Date }): Promise<Array<{
+    department: string;
+    count: number;
+    total: number;
+  }>> {
     const result = await this.db.query(
       `SELECT department, COUNT(*) as count, SUM(amount) as total
        FROM expense_requests
@@ -995,7 +1159,11 @@ export class ExpenseAgent extends BaseAgent {
     return result.rows;
   }
 
-  private async getTopSpenders(period: any): Promise<any> {
+  private async getTopSpenders(period: { start: Date; end: Date }): Promise<Array<{
+    employee_id: string;
+    count: number;
+    total: number;
+  }>> {
     const result = await this.db.query(
       `SELECT employee_id, COUNT(*) as count, SUM(amount) as total
        FROM expense_requests
@@ -1010,7 +1178,11 @@ export class ExpenseAgent extends BaseAgent {
     return result.rows;
   }
 
-  private async analyzeTrends(period: any): Promise<any> {
+  private async analyzeTrends(period: { start: Date; end: Date }): Promise<{
+    monthlyTrend: 'increasing' | 'stable' | 'decreasing';
+    categoryShifts: string[];
+    anomalies: string[];
+  }> {
     // トレンド分析
     return {
       monthlyGrowth: 0.05,
@@ -1019,7 +1191,12 @@ export class ExpenseAgent extends BaseAgent {
     };
   }
 
-  private generateRecommendations(data: any): string[] {
+  private generateRecommendations(data: {
+    categoryBreakdown?: Array<{ category_id: string; total: number }>;
+    departmentBreakdown?: Array<{ department: string; total: number }>;
+    topSpenders?: Array<{ employee_id: string; total: number }>;
+    trends?: { monthlyTrend: string; anomalies: string[] };
+  }): string[] {
     const recommendations = [];
     
     if (data.fraudDetected > 5) {
@@ -1033,7 +1210,7 @@ export class ExpenseAgent extends BaseAgent {
     return recommendations;
   }
 
-  private async saveExpenseReport(report: any): Promise<void> {
+  private async saveExpenseReport(report: unknown): Promise<void> {
     await this.db.query(
       `INSERT INTO expense_reports (report_data, generated_at)
        VALUES ($1, $2)`,
@@ -1041,11 +1218,18 @@ export class ExpenseAgent extends BaseAgent {
     );
   }
 
-  private async sendNotification(expenseId: string | null, notification: any): Promise<void> {
+  private async sendNotification(expenseId: string | null, notification: {
+    type: string;
+    [key: string]: unknown;
+  }): Promise<void> {
     console.log(`Notification:`, notification);
   }
 
-  private extractFraudPatterns(historicalData: ExpenseRequest[]): Map<string, any> {
+  private extractFraudPatterns(historicalData: ExpenseRequest[]): Map<string, {
+    pattern: string;
+    frequency: number;
+    riskLevel: 'low' | 'medium' | 'high';
+  }> {
     const patterns = new Map();
     
     // パターン抽出ロジック

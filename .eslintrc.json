@@ -13,11 +13,14 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:@typescript-eslint/recommended-requiring-type-checking",
     "plugin:@typescript-eslint/strict",
+    "plugin:@typescript-eslint/strict-type-checked",
     "plugin:import/errors",
     "plugin:import/warnings",
     "plugin:import/typescript",
     "plugin:react/recommended",
     "plugin:react-hooks/recommended",
+    "plugin:promise/recommended",
+    "plugin:jsdoc/recommended-typescript",
     "prettier"
   ],
   "plugins": [
@@ -26,7 +29,11 @@
     "react",
     "react-hooks",
     "unicorn",
-    "sonarjs"
+    "sonarjs",
+    "security",
+    "promise",
+    "jsdoc",
+    "deprecation"
   ],
   "env": {
     "browser": true,
@@ -46,7 +53,13 @@
   },
   "rules": {
     /* TypeScript固有のルール */
-    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/explicit-function-return-type": ["error", {
+      "allowExpressions": false,
+      "allowTypedFunctionExpressions": false,
+      "allowHigherOrderFunctions": false,
+      "allowDirectConstAssertionInArrowFunctions": false,
+      "allowConciseArrowFunctionExpressionsStartingWithVoid": false
+    }],
     "@typescript-eslint/explicit-module-boundary-types": "error",
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/no-unsafe-assignment": "error",
@@ -63,13 +76,38 @@
     "@typescript-eslint/prefer-optional-chain": "error",
     "@typescript-eslint/prefer-readonly": "error",
     "@typescript-eslint/prefer-readonly-parameter-types": "off",
+    "@typescript-eslint/strict-boolean-expressions": ["error", {
+      "allowString": false,
+      "allowNumber": false,
+      "allowNullableObject": false,
+      "allowNullableBoolean": false,
+      "allowNullableString": false,
+      "allowNullableNumber": false,
+      "allowAny": false
+    }],
+    "@typescript-eslint/switch-exhaustiveness-check": "error",
+    "@typescript-eslint/array-type": ["error", { "default": "array-simple" }],
+    "@typescript-eslint/consistent-indexed-object-style": ["error", "record"],
+    "@typescript-eslint/method-signature-style": ["error", "property"],
+    "@typescript-eslint/no-confusing-void-expression": "error",
+    "@typescript-eslint/no-meaningless-void-operator": "error",
+    "@typescript-eslint/no-mixed-enums": "error",
+    "@typescript-eslint/no-redundant-type-constituents": "error",
+    "@typescript-eslint/no-useless-empty-export": "error",
+    "@typescript-eslint/prefer-enum-initializers": "error",
+    "@typescript-eslint/prefer-reduce-type-parameter": "error",
+    "@typescript-eslint/prefer-return-this-type": "error",
+    "@typescript-eslint/promise-function-async": "error",
+    "@typescript-eslint/require-array-sort-compare": "error",
+    "@typescript-eslint/sort-type-constituents": "error",
     "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "type-imports" }],
     "@typescript-eslint/consistent-type-exports": "error",
     "@typescript-eslint/naming-convention": [
       "error",
       {
         "selector": "interface",
-        "format": ["PascalCase"]
+        "format": ["PascalCase"],
+        "prefix": ["I"]
       },
       {
         "selector": "typeAlias",
@@ -80,15 +118,78 @@
         "format": ["PascalCase"]
       },
       {
+        "selector": "enumMember",
+        "format": ["UPPER_CASE"]
+      },
+      {
         "selector": "class",
         "format": ["PascalCase"]
+      },
+      {
+        "selector": "method",
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow"
+      },
+      {
+        "selector": "property",
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow"
       },
       {
         "selector": "variable",
         "modifiers": ["const"],
         "format": ["camelCase", "UPPER_CASE", "PascalCase"]
+      },
+      {
+        "selector": "parameter",
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow"
+      },
+      {
+        "selector": "typeLike",
+        "format": ["PascalCase"]
       }
     ],
+    
+    /* 追加の型安全性ルール */
+    "@typescript-eslint/no-unsafe-argument": "error",
+    "@typescript-eslint/no-unsafe-enum-comparison": "error",
+    "@typescript-eslint/no-base-to-string": "error",
+    "@typescript-eslint/no-confusing-non-null-assertion": "error",
+    "@typescript-eslint/no-duplicate-enum-values": "error",
+    "@typescript-eslint/no-duplicate-type-constituents": "error",
+    "@typescript-eslint/no-dynamic-delete": "error",
+    "@typescript-eslint/no-for-in-array": "error",
+    "@typescript-eslint/no-implied-eval": "error",
+    "@typescript-eslint/no-invalid-void-type": "error",
+    "@typescript-eslint/no-non-null-asserted-nullish-coalescing": "error",
+    "@typescript-eslint/no-throw-literal": "error",
+    "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
+    "@typescript-eslint/no-unnecessary-condition": "error",
+    "@typescript-eslint/no-unnecessary-type-arguments": "error",
+    "@typescript-eslint/no-unsafe-declaration-merging": "error",
+    "@typescript-eslint/no-useless-template-literals": "error",
+    "@typescript-eslint/prefer-find": "error",
+    "@typescript-eslint/prefer-includes": "error",
+    "@typescript-eslint/prefer-promise-reject-errors": "error",
+    "@typescript-eslint/prefer-string-starts-ends-with": "error",
+    "@typescript-eslint/restrict-plus-operands": ["error", {
+      "allowAny": false,
+      "allowBoolean": false,
+      "allowNullish": false,
+      "allowNumberAndString": false,
+      "allowRegExp": false
+    }],
+    "@typescript-eslint/restrict-template-expressions": ["error", {
+      "allowNumber": false,
+      "allowBoolean": false,
+      "allowAny": false,
+      "allowNullish": false,
+      "allowRegExp": false
+    }],
+    "@typescript-eslint/unbound-method": ["error", {
+      "ignoreStatic": true
+    }],
     
     /* Import関連 */
     "import/order": [
@@ -140,13 +241,59 @@
     ],
     
     /* 複雑性 */
-    "sonarjs/cognitive-complexity": ["error", 15],
-    "sonarjs/no-duplicate-string": ["error", 3],
+    "sonarjs/cognitive-complexity": ["error", 8],
+    "complexity": ["error", 10],
+    "sonarjs/no-duplicate-string": ["error", { "threshold": 3 }],
     "sonarjs/no-identical-functions": "error",
+    "sonarjs/no-collapsible-if": "error",
+    "sonarjs/no-redundant-boolean": "error",
+    "sonarjs/no-redundant-jump": "error",
+    "sonarjs/no-unused-collection": "error",
+    "sonarjs/prefer-immediate-return": "error",
+    
+    /* セキュリティ */
+    "security/detect-object-injection": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-unsafe-regex": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-possible-timing-attacks": "warn",
+    
+    /* Promise */
+    "promise/always-return": "error",
+    "promise/no-return-wrap": "error",
+    "promise/param-names": "error",
+    "promise/catch-or-return": "error",
+    "promise/no-nesting": "warn",
+    "promise/no-promise-in-callback": "warn",
+    "promise/no-callback-in-promise": "warn",
+    "promise/avoid-new": "off",
+    
+    /* JSDoc */
+    "jsdoc/require-jsdoc": [
+      "error",
+      {
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ClassDeclaration": true,
+          "ArrowFunctionExpression": false,
+          "FunctionExpression": false
+        }
+      }
+    ],
+    "jsdoc/require-description": "warn",
+    "jsdoc/require-param-type": "off",
+    "jsdoc/require-returns-type": "off",
+    "jsdoc/check-tag-names": ["error", { "definedTags": ["internal", "experimental"] }],
+    
+    /* 非推奨チェック */
+    "deprecation/deprecation": "error",
     
     /* React */
     "react/prop-types": "off",
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "react/no-unstable-nested-components": "error",
+    "react/jsx-no-leaked-render": "error"
   },
   "overrides": [
     {
@@ -156,7 +303,12 @@
       },
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
-        "@typescript-eslint/no-non-null-assertion": "off"
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/no-unsafe-argument": "off"
       }
     }
   ]

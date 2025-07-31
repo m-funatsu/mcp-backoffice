@@ -331,3 +331,102 @@ export class MoneyValidator {
     );
   }
 }
+
+/**
+ * ヘルパー関数
+ */
+
+/**
+ * Money オブジェクトを作成
+ */
+export function createMoney(amount: number, currency: Currency = 'JPY', precision: number = 0): Money {
+  return {
+    amount: Math.round(amount * Math.pow(10, precision)),
+    currency,
+    precision
+  };
+}
+
+/**
+ * 文字列から Money オブジェクトを作成
+ */
+export function parseMoney(value: string, currency: Currency = 'JPY', precision: number = 0): Money {
+  return MoneyCalculator.fromString(value, currency, precision);
+}
+
+/**
+ * Money を加算
+ */
+export function addMoney(a: Money, b: Money): Money {
+  return MoneyCalculator.add(a, b);
+}
+
+/**
+ * Money を減算
+ */
+export function subtractMoney(a: Money, b: Money): Money {
+  return MoneyCalculator.subtract(a, b);
+}
+
+/**
+ * Money を乗算
+ */
+export function multiplyMoney(money: Money, multiplier: number): Money {
+  return MoneyCalculator.multiply(money, multiplier);
+}
+
+/**
+ * Money を除算
+ */
+export function divideMoney(money: Money, divisor: number): Money {
+  return MoneyCalculator.divide(money, divisor);
+}
+
+/**
+ * Money をフォーマット
+ */
+export function formatMoney(money: Money, locale: string = 'ja-JP'): string {
+  return MoneyCalculator.format(money, locale);
+}
+
+/**
+ * ゼロ金額を作成
+ */
+export function zeroMoney(currency: Currency = 'JPY', precision: number = 0): Money {
+  return MoneyCalculator.zero(currency, precision);
+}
+
+/**
+ * Money の合計を計算
+ */
+export function sumMoney(moneys: Money[]): Money {
+  return MoneyCalculator.sum(moneys);
+}
+
+/**
+ * Money が正の値か判定
+ */
+export function isPositiveMoney(money: Money): boolean {
+  return MoneyValidator.isPositive(money);
+}
+
+/**
+ * Money がゼロか判定
+ */
+export function isZeroMoney(money: Money): boolean {
+  return MoneyValidator.isZero(money);
+}
+
+/**
+ * Money が等しいか判定
+ */
+export function equalsMoney(a: Money, b: Money): boolean {
+  return MoneyCalculator.equals(a, b);
+}
+
+/**
+ * Money を比較
+ */
+export function compareMoney(a: Money, b: Money): number {
+  return MoneyCalculator.compare(a, b);
+}

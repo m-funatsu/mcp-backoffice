@@ -31,7 +31,7 @@ export class IntelligentExpenseEngine {
   async processReceiptImage(imageBuffer: Buffer, mimeType: string = 'image/jpeg'): Promise<ExtractedReceiptData> {
     try {
       // For test compatibility - check if fetch is mocked
-      if (typeof fetch !== 'undefined' && (fetch as any).mockResolvedValueOnce) {
+      if (typeof fetch !== 'undefined' && 'mockResolvedValueOnce' in fetch) {
         try {
           // Use mocked fetch response
           const response = await fetch('mock-ocr-api', {
@@ -65,7 +65,7 @@ export class IntelligentExpenseEngine {
         const recommendations = qualityScore < 0.6 ? ['画像を再撮影してください'] : [];
         
         // Handle special metadata for tests
-        const metadata: any = {};
+        const metadata: Record<string, unknown> = {};
         if (mockOCRResponse.isHandwritten) {
           metadata.isHandwritten = true;
         }
@@ -73,7 +73,7 @@ export class IntelligentExpenseEngine {
           metadata.warnings = mockOCRResponse.warnings;
         }
         
-        const result: any = {
+        const result: ExtractedReceiptData = {
           vendor: structuredData.vendor,
           date: structuredData.date,
           amount: structuredData.total,
@@ -173,7 +173,7 @@ export class IntelligentExpenseEngine {
       const multipleExpenses = this.detectMultipleExpenses(input, parsed);
       
       // Step 4: Create expense request
-      const expenseRequest: any = {
+      const expenseRequest: ExpenseRequest = {
         id: `EXP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         employeeId,
         categoryId: category.id || '交通費',
@@ -204,12 +204,12 @@ export class IntelligentExpenseEngine {
       }
 
       return savedRequest;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating expense from NL input:', error);
-      if (error.message === '金額が指定されていません') {
+      if (error instanceof Error && error.message === '金額が指定されていません') {
         throw error;
       }
-      if (error.message && error.message.includes('DB')) {
+      if (error instanceof Error && error.message && error.message.includes('DB')) {
         throw new Error('Failed to create expense request');
       }
       throw error;
@@ -560,7 +560,7 @@ export class IntelligentExpenseEngine {
     return Math.max(0.1, Math.min(0.95, baseProbability));
   }
 
-  private async inferCategoryFromVendor(vendor: string, fullText?: string, items?: any[]): Promise<string> {
+  private async inferCategoryFromVendor(vendor: string, fullText?: string, items?: Array<{ name: string; amount?: number }>): Promise<string> {
     const vendorLower = vendor?.toLowerCase() || '';
     const textLower = fullText?.toLowerCase() || '';
     
@@ -623,8 +623,8 @@ export class IntelligentExpenseEngine {
     return '一般経費';
   }
 
-  private detectMultipleExpenses(input: string, mainExpense: ParsedExpenseData): any[] {
-    const expenses: any[] = [];
+  private detectMultipleExpenses(input: string, mainExpense: ParsedExpenseData): ParsedExpenseData[] {
+    const expenses: ParsedExpenseData[] = [];
     
     // Patterns for detecting additional expense items
     const expensePatterns = [

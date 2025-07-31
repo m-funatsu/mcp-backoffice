@@ -1,0 +1,100 @@
+{
+  "extends": "./.eslintrc.json",
+  "rules": {
+    /* 最も厳格な型チェック設定 */
+    "@typescript-eslint/no-explicit-any": ["error", {
+      "fixToUnknown": true,
+      "ignoreRestArgs": false
+    }],
+    
+    /* 未使用コードの完全排除 */
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "vars": "all",
+      "args": "all",
+      "ignoreRestSiblings": false,
+      "argsIgnorePattern": "",
+      "varsIgnorePattern": "",
+      "caughtErrors": "all"
+    }],
+    
+    /* 型の厳密性を最大化 */
+    "@typescript-eslint/strict-boolean-expressions": ["error", {
+      "allowString": false,
+      "allowNumber": false,
+      "allowNullableObject": false,
+      "allowNullableBoolean": false,
+      "allowNullableString": false,
+      "allowNullableNumber": false,
+      "allowAny": false,
+      "allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": false
+    }],
+    
+    /* Promiseの完全な型安全性 */
+    "@typescript-eslint/no-floating-promises": ["error", {
+      "ignoreVoid": false,
+      "ignoreIIFE": false
+    }],
+    
+    /* テンプレート文字列の厳格化 */
+    "@typescript-eslint/restrict-template-expressions": ["error", {
+      "allowNumber": false,
+      "allowBoolean": false,
+      "allowAny": false,
+      "allowNullish": false,
+      "allowRegExp": false,
+      "allowNever": false
+    }],
+    
+    /* 型アサーションの禁止 */
+    "@typescript-eslint/consistent-type-assertions": ["error", {
+      "assertionStyle": "never"
+    }],
+    
+    /* readonlyの強制 */
+    "@typescript-eslint/prefer-readonly": ["error", {
+      "onlyInlineLambdas": false
+    }],
+    "@typescript-eslint/prefer-readonly-parameter-types": ["error", {
+      "checkParameterProperties": true,
+      "ignoreInferredTypes": false
+    }],
+    
+    /* 複雑性の更なる制限 */
+    "complexity": ["error", 5],
+    "max-lines": ["error", 300],
+    "max-lines-per-function": ["error", 50],
+    "max-statements": ["error", 10],
+    "max-nested-callbacks": ["error", 2],
+    "max-depth": ["error", 2],
+    
+    /* インポートの厳格化 */
+    "no-restricted-imports": ["error", {
+      "patterns": ["**/dist/*", "**/node_modules/*"],
+      "paths": [{
+        "name": ".",
+        "message": "Please use explicit imports"
+      }]
+    }],
+    
+    /* コメントの必須化 */
+    "jsdoc/require-jsdoc": ["error", {
+      "require": {
+        "FunctionDeclaration": true,
+        "MethodDefinition": true,
+        "ClassDeclaration": true,
+        "ArrowFunctionExpression": true,
+        "FunctionExpression": true
+      }
+    }],
+    "jsdoc/require-description": "error",
+    "jsdoc/require-param": "error",
+    "jsdoc/require-returns": "error",
+    "jsdoc/check-param-names": "error",
+    "jsdoc/check-tag-names": "error",
+    
+    /* セキュリティ強化 */
+    "security/detect-object-injection": "error",
+    "security/detect-non-literal-regexp": "error",
+    "security/detect-possible-timing-attacks": "error"
+  }
+}

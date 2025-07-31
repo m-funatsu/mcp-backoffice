@@ -6,6 +6,15 @@
 import { Timezone } from './index';
 
 /**
+ * DateTime型 - タイムゾーン付き日時
+ */
+export interface DateTime {
+  date: Date;
+  timezone: string;
+  offset: number; // offset in minutes
+}
+
+/**
  * 日付範囲
  */
 export interface DateRange {
@@ -353,6 +362,38 @@ export class DateTimeCalculator {
   }
 
   /**
+   * 年の開始日を取得
+   */
+  static startOfYear(date: Date): Date {
+    return new Date(date.getFullYear(), 0, 1);
+  }
+
+  /**
+   * 年の終了日を取得
+   */
+  static endOfYear(date: Date): Date {
+    return new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+  }
+
+  /**
+   * 営業日を加算
+   */
+  static addBusinessDays(date: Date, days: number, holidays: Holiday[] = []): Date {
+    let result = new Date(date);
+    let remaining = Math.abs(days);
+    const direction = days > 0 ? 1 : -1;
+    
+    while (remaining > 0) {
+      result.setDate(result.getDate() + direction);
+      if (this.isBusinessDay(result, holidays)) {
+        remaining--;
+      }
+    }
+    
+    return result;
+  }
+
+  /**
    * 労働時間を計算
    */
   static calculateWorkingHours(
@@ -451,4 +492,226 @@ export class DateTimeValidator {
   static isToday(date: Date): boolean {
     return DateTimeCalculator.isSameDay(date, new Date());
   }
+}
+
+/**
+ * ヘルパー関数
+ */
+
+/**
+ * DateTimeFactory - DateTime オブジェクトの生成
+ */
+export const DateTimeFactory = {
+  fromDate(date: Date, timezone?: string): DateTime {
+    return {
+      date,
+      timezone: timezone || 'Asia/Tokyo',
+      offset: 9 * 60 // JST offset in minutes
+    };
+  },
+
+  now(timezone?: string): DateTime {
+    return this.fromDate(new Date(), timezone);
+  }
+};
+
+/**
+ * DateTimeFormatter - DateTime のフォーマット
+ */
+export const DateTimeFormatter = {
+  format(datetime: DateTime, pattern: string): string {
+    const date = datetime.date;
+    const replacements: Record<string, string> = {
+      'yyyy': date.getFullYear().toString(),
+      'yy': date.getFullYear().toString().slice(-2),
+      'MM': (date.getMonth() + 1).toString().padStart(2, '0'),
+      'M': (date.getMonth() + 1).toString(),
+      'dd': date.getDate().toString().padStart(2, '0'),
+      'd': date.getDate().toString(),
+      'HH': date.getHours().toString().padStart(2, '0'),
+      'H': date.getHours().toString(),
+      'mm': date.getMinutes().toString().padStart(2, '0'),
+      'm': date.getMinutes().toString(),
+      'ss': date.getSeconds().toString().padStart(2, '0'),
+      's': date.getSeconds().toString(),
+    };
+
+    let formatted = pattern;
+    Object.entries(replacements).forEach(([key, value]) => {
+      formatted = formatted.replace(new RegExp(key, 'g'), value);
+    });
+
+    return formatted;
+  },
+
+  formatJapanese(datetime: DateTime): string {
+    const date = datetime.date;
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours()}時${date.getMinutes()}分`;
+  }
+};
+
+/**
+ * DateTime オブジェクトを作成
+ */
+export function createDateTime(value: Date | string | number, timezone?: string): DateTime {
+  const date = value instanceof Date ? value : new Date(value);
+  return DateTimeFactory.fromDate(date, timezone);
+}
+
+/**
+ * 現在の DateTime を取得
+ */
+export function nowDateTime(timezone?: string): DateTime {
+  return DateTimeFactory.now(timezone);
+}
+
+/**
+ * DateTime をフォーマット
+ */
+export function formatDateTime(datetime: DateTime, pattern: string = 'yyyy-MM-dd HH:mm:ss'): string {
+  return DateTimeFormatter.format(datetime, pattern);
+}
+
+/**
+ * DateTime を日本語形式でフォーマット
+ */
+export function formatDateTimeJapanese(datetime: DateTime): string {
+  return DateTimeFormatter.formatJapanese(datetime);
+}
+
+/**
+ * 日付範囲を作成
+ */
+export function createDateRange(start: Date | string, end: Date | string): DateRange {
+  return {
+    start: start instanceof Date ? start : new Date(start),
+    end: end instanceof Date ? end : new Date(end)
+  };
+}
+
+/**
+ * 時刻を作成
+ */
+export function createTime(hours: number, minutes: number, seconds?: number, milliseconds?: number): Time {
+  return { hours, minutes, seconds, milliseconds };
+}
+
+/**
+ * DateTime を加算
+ */
+export function addDateTime(datetime: DateTime, duration: Duration): DateTime {
+  const newDate = DateTimeCalculator.add(datetime.date, duration);
+  return {
+    ...datetime,
+    date: newDate
+  };
+}
+
+/**
+ * DateTime を減算
+ */
+export function subtractDateTime(datetime: DateTime, duration: Duration): DateTime {
+  const newDate = DateTimeCalculator.subtract(datetime.date, duration);
+  return {
+    ...datetime,
+    date: newDate
+  };
+}
+
+/**
+ * DateTime 間の差分を計算
+ */
+export function diffDateTime(a: DateTime, b: DateTime, unit: DurationUnit = 'milliseconds'): number {
+  return DateTimeCalculator.diff(a.date, b.date, unit);
+}
+
+/**
+ * 営業日を計算
+ */
+export function addBusinessDays(date: Date, days: number, holidays?: Holiday[]): Date {
+  return DateTimeCalculator.addBusinessDays(date, days, holidays);
+}
+
+/**
+ * 営業日数を計算
+ */
+export function businessDaysBetween(start: Date, end: Date, holidays?: Holiday[]): number {
+  return DateTimeCalculator.businessDaysBetween(start, end, holidays);
+}
+
+/**
+ * 月の開始日を取得
+ */
+export function startOfMonth(date: Date): Date {
+  return DateTimeCalculator.startOfMonth(date);
+}
+
+/**
+ * 月の終了日を取得
+ */
+export function endOfMonth(date: Date): Date {
+  return DateTimeCalculator.endOfMonth(date);
+}
+
+/**
+ * 年の開始日を取得
+ */
+export function startOfYear(date: Date): Date {
+  return DateTimeCalculator.startOfYear(date);
+}
+
+/**
+ * 年の終了日を取得
+ */
+export function endOfYear(date: Date): Date {
+  return DateTimeCalculator.endOfYear(date);
+}
+
+/**
+ * 同じ日か判定
+ */
+export function isSameDay(a: Date, b: Date): boolean {
+  return DateTimeCalculator.isSameDay(a, b);
+}
+
+/**
+ * 同じ月か判定
+ */
+export function isSameMonth(a: Date, b: Date): boolean {
+  return DateTimeCalculator.isSameMonth(a, b);
+}
+
+/**
+ * 日付が範囲内か判定
+ */
+export function isDateInRange(date: Date, range: DateRange): boolean {
+  return DateTimeCalculator.isInRange(date, range);
+}
+
+/**
+ * 有効な日付か判定
+ */
+export function isValidDate(date: any): date is Date {
+  return DateTimeValidator.isValidDate(date);
+}
+
+/**
+ * 過去の日付か判定
+ */
+export function isPastDate(date: Date): boolean {
+  return DateTimeValidator.isPast(date);
+}
+
+/**
+ * 未来の日付か判定
+ */
+export function isFutureDate(date: Date): boolean {
+  return DateTimeValidator.isFuture(date);
+}
+
+/**
+ * 今日か判定
+ */
+export function isTodayDate(date: Date): boolean {
+  return DateTimeValidator.isToday(date);
 }

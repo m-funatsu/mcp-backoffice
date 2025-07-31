@@ -16,386 +16,60 @@ import Database from './database.js';
 import { EmployeeLifecycleManagement } from './hr-lifecycle-management-v1.5.0.js';
 import { TalentManagementSystem } from './talent-management-system-v1.5.0.js';
 import { LearningTrainingManagement } from './learning-training-management-v1.5.0.js';
-import type { Employee } from './types.js';
+import type {
+  HumanCapitalMetrics,
+  ComplianceMetrics,
+  CostMetrics,
+  DiversityMetrics,
+  LeadershipMetrics,
+  CultureMetrics,
+  SafetyMetrics,
+  ProductivityMetrics,
+  RecruitmentMetrics,
+  SkillsMetrics,
+  WorkforceMetrics,
+  JapaneseSpecificMetrics,
+  AgeGroupDistribution,
+  GenderDistribution,
+  NationalityDistribution,
+  DiversityInLeadership,
+  PayGapByGender,
+  IncidentsBySeverity,
+  WorkloadDistribution,
+  HumanCapitalReport,
+  ReportType,
+  ReportPeriod,
+  ReportNarrative,
+  DataVisualization,
+  ReportCertification,
+  ReportStatus,
+  MetricsCalculationOptions,
+  HumanCapitalInsights,
+  TrendInsight,
+  CorrelationInsight,
+  PredictionInsight,
+  Recommendation,
+  RiskInsight,
+  Employee
+} from './types/domain/human-capital.js';
+import type { Money } from './types/core/money.js';
+import type { DateTime } from './types/core/datetime.js';
+import { createMoney } from './types/core/money.js';
+import { createDateTime } from './types/core/datetime.js';
 import { format, startOfYear, endOfYear, subYears, differenceInDays, differenceInMonths, differenceInYears, addDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// ISO 30414 Compliance Metrics
-export interface HumanCapitalMetrics {
-  // Compliance & Ethics
-  compliance: ComplianceMetrics;
-  // Costs
-  costs: CostMetrics;
-  // Diversity
-  diversity: DiversityMetrics;
-  // Leadership
-  leadership: LeadershipMetrics;
-  // Organizational Culture
-  culture: CultureMetrics;
-  // Organizational Health & Safety
-  safety: SafetyMetrics;
-  // Productivity
-  productivity: ProductivityMetrics;
-  // Recruitment & Turnover
-  recruitment: RecruitmentMetrics;
-  // Skills & Capabilities
-  skills: SkillsMetrics;
-  // Workforce Availability
-  workforce: WorkforceMetrics;
-  // Japanese Specific Metrics
-  japanese: JapaneseSpecificMetrics;
-}
 
-export interface ComplianceMetrics {
-  // 11.1 - Compliance & Ethics
-  ethicsTrainingCompletionRate: number; // %
-  whistleblowerCases: number;
-  legalViolations: number;
-  finesAndPenalties: number; // JPY
-  complianceRating: number; // 1-5
-  harassmentIncidents: number;
-  harassmentResolutionRate: number; // %
-  ethicsHotlineCalls: number;
-  ethicsTrainingHours: number;
-  codeOfConductAcknowledgment: number; // %
-  
-  // Additional properties for test compatibility
-  complianceScore?: number;
-  harassmentIncidentRate?: number;
-  incidentTypes?: Record<string, number>;
-  incidentsBySeverity?: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
-}
 
-export interface CostMetrics {
-  // 11.2 - Costs
-  totalRemunerationCost: number; // JPY
-  totalRecruitmentCost: number; // JPY
-  totalTrainingCost: number; // JPY
-  totalHealthAndSafetyCost: number; // JPY
-  externalWorkforceCost: number; // JPY
-  remunerationCostPerEmployee: number; // JPY
-  recruitmentCostPerHire: number; // JPY
-  trainingCostPerEmployee: number; // JPY
-  totalCompensationRatio: number; // %
-  benefitsCostPerEmployee: number; // JPY
-  overtimeCostPerEmployee: number; // JPY
-  absenteeismCost: number; // JPY
-  turnoverCost: number; // JPY
-  workforceProductivityValue: number; // JPY
-}
 
-export interface DiversityMetrics {
-  // 11.3 - Diversity
-  ageGroupDistribution: AgeGroupDistribution;
-  genderDistribution: GenderDistribution;
-  nationalityDistribution: NationalityDistribution;
-  disabilityRate: number; // %
-  diversityInLeadership: DiversityInLeadership;
-  payGapByGender: PayGapByGender;
-  diversityTrainingParticipation: number; // %
-  diversityInclusionScore: number; // 1-5
-  minorityRepresentation: number; // %
-  womenInSTEM: number; // %
-  multigenerationalTeams: number; // %
-  culturalDiversityIndex: number; // 1-5
-}
 
-export interface AgeGroupDistribution {
-  under25: number; // %
-  age25to34: number; // %
-  age35to44: number; // %
-  age45to54: number; // %
-  age55to64: number; // %
-  over65: number; // %
-}
 
-export interface GenderDistribution {
-  male: number; // %
-  female: number; // %
-  other: number; // %
-  preferNotToSay: number; // %
-}
-
-export interface NationalityDistribution {
-  japanese: number; // %
-  foreign: number; // %
-  byCountry: { [country: string]: number }; // %
-}
-
-export interface DiversityInLeadership {
-  femaleLeaders: number; // %
-  foreignLeaders: number; // %
-  youngLeaders: number; // %
-  disabledLeaders: number; // %
-}
-
-export interface PayGapByGender {
-  averagePayGap: number; // %
-  medianPayGap: number; // %
-  executivePayGap: number; // %
-  managerPayGap: number; // %
-}
-
-export interface LeadershipMetrics {
-  // 11.4 - Leadership
-  leadershipDevelopmentParticipation: number; // %
-  internalPromotionRate: number; // %
-  leadershipReadiness: number; // %
-  successionPlanCoverage: number; // %
-  leadershipTurnoverRate: number; // %
-  leadershipEffectivenessScore: number; // 1-5
-  mentorshipProgramParticipation: number; // %
-  highPotentialIdentificationRate: number; // %
-  crossFunctionalMovement: number; // %
-  leadershipTrainingHours: number;
-  leadershipFeedbackScore: number; // 1-5
-  managerSpanOfControl: number; // average
-}
-
-export interface CultureMetrics {
-  // 11.5 - Organizational Culture
-  employeeEngagementScore: number; // 1-5
-  employeeSatisfactionScore: number; // 1-5
-  culturalAlignmentScore: number; // 1-5
-  valuesDemonstrationScore: number; // 1-5
-  workLifeBalanceScore: number; // 1-5
-  recognitionProgramParticipation: number; // %
-  employeeNPS: number; // -100 to 100
-  culturalEventParticipation: number; // %
-  volunteerParticipation: number; // %
-  innovationScore: number; // 1-5
-  collaborationScore: number; // 1-5
-  psychologicalSafetyScore: number; // 1-5
-}
-
-export interface SafetyMetrics {
-  // 11.6 - Organizational Health & Safety
-  accidentRate: number; // per 1000 employees
-  lostTimeInjuryRate: number; // per 1000 employees
-  occupationalDiseasesRate: number; // per 1000 employees
-  safetyTrainingCompletionRate: number; // %
-  safetyIncidentReportingRate: number; // %
-  workplaceInspectionCompliance: number; // %
-  healthCheckParticipationRate: number; // %
-  mentalHealthSupportUtilization: number; // %
-  ergonomicAssessmentCompliance: number; // %
-  safetyCommitteeParticipation: number; // %
-  emergencyDrillParticipation: number; // %
-  safetyKPIAchievement: number; // %
-}
-
-export interface ProductivityMetrics {
-  // 11.7 - Productivity
-  revenuePerEmployee: number; // JPY
-  profitPerEmployee: number; // JPY
-  humanCapitalROI: number; // %
-  employeeProductivityIndex: number; // 1-5
-  outputPerHour: number; // units
-  qualityScore: number; // 1-5
-  customerSatisfactionScore: number; // 1-5
-  innovationIndex: number; // 1-5
-  processEfficiencyScore: number; // 1-5
-  digitalAdoptionRate: number; // %
-  automationImpactScore: number; // 1-5
-  workloadOptimizationScore: number; // 1-5
-}
-
-export interface RecruitmentMetrics {
-  // 11.8 - Recruitment, Mobility & Turnover
-  turnoverRate: number; // %
-  voluntaryTurnoverRate: number; // %
-  involuntaryTurnoverRate: number; // %
-  retentionRate: number; // %
-  timeToFill: number; // days
-  costPerHire: number; // JPY
-  qualityOfHire: number; // 1-5
-  internalMobilityRate: number; // %
-  newHireRetentionRate: number; // %
-  regretTableTurnover: number; // %
-  exitInterviewCompletionRate: number; // %
-  recruitmentSourceEffectiveness: { [source: string]: number }; // %
-}
-
-export interface SkillsMetrics {
-  // 11.9 - Skills & Capabilities
-  skillGapAnalysis: SkillGapAnalysis;
-  trainingParticipationRate: number; // %
-  trainingCompletionRate: number; // %
-  trainingEffectivenessScore: number; // 1-5
-  skillDevelopmentIndex: number; // 1-5
-  certificationRate: number; // %
-  expertiseDistribution: ExpertiseDistribution;
-  learningHoursPerEmployee: number;
-  skillAssessmentScore: number; // 1-5
-  futureSkillsReadiness: number; // 1-5
-  digitalSkillsIndex: number; // 1-5
-  criticalSkillsCoverage: number; // %
-}
-
-export interface SkillGapAnalysis {
-  criticalSkillGaps: number;
-  skillGapsByDepartment: { [department: string]: number };
-  skillGapsByLevel: { [level: string]: number };
-  timeToCloseCriticalGaps: number; // months
-}
-
-export interface ExpertiseDistribution {
-  expert: number; // %
-  advanced: number; // %
-  intermediate: number; // %
-  beginner: number; // %
-}
-
-export interface WorkforceMetrics {
-  // 11.10 - Workforce Availability
-  totalWorkforce: number;
-  fullTimeEquivalent: number;
-  contingentWorkforce: number; // %
-  averageAge: number;
-  averageTenure: number; // years
-  workforce_stability: number; // %
-  capacityUtilization: number; // %
-  workforceFlexibility: number; // 1-5
-  remoteWorkParticipation: number; // %
-  partTimeWorkforce: number; // %
-  workforceReadiness: number; // 1-5
-  successionReadiness: number; // %
-}
-
-export interface JapaneseSpecificMetrics {
-  // Japanese Labor Standards Act Compliance
-  overtimeComplianceRate: number; // %
-  paidLeaveUtilizationRate: number; // %
-  workStyleReformCompliance: number; // %
-  healthAndProductivityManagement: number; // 1-5
-  mentalHealthSupport: number; // 1-5
-  workLifeBalanceInitiatives: number; // 1-5
-  diversityAndInclusion: number; // 1-5
-  sustainabilityInitiatives: number; // 1-5
-  stakeholderEngagement: number; // 1-5
-  socialContribution: number; // 1-5
-  corporateGovernance: number; // 1-5
-  riskManagement: number; // 1-5
-}
-
-export interface HumanCapitalReport {
-  reportId: string;
-  companyName: string;
-  reportingPeriod: {
-    startDate: Date;
-    endDate: Date;
-  };
-  reportGeneratedAt: Date;
-  metrics: HumanCapitalMetrics;
-  benchmarkComparisons: BenchmarkComparisons;
-  trends: TrendAnalysis;
-  recommendations: Recommendation[];
-  riskAssessment: RiskAssessment;
-  compliance: ComplianceStatus;
-  executiveSummary: ExecutiveSummary;
-  attachments: ReportAttachment[];
-}
-
-export interface BenchmarkComparisons {
-  industryBenchmarks: { [metric: string]: number };
-  regionBenchmarks: { [metric: string]: number };
-  sizeBenchmarks: { [metric: string]: number };
-  performanceRanking: { [metric: string]: number }; // percentile
-}
-
-export interface TrendAnalysis {
-  yearOverYear: { [metric: string]: number }; // % change
-  quarterOverQuarter: { [metric: string]: number }; // % change
-  forecast: { [metric: string]: number }; // next year projection
-  seasonalPatterns: { [metric: string]: number[] }; // monthly patterns
-}
-
-export interface Recommendation {
-  id: string;
-  category: string;
-  priority: 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  expectedImpact: string;
-  implementationCost: number; // JPY
-  timeToImplement: number; // months
-  requiredResources: string[];
-  kpiTarget: string;
-  riskLevel: 'low' | 'medium' | 'high';
-}
-
-export interface RiskAssessment {
-  overallRiskScore: number; // 1-5
-  riskAreas: RiskArea[];
-  mitigationStrategies: MitigationStrategy[];
-  monitoringPlan: MonitoringPlan;
-}
-
-export interface RiskArea {
-  area: string;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  impact: string;
-  probability: number; // %
-  timeframe: string;
-}
-
-export interface MitigationStrategy {
-  id: string;
-  riskArea: string;
-  strategy: string;
-  timeline: string;
-  responsible: string;
-  resources: string[];
-  successMetrics: string[];
-}
-
-export interface MonitoringPlan {
-  keyIndicators: string[];
-  monitoringFrequency: string;
-  alertThresholds: { [metric: string]: number };
-  reviewSchedule: string;
-  reportingStructure: string;
-}
-
-export interface ComplianceStatus {
-  iso30414Compliance: number; // %
-  japoneseLaborLawCompliance: number; // %
-  securitiesLawCompliance: number; // %
-  esgReportingCompliance: number; // %
-  gdprCompliance: number; // %
-  overallComplianceScore: number; // %
-}
-
-export interface ExecutiveSummary {
-  keyFindings: string[];
-  performanceHighlights: string[];
-  majorConcerns: string[];
-  strategicRecommendations: string[];
-  investmentPriorities: string[];
-  nextSteps: string[];
-}
-
-export interface ReportAttachment {
-  id: string;
-  type: 'chart' | 'table' | 'document' | 'dataset';
-  title: string;
-  description: string;
-  url: string;
-  size: number; // bytes
-  format: string;
-}
 
 export class HumanCapitalDisclosureEngine {
-  private db: Database;
-  private lifecycleManagement: EmployeeLifecycleManagement;
-  private talentManagement: TalentManagementSystem;
-  private learningManagement: LearningTrainingManagement;
+  private readonly db: Database;
+  private readonly lifecycleManagement: EmployeeLifecycleManagement;
+  private readonly talentManagement: TalentManagementSystem;
+  private readonly learningManagement: LearningTrainingManagement;
 
   constructor(
     db: Database,
@@ -423,7 +97,7 @@ export class HumanCapitalDisclosureEngine {
     }
     
     const employees = await this.db.getAllEmployees();
-    const activeEmployees = employees.filter(emp => emp.isActive);
+    const activeEmployees = employees.filter((emp: Employee) => emp.isActive);
 
     const metrics: HumanCapitalMetrics = {
       compliance: await this.calculateComplianceMetrics(activeEmployees, reportingPeriod),
@@ -480,10 +154,10 @@ export class HumanCapitalDisclosureEngine {
    * Calculate real-time human capital dashboard metrics
    */
   async calculateRealTimeMetrics(): Promise<{
-    keyMetrics: { [metric: string]: number };
-    alerts: string[];
-    trends: { [metric: string]: 'up' | 'down' | 'stable' };
-    recommendations: string[];
+    keyMetrics: Record<string, number>;
+    alerts: ReadonlyArray<string>;
+    trends: Record<string, 'up' | 'down' | 'stable'>;
+    recommendations: ReadonlyArray<string>;
   }> {
     const currentYear = new Date().getFullYear();
     const reportingPeriod = {
@@ -493,7 +167,7 @@ export class HumanCapitalDisclosureEngine {
 
     const metrics = await this.calculateHumanCapitalMetrics(reportingPeriod);
     
-    const keyMetrics = {
+    const keyMetrics: Record<string, number> = {
       'Employee Engagement': metrics.culture.employeeEngagementScore,
       'Turnover Rate': metrics.recruitment.turnoverRate,
       'Training Completion': metrics.skills.trainingCompletionRate,
@@ -518,7 +192,7 @@ export class HumanCapitalDisclosureEngine {
 
   // Private calculation methods
 
-  private async calculateComplianceMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<ComplianceMetrics> {
+  private async calculateComplianceMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<ComplianceMetrics> {
     // Get training completion data from database
     const trainingCompletions = await this.db.query(
       'SELECT COUNT(DISTINCT employee_id) as completed FROM trainings WHERE training_type = $1 AND completed_at IS NOT NULL',
@@ -576,7 +250,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateCostMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<CostMetrics> {
+  private async calculateCostMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<CostMetrics> {
     const totalEmployees = employees.length;
     const averageSalary = totalEmployees > 0 
       ? employees.reduce((sum, emp) => sum + (emp.baseSalary || emp.hourlyRate * 2000), 0) / totalEmployees
@@ -600,7 +274,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateDiversityMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<DiversityMetrics> {
+  private async calculateDiversityMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<DiversityMetrics> {
     // Mock implementation - in production, integrate with actual diversity data
     return {
       ageGroupDistribution: {
@@ -650,7 +324,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateLeadershipMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<LeadershipMetrics> {
+  private async calculateLeadershipMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<LeadershipMetrics> {
     // Mock implementation
     return {
       leadershipDevelopmentParticipation: 78.5,
@@ -668,7 +342,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateCultureMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<CultureMetrics> {
+  private async calculateCultureMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<CultureMetrics> {
     // Mock implementation
     return {
       employeeEngagementScore: 4.2,
@@ -686,7 +360,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateSafetyMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<SafetyMetrics> {
+  private async calculateSafetyMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<SafetyMetrics> {
     // Mock implementation
     return {
       accidentRate: 2.1,
@@ -704,7 +378,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateProductivityMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<ProductivityMetrics> {
+  private async calculateProductivityMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<ProductivityMetrics> {
     // Mock implementation
     return {
       revenuePerEmployee: 15000000,
@@ -722,7 +396,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateRecruitmentMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<RecruitmentMetrics> {
+  private async calculateRecruitmentMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<RecruitmentMetrics> {
     // Mock implementation
     return {
       turnoverRate: 12.5,
@@ -746,7 +420,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateSkillsMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<SkillsMetrics> {
+  private async calculateSkillsMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<SkillsMetrics> {
     // Mock implementation
     return {
       skillGapAnalysis: {
@@ -784,7 +458,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateWorkforceMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<WorkforceMetrics> {
+  private async calculateWorkforceMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<WorkforceMetrics> {
     const totalWorkforce = employees.length;
     const averageAge = totalWorkforce > 0 
       ? employees.reduce((sum, emp) => {
@@ -819,7 +493,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateJapaneseSpecificMetrics(employees: Employee[], period: { startDate: Date; endDate: Date }): Promise<JapaneseSpecificMetrics> {
+  private async calculateJapaneseSpecificMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<JapaneseSpecificMetrics> {
     // Mock implementation
     return {
       overtimeComplianceRate: 96.8,

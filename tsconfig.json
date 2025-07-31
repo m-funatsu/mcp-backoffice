@@ -23,6 +23,15 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    
+    /* 追加のコンパイラチェック */
+    "useUnknownInCatchVariables": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
     
     /* モジュール解決 */
     "esModuleInterop": true,
@@ -48,6 +57,15 @@
     "isolatedModules": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "preserveConstEnums": true,
+    "newLine": "lf",
+    "stripInternal": true,
+    "assumeChangesOnlyAffectDirectDependencies": false,
+    "disableSizeLimit": false,
+    "generateCpuProfile": "profile.cpuprofile",
+    "listEmittedFiles": false,
+    "listFiles": false,
+    "traceResolution": false,
     
     /* パス設定 */
     "baseUrl": ".",

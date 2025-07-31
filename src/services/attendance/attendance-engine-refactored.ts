@@ -231,7 +231,7 @@ export class RefactoredAttendanceEngine {
   /**
    * 月次勤怠サマリー生成
    */
-  async generateMonthlyS ummary(
+  async generateMonthlySummary(
     employeeId: string,
     year: number,
     month: number
@@ -275,7 +275,7 @@ export class RefactoredAttendanceEngine {
       }
     );
 
-    const monthlyS ummary: MonthlyAttendanceSummary = {
+    const monthlySummary: MonthlyAttendanceSummary = {
       employeeId,
       year,
       month,
@@ -283,9 +283,9 @@ export class RefactoredAttendanceEngine {
     };
 
     // 3. 保存
-    await this.attendanceRepository.saveMonthlyS ummary(monthlyS ummary);
+    await this.attendanceRepository.saveMonthlySummary(monthlySummary);
 
-    return Result.success(monthlyS ummary);
+    return Result.success(monthlySummary);
   }
 
   /**
@@ -679,7 +679,7 @@ interface EmployeeRepository {
 interface AttendanceRepository {
   saveRecord(record: AttendanceRecord): Promise<void>;
   saveDailyAttendance(daily: DailyAttendance): Promise<void>;
-  saveMonthlyS ummary(summary: MonthlyAttendanceSummary): Promise<void>;
+  saveMonthlySummary(summary: MonthlyAttendanceSummary): Promise<void>;
   findByEmployeeAndDate(employeeId: string, date: DateTime): Promise<AttendanceRecord[]>;
   findMonthlyAttendances(employeeId: string, year: number, month: number): Promise<DailyAttendance[]>;
 }

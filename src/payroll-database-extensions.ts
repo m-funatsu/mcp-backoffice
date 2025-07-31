@@ -3,6 +3,30 @@ import Database from './database.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+// Type guard for database row objects
+interface DatabaseRow {
+  [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is DatabaseRow {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringField(row: DatabaseRow, field: string): string | undefined {
+  const value = row[field];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumberField(row: DatabaseRow, field: string): number | undefined {
+  const value = row[field];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function getBooleanField(row: DatabaseRow, field: string): boolean {
+  const value = row[field];
+  return value === 1 || value === true;
+}
+
 /**
  * 給与計算システム用データベース拡張機能
  * Database Extensions for Payroll Calculation System
@@ -26,9 +50,10 @@ export class PayrollDatabaseExtensions {
       this.db.exec(schema).then(() => {
         console.error('Payroll schema extensions initialized successfully');
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         // Check if error is due to column already existing
-        if (err.message.includes('duplicate column name') || err.message.includes('already exists')) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.includes('duplicate column name') || errorMessage.includes('already exists')) {
           console.error('Payroll schema extensions already exist, skipping initialization');
           resolve();
         } else {
@@ -94,7 +119,7 @@ export class PayrollDatabaseExtensions {
 
       this.db.run(sql, values).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -129,7 +154,7 @@ export class PayrollDatabaseExtensions {
         bankAccount.accountHolderName
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -164,7 +189,7 @@ export class PayrollDatabaseExtensions {
         taxInfo.hasSpouseDeduction ? 1 : 0
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -192,7 +217,7 @@ export class PayrollDatabaseExtensions {
         allowance.effectiveTo ? allowance.effectiveTo.toISOString().split('T')[0] : null
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -220,7 +245,7 @@ export class PayrollDatabaseExtensions {
         deduction.effectiveTo ? deduction.effectiveTo.toISOString().split('T')[0] : null
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -257,16 +282,32 @@ export class PayrollDatabaseExtensions {
     };
   }
 
-  private async getEmployeeExtendedFields(employeeId: string): Promise<any> {
+  private async getEmployeeExtendedFields(employeeId: string): Promise<{
+    employee_number?: string;
+    social_insurance_number?: string;
+    contract_type?: 'full_time' | 'part_time' | 'contract' | 'temporary';
+    salary_type?: 'hourly' | 'monthly' | 'annual';
+    base_salary?: number;
+  }> {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT employee_number, social_insurance_number, contract_type, salary_type, base_salary
         FROM employees WHERE id = $1
       `;
 
-      this.db.get(sql, [employeeId]).then((row: any) => {
-        resolve(row || {});
-      }).catch((err: any) => {
+      this.db.get(sql, [employeeId]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
+          resolve({});
+          return;
+        }
+        resolve({
+          employee_number: getStringField(row, 'employee_number'),
+          social_insurance_number: getStringField(row, 'social_insurance_number'),
+          contract_type: getStringField(row, 'contract_type') as 'full_time' | 'part_time' | 'contract' | 'temporary' | undefined,
+          salary_type: getStringField(row, 'salary_type') as 'hourly' | 'monthly' | 'annual' | undefined,
+          base_salary: getNumberField(row, 'base_salary')
+        });
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -280,19 +321,19 @@ export class PayrollDatabaseExtensions {
         ORDER BY created_at DESC LIMIT 1
       `;
 
-      this.db.get(sql, [employeeId]).then((row: any) => {
-        if (!row) {
+      this.db.get(sql, [employeeId]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
           resolve(undefined);
         } else {
           resolve({
-            bankName: row.bank_name,
-            branchName: row.branch_name,
-            accountType: row.account_type,
-            accountNumber: row.account_number,
-            accountHolderName: row.account_holder_name
+            bankName: getStringField(row, 'bank_name') || '',
+            branchName: getStringField(row, 'branch_name') || '',
+            accountType: getStringField(row, 'account_type') as 'checking' | 'savings' | undefined,
+            accountNumber: getStringField(row, 'account_number') || '',
+            accountHolderName: getStringField(row, 'account_holder_name') || ''
           });
         }
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -306,19 +347,19 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db.get(sql, [employeeId]).then((row: any) => {
-        if (!row) {
+      this.db.get(sql, [employeeId]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
           resolve(undefined);
         } else {
           resolve({
-            dependents: row.dependents,
-            taxRate: row.tax_rate,
-            isDisabled: row.is_disabled === 1,
-            isSingleParent: row.is_single_parent === 1,
-            hasSpouseDeduction: row.has_spouse_deduction === 1
+            dependents: getNumberField(row, 'dependents') || 0,
+            taxRate: getNumberField(row, 'tax_rate') || 0,
+            isDisabled: getBooleanField(row, 'is_disabled'),
+            isSingleParent: getBooleanField(row, 'is_single_parent'),
+            hasSpouseDeduction: getBooleanField(row, 'has_spouse_deduction')
           });
         }
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -332,17 +373,21 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC
       `;
 
-      this.db.all(sql, [employeeId]).then((rows: any[]) => {
-        const allowances = rows.map(row => ({
-          type: row.type,
-          description: row.description,
-          amount: row.amount,
-          isFixed: row.is_fixed === 1,
-          effectiveFrom: new Date(row.effective_from),
-          effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
+      this.db.all(sql, [employeeId]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve([]);
+          return;
+        }
+        const allowances = rows.filter(isRecord).map(row => ({
+          type: getStringField(row, 'type') || '',
+          description: getStringField(row, 'description') || '',
+          amount: getNumberField(row, 'amount') || 0,
+          isFixed: getBooleanField(row, 'is_fixed'),
+          effectiveFrom: new Date(getStringField(row, 'effective_from') || Date.now()),
+          effectiveTo: getStringField(row, 'effective_to') ? new Date(getStringField(row, 'effective_to')!) : undefined
         }));
         resolve(allowances);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -356,17 +401,21 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC
       `;
 
-      this.db.all(sql, [employeeId]).then((rows: any[]) => {
-        const deductions = rows.map(row => ({
-          type: row.type,
-          description: row.description,
-          amount: row.amount,
-          isFixed: row.is_fixed === 1,
-          effectiveFrom: new Date(row.effective_from),
-          effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined
+      this.db.all(sql, [employeeId]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve([]);
+          return;
+        }
+        const deductions = rows.filter(isRecord).map(row => ({
+          type: getStringField(row, 'type') || '',
+          description: getStringField(row, 'description') || '',
+          amount: getNumberField(row, 'amount') || 0,
+          isFixed: getBooleanField(row, 'is_fixed'),
+          effectiveFrom: new Date(getStringField(row, 'effective_from') || Date.now()),
+          effectiveTo: getStringField(row, 'effective_to') ? new Date(getStringField(row, 'effective_to')!) : undefined
         }));
         resolve(deductions);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -376,7 +425,13 @@ export class PayrollDatabaseExtensions {
    * 社会保険料率の取得
    * Get social insurance rates for calculation
    */
-  async getSocialInsuranceRates(year: number = new Date().getFullYear()): Promise<any> {
+  async getSocialInsuranceRates(year: number = new Date().getFullYear()): Promise<{
+    health_insurance_rate: number;
+    pension_insurance_rate: number;
+    unemployment_insurance_rate: number;
+    long_term_care_insurance_rate: number;
+    workers_compensation_rate: number;
+  }> {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM social_insurance_rates 
@@ -384,15 +439,25 @@ export class PayrollDatabaseExtensions {
         ORDER BY effective_from DESC LIMIT 1
       `;
 
-      this.db.get(sql, [year]).then((row: any) => {
-        resolve(row || {
-          health_insurance_rate: 0.0991,
-          pension_insurance_rate: 0.183,
-          unemployment_insurance_rate: 0.006,
-          long_term_care_insurance_rate: 0.0123,
-          workers_compensation_rate: 0.003
-        });
-      }).catch((err: any) => {
+      this.db.get(sql, [year]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
+          resolve({
+            health_insurance_rate: 0.0991,
+            pension_insurance_rate: 0.183,
+            unemployment_insurance_rate: 0.006,
+            long_term_care_insurance_rate: 0.0123,
+            workers_compensation_rate: 0.003
+          });
+        } else {
+          resolve({
+            health_insurance_rate: getNumberField(row, 'health_insurance_rate') || 0.0991,
+            pension_insurance_rate: getNumberField(row, 'pension_insurance_rate') || 0.183,
+            unemployment_insurance_rate: getNumberField(row, 'unemployment_insurance_rate') || 0.006,
+            long_term_care_insurance_rate: getNumberField(row, 'long_term_care_insurance_rate') || 0.0123,
+            workers_compensation_rate: getNumberField(row, 'workers_compensation_rate') || 0.003
+          });
+        }
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -402,7 +467,12 @@ export class PayrollDatabaseExtensions {
    * 所得税率の取得
    * Get income tax brackets for calculation
    */
-  async getTaxBrackets(year: number = new Date().getFullYear()): Promise<any[]> {
+  async getTaxBrackets(year: number = new Date().getFullYear()): Promise<Array<{
+    min_income: number;
+    max_income: number | null;
+    tax_rate: number;
+    deduction: number;
+  }>> {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT * FROM tax_brackets 
@@ -410,9 +480,19 @@ export class PayrollDatabaseExtensions {
         ORDER BY min_income ASC
       `;
 
-      this.db.all(sql, [year]).then((rows: any[]) => {
-        resolve(rows || []);
-      }).catch((err: any) => {
+      this.db.all(sql, [year]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve([]);
+          return;
+        }
+        const brackets = rows.filter(isRecord).map(row => ({
+          min_income: getNumberField(row, 'min_income') || 0,
+          max_income: getNumberField(row, 'max_income') || null,
+          tax_rate: getNumberField(row, 'tax_rate') || 0,
+          deduction: getNumberField(row, 'deduction') || 0
+        }));
+        resolve(brackets);
+      }).catch((err: unknown) => {
         reject(err);
       });
     });

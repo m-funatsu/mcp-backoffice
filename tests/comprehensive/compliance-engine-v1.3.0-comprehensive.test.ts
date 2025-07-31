@@ -136,12 +136,16 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
           return { rows: [] };
         });
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.monthlyOvertimeHours).toBe(30);
-        expect(status.isCompliant).toBe(true);
-        expect(status.riskLevel).toBe('low'); // 30/45 = 66.7% which is < 80%
-        expect(status.alerts).toHaveLength(0);
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.monthlyOvertimeHours).toBe(30);
+          expect(status.isCompliant).toBe(true);
+          expect(status.riskLevel).toBe('low'); // 30/45 = 66.7% which is < 80%
+          expect(status.alerts).toHaveLength(0);
+        }
       });
 
       it('月45時間超過で警告を生成する', async () => {
@@ -169,17 +173,21 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
           return { rows: [] };
         });
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.monthlyOvertimeHours).toBe(50);
-        expect(status.isCompliant).toBe(false);
-        expect(status.riskLevel).toBe('critical'); // Changed from 'medium' to 'critical' because 50 > 45
-        expect(status.alerts).toContainEqual(
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.monthlyOvertimeHours).toBe(50);
+          expect(status.isCompliant).toBe(false);
+          expect(status.riskLevel).toBe('critical'); // Changed from 'medium' to 'critical' because 50 > 45
+          expect(status.alerts).toContainEqual(
           expect.objectContaining({
             type: '36_AGREEMENT_MONTHLY_VIOLATION',
             message: expect.stringContaining('45時間')
           })
         );
+        }
       });
 
       it('特別条項適用時の月100時間超過で重大違反を検出する', async () => {
@@ -210,18 +218,22 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
           return { rows: [] };
         });
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.monthlyOvertimeHours).toBe(105);
-        expect(status.isCompliant).toBe(false);
-        expect(status.riskLevel).toBe('critical');
-        expect(status.alerts).toContainEqual(
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.monthlyOvertimeHours).toBe(105);
+          expect(status.isCompliant).toBe(false);
+          expect(status.riskLevel).toBe('critical');
+          expect(status.alerts).toContainEqual(
           expect.objectContaining({
             type: '36_AGREEMENT_MONTHLY_VIOLATION',
             severity: 'critical',
             message: expect.stringContaining('45時間') // The alert is for exceeding monthly limit
           })
         );
+        }
       });
     });
 
@@ -254,11 +266,15 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.yearlyOvertime).toBe(305); // 25×11 + 30
-        expect(status.remainingYearlyAllowance).toBe(55);
-        expect(status.isCompliant).toBe(true);
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.yearlyOvertime).toBe(305); // 25×11 + 30
+          expect(status.remainingYearlyAllowance).toBe(55);
+          expect(status.isCompliant).toBe(true);
+        }
       });
 
       it('年間360時間超過で警告を生成する', async () => {
@@ -288,16 +304,20 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.yearlyOvertime).toBe(425); // 35×11 + 40
-        expect(status.isCompliant).toBe(false);
-        expect(status.alerts).toContainEqual(
-          expect.objectContaining({
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.yearlyOvertime).toBe(425); // 35×11 + 40
+          expect(status.isCompliant).toBe(false);
+          expect(status.alerts).toContainEqual(
+            expect.objectContaining({
             type: '36_AGREEMENT_YEARLY_VIOLATION',
             message: expect.stringContaining('360時間')
           })
         );
+        }
       });
 
       it('特別条項年間720時間超過で重大違反を検出する', async () => {
@@ -328,9 +348,12 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
-
-        expect(status.yearlyOvertime).toBe(850); // 70×11 + 80
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
+          expect(status.yearlyOvertime).toBe(850); // 70×11 + 80
         expect(status.isCompliant).toBe(false);
         expect(status.riskLevel).toBe('critical');
         expect(status.alerts).toContainEqual(
@@ -339,6 +362,7 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
             severity: 'critical'
           })
         );
+        }
       });
     });
 
@@ -377,12 +401,17 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
 
         expect(status.multiMonthAverages).toBeDefined();
         expect(status.multiMonthAverages?.twoMonth).toBe(75); // (75+75)/2
         expect(status.multiMonthAverages?.sixMonth).toBeLessThan(80);
         expect(status.healthRiskAssessment).toBe('medium');
+        }
       });
 
       it('複数月平均80時間超過で健康リスク警告を生成する', async () => {
@@ -419,7 +448,11 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
 
         expect(status.multiMonthAverages?.twoMonth).toBeGreaterThan(80);
         expect(status.healthRiskAssessment).toBe('high');
@@ -429,6 +462,7 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
             message: expect.stringContaining('健康確保措置')
           })
         );
+        }
       });
     });
 
@@ -465,7 +499,11 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
 
         expect(status.specialClauseUsage).toBe(6);
         expect(status.specialClauseRemaining).toBe(0);
@@ -474,6 +512,7 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
             type: 'SPECIAL_CLAUSE_LIMIT_EXCEEDED'
           })
         );
+        }
       });
 
       it('年6回超過で特別条項使用制限違反を検出する', async () => {
@@ -508,7 +547,11 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         mockDb.getTimeRecords = vi.fn().mockResolvedValue(currentMonthRecords);
         mockDb.getEmployee = vi.fn().mockResolvedValue(testEmployee);
 
-        const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          const status = result.value;
 
         expect(status.specialClauseUsage).toBe(7);
         expect(status.isCompliant).toBe(false);
@@ -518,8 +561,10 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
             message: expect.stringContaining('6回')
           })
         );
+        }
       });
     });
+    }
   });
 
   describe('客観的記録保持', () => {
@@ -683,12 +728,16 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         return { rows: [] };
       });
 
-      const status = await engine.monitor36Agreement('emp001', currentDate);
-
-      expect(status.alerts.length).toBeGreaterThan(0);
-      const alert = status.alerts.find(a => a.type === 'OVERTIME_PREDICTION_WARNING');
-      expect(alert).toBeDefined();
-      expect(alert?.message).toContain('予測');
+      const result = await engine.monitor36Agreement('emp001', currentDate);
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
+        expect(status.alerts.length).toBeGreaterThan(0);
+        const alert = status.alerts.find(a => a.type === 'OVERTIME_PREDICTION_WARNING');
+        expect(alert).toBeDefined();
+        expect(alert?.message).toContain('予測');
+      }
     });
 
     it('月間残業40時間到達で注意アラートを生成する', async () => {
@@ -717,12 +766,17 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         return { rows: [] };
       });
 
-      const status = await engine.monitor36Agreement('emp001', new Date('2024-01-20'));
+      const result = await engine.monitor36Agreement('emp001', new Date('2024-01-20'));
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
 
       expect(status.alerts.length).toBeGreaterThan(0);
       const alert = status.alerts.find(a => a.type === 'OVERTIME_THRESHOLD_ALERT');
       expect(alert).toBeDefined();
       expect(status.monthlyOvertimeHours).toBe(40);
+      }
     });
 
     it('健康リスク基準到達で即座にアラートを生成する', async () => {
@@ -758,12 +812,17 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
         return { rows: [] };
       });
 
-      const status = await engine.monitor36Agreement('emp001', new Date('2024-01-25'));
+      const result = await engine.monitor36Agreement('emp001', new Date('2024-01-25'));
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
 
       expect(status.alerts.length).toBeGreaterThan(0);
       const alert = status.alerts.find(a => a.type === 'HEALTH_RISK_ALERT');
       expect(alert).toBeDefined();
       expect(alert?.message).toContain('医師面接指導');
+      }
     });
   });
 
@@ -858,10 +917,15 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
       mockDb.getTimeRecords = vi.fn().mockResolvedValue([]);
       mockDb.query = vi.fn().mockResolvedValue({ rows: [] }); // 協定データなし
 
-      const status = await engine.monitor36Agreement('emp001', new Date());
+      const result = await engine.monitor36Agreement('emp001', new Date());
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
 
       expect(status.monthlyLimit).toBe(45); // デフォルト値
       expect(status.yearlyLimit).toBe(360);
+      }
     });
 
     it('データベースエラーを適切に処理する', async () => {
@@ -985,7 +1049,11 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
       const records = generateTimeRecordsWithOvertime('emp001', '2024-01', 45);
       mockDb.getTimeRecords = vi.fn().mockResolvedValue(records);
 
-      const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+      const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
 
       // workSystemとweeklyAverageHoursは実装されていない
       if ('workSystem' in status) {
@@ -1007,7 +1075,11 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
       mockDb.getEmployee = vi.fn().mockResolvedValue(managerEmployee);
       mockDb.getTimeRecords = vi.fn().mockResolvedValue(records);
 
-      const status = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+      const result = await engine.monitor36Agreement('emp001', new Date('2024-01-31'));
+      expect(result.success).toBe(true);
+      
+      if (result.success) {
+        const status = result.value;
 
       // 管理監督者でも健康管理は必要
       if ('isExemptFromOvertime' in status) {
@@ -1020,6 +1092,7 @@ describe('v1.3.0 コンプライアンスエンジン - 網羅的テスト', () 
       const managerAlert = status.alerts.find(a => a.type === 'MANAGER_HEALTH_WARNING');
       if (managerAlert) {
         expect(managerAlert).toBeDefined();
+      }
       }
     });
   });

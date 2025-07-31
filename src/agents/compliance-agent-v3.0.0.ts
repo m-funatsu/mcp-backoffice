@@ -13,6 +13,16 @@ import { IntegratedAnomalyDetectionEngine } from '../integrated-anomaly-detectio
 import type { AgentGoal, AgentAction, AgentContext } from '../agent-framework-v3.0.0.js';
 import type { Employee, TimeRecord, ComplianceAlert } from '../types.js';
 
+export interface ComplianceAgentConfig {
+  database: {
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password: string;
+  };
+}
+
 export interface ComplianceGoal extends AgentGoal {
   targetPeriod: {
     start: Date;
@@ -34,6 +44,90 @@ export interface ComplianceAction extends AgentAction {
     timeline: number; // days
     responsible: string;
   };
+  execute?: () => Promise<ActionResult>;
+}
+
+export interface ActionResult {
+  success: boolean;
+  message?: string;
+  data?: unknown;
+  errors?: string[];
+}
+
+export interface ComplianceStatus {
+  overallScore: number;
+  violations: ComplianceAlert[];
+  summary: {
+    totalEmployees: number;
+    totalViolations: number;
+    criticalViolations: number;
+    complianceRate: number;
+  };
+}
+
+export interface ComplianceViolation {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  detectedAt: Date;
+  value?: number;
+  threshold?: number;
+}
+
+export interface ComplianceRisk {
+  employeeId: string;
+  riskType: string;
+  probability: number;
+  impact: 'low' | 'medium' | 'high';
+  predictedDate: Date;
+  preventiveMeasures: string[];
+}
+
+export interface RemediationPlan {
+  violationId: string;
+  steps: RemediationStep[];
+  estimatedCompletion: Date;
+  assignedTo: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface RemediationStep {
+  id: string;
+  description: string;
+  action: string;
+  deadline: Date;
+  responsible: string;
+  completed: boolean;
+}
+
+export interface HistoricalComplianceData {
+  date: Date;
+  violations: ComplianceViolation[];
+  remediations: RemediationPlan[];
+  complianceScore: number;
+}
+
+export interface ViolationPatterns {
+  byType: Record<string, number>;
+  byEmployee: Record<string, number>;
+  byDepartment: Record<string, number>;
+  temporal: Array<{ date: Date; count: number }>;
+}
+
+export interface RemediationEffectiveness {
+  overall: number;
+  byType: Record<string, number>;
+  averageResolutionTime: number;
+  successRate: number;
+}
+
+export interface ComplianceThresholds {
+  overtimeHours: number;
+  breakDuration: number;
+  consecutiveDays: number;
 }
 
 export class ComplianceAgent extends BaseAgent {
@@ -42,7 +136,7 @@ export class ComplianceAgent extends BaseAgent {
   private complianceEngine: ComplianceEngine;
   private anomalyEngine: IntegratedAnomalyDetectionEngine;
   
-  constructor(config: any) {
+  constructor(config: ComplianceAgentConfig) {
     const db = new DatabasePostgreSQL(config.database);
     super('コンプライアンスエージェント', {
       name: 'compliance_agent',
@@ -60,7 +154,7 @@ export class ComplianceAgent extends BaseAgent {
     
     this.db = db;
     // DatabasePostgreSQLをDatabaseインターフェースとして使用
-    this.dbAdapter = db as any;
+    this.dbAdapter = db as unknown as Database;
     this.complianceEngine = new ComplianceEngine(this.dbAdapter);
     this.anomalyEngine = new IntegratedAnomalyDetectionEngine(this.db);
   }
@@ -158,11 +252,11 @@ export class ComplianceAgent extends BaseAgent {
     return actions;
   }
 
-  protected async execute(action: ComplianceAction): Promise<any> {
+  protected async execute(action: ComplianceAction): Promise<ActionResult> {
     this.logger.info(`Executing compliance action: ${action.description}`);
     
     try {
-      const result = await action.execute();
+      const result = action.execute ? await action.execute() : { success: false, message: 'No execute function defined' };
       
       // アクション結果の記録
       await this.recordActionResult(action, result);
@@ -228,7 +322,7 @@ export class ComplianceAgent extends BaseAgent {
 
   // ===== プライベートメソッド =====
 
-  private async assessComplianceStatus(period: { start: Date; end: Date }): Promise<any> {
+  private async assessComplianceStatus(period: { start: Date; end: Date }): Promise<ComplianceStatus> {
     const employees = await this.db.getAllEmployees();
     const violations: ComplianceAlert[] = [];
     
@@ -254,8 +348,8 @@ export class ComplianceAgent extends BaseAgent {
     };
   }
 
-  private async detectViolations(goal: ComplianceGoal): Promise<any[]> {
-    const violations = [];
+  private async detectViolations(goal: ComplianceGoal): Promise<ComplianceViolation[]> {
+    const violations: ComplianceViolation[] = [];
     const employees = await this.db.getAllEmployees();
     
     for (const employee of employees) {
@@ -302,7 +396,7 @@ export class ComplianceAgent extends BaseAgent {
     return violations;
   }
 
-  private async predictComplianceRisks(period: { start: Date; end: Date }): Promise<any[]> {
+  private async predictComplianceRisks(period: { start: Date; end: Date }): Promise<ComplianceRisk[]> {
     const risks = [];
     
     // 過去のパターンから将来のリスクを予測
@@ -324,7 +418,7 @@ export class ComplianceAgent extends BaseAgent {
     return risks;
   }
 
-  private async createRemediationPlans(violations: any[], autoRemediate: boolean): Promise<any[]> {
+  private async createRemediationPlans(violations: ComplianceViolation[], autoRemediate: boolean): Promise<RemediationPlan[]> {
     const plans = [];
     
     // 違反をグループ化
@@ -352,7 +446,7 @@ export class ComplianceAgent extends BaseAgent {
     });
   }
 
-  private async executeRemediationPlan(plan: any): Promise<void> {
+  private async executeRemediationPlan(plan: RemediationPlan): Promise<void> {
     this.logger.info(`Executing remediation plan: ${plan.id}`);
     
     for (const step of plan.steps) {
@@ -392,7 +486,13 @@ export class ComplianceAgent extends BaseAgent {
     }
   }
 
-  private async generateComplianceReport(data: any): Promise<void> {
+  private async generateComplianceReport(data: {
+    period: { start: Date; end: Date };
+    status: ComplianceStatus;
+    violations: ComplianceViolation[];
+    predictedRisks: ComplianceRisk[];
+    remediations: RemediationPlan[];
+  }): Promise<void> {
     const report = {
       generatedAt: new Date(),
       period: data.period,
@@ -424,7 +524,7 @@ export class ComplianceAgent extends BaseAgent {
 
   // ヘルパーメソッド
   
-  private async collectComplianceData(context: AgentContext): Promise<any> {
+  private async collectComplianceData(context: AgentContext): Promise<{ employees: Employee[]; timeRecords: TimeRecord[]; violations: ComplianceAlert[] }> {
     return {
       employees: await this.db.getAllEmployees(),
       timeRecords: await this.db.getAllTimeRecords(),
@@ -432,7 +532,7 @@ export class ComplianceAgent extends BaseAgent {
     };
   }
 
-  private async analyzeCompliance(context: AgentContext): Promise<any[]> {
+  private async analyzeCompliance(context: AgentContext): Promise<ComplianceViolation[]> {
     const violations = [];
     
     if (context.data) {
@@ -448,7 +548,7 @@ export class ComplianceAgent extends BaseAgent {
     return violations;
   }
 
-  private async createRemediationPlan(violation: any): Promise<any> {
+  private async createRemediationPlan(violation: ComplianceViolation): Promise<RemediationPlan> {
     const steps = [];
     
     switch (violation.type) {
@@ -475,12 +575,12 @@ export class ComplianceAgent extends BaseAgent {
     };
   }
 
-  private async remediateViolation(violation: any): Promise<any> {
+  private async remediateViolation(violation: ComplianceViolation): Promise<ActionResult> {
     // 実際の是正処理
     return { success: true, violationId: violation.id, remediatedAt: new Date() };
   }
 
-  private async recordActionResult(action: ComplianceAction, result: any): Promise<void> {
+  private async recordActionResult(action: ComplianceAction, result: ActionResult): Promise<void> {
     await this.db.query(
       `INSERT INTO compliance_actions (action_id, type, description, result, executed_at)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -488,7 +588,7 @@ export class ComplianceAgent extends BaseAgent {
     );
   }
 
-  private async notifyStakeholders(action: ComplianceAction, result: any): Promise<void> {
+  private async notifyStakeholders(action: ComplianceAction, result: ActionResult): Promise<void> {
     const stakeholders = await this.identifyStakeholders(action);
     
     for (const stakeholder of stakeholders) {
@@ -500,7 +600,7 @@ export class ComplianceAgent extends BaseAgent {
     }
   }
 
-  private async checkRecentViolations(): Promise<any[]> {
+  private async checkRecentViolations(): Promise<ComplianceViolation[]> {
     const recentWindow = new Date(Date.now() - 60 * 60 * 1000); // 過去1時間
     
     const violations = await this.db.query(
@@ -513,7 +613,7 @@ export class ComplianceAgent extends BaseAgent {
     return violations.rows;
   }
 
-  private async handleCriticalViolations(violations: any[]): Promise<void> {
+  private async handleCriticalViolations(violations: ComplianceViolation[]): Promise<void> {
     for (const violation of violations) {
       // 即座に管理者へエスカレーション
       await this.escalateToManagement([violation], 'emergency');
@@ -526,7 +626,7 @@ export class ComplianceAgent extends BaseAgent {
     }
   }
 
-  private async predictNearFutureViolations(): Promise<any[]> {
+  private async predictNearFutureViolations(): Promise<ComplianceRisk[]> {
     // 次の24時間の予測
     const predictions = [];
     const employees = await this.db.getAllEmployees();
@@ -550,7 +650,7 @@ export class ComplianceAgent extends BaseAgent {
     return predictions;
   }
 
-  private async proactiveIntervention(predictions: any[]): Promise<void> {
+  private async proactiveIntervention(predictions: ComplianceRisk[]): Promise<void> {
     for (const prediction of predictions) {
       if (prediction.probability > 0.7) {
         // 予防的通知
@@ -573,7 +673,7 @@ export class ComplianceAgent extends BaseAgent {
     }
   }
 
-  private async getHistoricalComplianceData(): Promise<any> {
+  private async getHistoricalComplianceData(): Promise<HistoricalComplianceData[]> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     const data = await this.db.query(
@@ -586,7 +686,7 @@ export class ComplianceAgent extends BaseAgent {
     return data.rows;
   }
 
-  private analyzeViolationPatterns(historicalData: any[]): any {
+  private analyzeViolationPatterns(historicalData: HistoricalComplianceData[]): ViolationPatterns {
     const patterns = {
       byType: {},
       byTime: {},
@@ -607,7 +707,7 @@ export class ComplianceAgent extends BaseAgent {
     return patterns;
   }
 
-  private evaluateRemediationEffectiveness(historicalData: any[]): any {
+  private evaluateRemediationEffectiveness(historicalData: HistoricalComplianceData[]): RemediationEffectiveness {
     const effectiveness = {
       overall: 0,
       byType: {},
@@ -621,7 +721,7 @@ export class ComplianceAgent extends BaseAgent {
     return effectiveness;
   }
 
-  private calculateOptimalThresholds(patterns: any): any {
+  private calculateOptimalThresholds(patterns: ViolationPatterns): ComplianceThresholds {
     // パターンに基づく最適な閾値計算
     return {
       overtimeWarning: 35, // 時間
@@ -630,7 +730,11 @@ export class ComplianceAgent extends BaseAgent {
     };
   }
 
-  private async updateComplianceStrategies(learnings: any): Promise<void> {
+  private async updateComplianceStrategies(learnings: {
+    patterns: ViolationPatterns;
+    effectiveness: RemediationEffectiveness;
+    newThresholds: ComplianceThresholds;
+  }): Promise<void> {
     // 学習結果をコンプライアンス戦略に反映
     await this.db.query(
       `UPDATE compliance_config 
@@ -640,7 +744,7 @@ export class ComplianceAgent extends BaseAgent {
     );
   }
 
-  private groupViolationsByType(violations: any[]): any {
+  private groupViolationsByType(violations: ComplianceAlert[]): Record<string, number> {
     const grouped = {};
     violations.forEach(v => {
       grouped[v.type] = (grouped[v.type] || 0) + 1;
@@ -648,27 +752,27 @@ export class ComplianceAgent extends BaseAgent {
     return grouped;
   }
 
-  private async calculateComplianceTrend(period: any): Promise<string> {
+  private async calculateComplianceTrend(period: { start: Date; end: Date }): Promise<string> {
     // トレンド計算ロジック
     return 'improving'; // 簡易実装
   }
 
-  private async checkOvertimeCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<any[]> {
+  private async checkOvertimeCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<ComplianceViolation[]> {
     // 残業コンプライアンスチェック
     return [];
   }
 
-  private async checkBreakCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<any[]> {
+  private async checkBreakCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<ComplianceViolation[]> {
     // 休憩コンプライアンスチェック
     return [];
   }
 
-  private async checkHolidayCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<any[]> {
+  private async checkHolidayCompliance(employee: Employee, timeRecords: TimeRecord[]): Promise<ComplianceViolation[]> {
     // 休日コンプライアンスチェック
     return [];
   }
 
-  private async getHistoricalViolations(): Promise<any[]> {
+  private async getHistoricalViolations(): Promise<ComplianceViolation[]> {
     const result = await this.db.query(
       `SELECT * FROM compliance_violations 
        WHERE detected_at > NOW() - INTERVAL '90 days'`
@@ -676,22 +780,22 @@ export class ComplianceAgent extends BaseAgent {
     return result.rows;
   }
 
-  private predictSeasonalRisks(patterns: any, period: any): any[] {
+  private predictSeasonalRisks(patterns: ViolationPatterns, period: { start: Date; end: Date }): ComplianceRisk[] {
     // 季節性リスク予測
     return [];
   }
 
-  private async predictOrganizationalRisks(period: any): Promise<any[]> {
+  private async predictOrganizationalRisks(period: { start: Date; end: Date }): Promise<ComplianceRisk[]> {
     // 組織リスク予測
     return [];
   }
 
-  private predictRegulatoryRisks(period: any): any[] {
+  private predictRegulatoryRisks(period: { start: Date; end: Date }): ComplianceRisk[] {
     // 規制リスク予測
     return [];
   }
 
-  private groupViolationsByTypeAndSeverity(violations: any[]): Map<string, any[]> {
+  private groupViolationsByTypeAndSeverity(violations: ComplianceViolation[]): Map<string, ComplianceViolation[]> {
     const grouped = new Map();
     
     violations.forEach(v => {
@@ -705,7 +809,7 @@ export class ComplianceAgent extends BaseAgent {
     return grouped;
   }
 
-  private generateRemediationSteps(type: string, severity: string): any[] {
+  private generateRemediationSteps(type: string, severity: string): RemediationStep[] {
     // 是正ステップ生成
     return [
       { action: 'notify', target: 'employee', message: '違反通知' },
@@ -723,7 +827,7 @@ export class ComplianceAgent extends BaseAgent {
     return timelines[severity] || 7;
   }
 
-  private estimateRemediationImpact(violations: any[]): any {
+  private estimateRemediationImpact(violations: ComplianceViolation[]): { affectedEmployees: number; estimatedCost: number; timeRequired: number; riskReduction: number } {
     return {
       affectedEmployees: violations.length,
       estimatedCost: violations.length * 10000,
@@ -731,11 +835,11 @@ export class ComplianceAgent extends BaseAgent {
     };
   }
 
-  private async sendNotification(target: string, message: any): Promise<void> {
+  private async sendNotification(target: string, message: { subject?: string; body?: string } | string): Promise<void> {
     console.log(`Notification to ${target}: ${message.subject || message}`);
   }
 
-  private async adjustWorkSchedule(employeeId: string, adjustments: any): Promise<void> {
+  private async adjustWorkSchedule(employeeId: string, adjustments: { shiftChanges?: Array<{ date: Date; newTime: string }>; reducedHours?: number }): Promise<void> {
     console.log(`Adjusting schedule for ${employeeId}:`, adjustments);
   }
 
@@ -747,11 +851,11 @@ export class ComplianceAgent extends BaseAgent {
     console.log(`Enforcing ${breakDuration} minute break for ${employeeId}`);
   }
 
-  private async escalateToManagement(violations: any[], level: string): Promise<void> {
+  private async escalateToManagement(violations: ComplianceViolation[], level: string): Promise<void> {
     console.log(`Escalating ${violations.length} violations to ${level} management`);
   }
 
-  private async recordRemediationStep(planId: string, step: any): Promise<void> {
+  private async recordRemediationStep(planId: string, step: RemediationStep): Promise<void> {
     await this.db.query(
       `INSERT INTO remediation_steps (plan_id, step, executed_at)
        VALUES ($1, $2, $3)`,
@@ -759,14 +863,19 @@ export class ComplianceAgent extends BaseAgent {
     );
   }
 
-  private generateExecutiveSummary(data: any): string {
+  private generateExecutiveSummary(data: {
+    status: ComplianceStatus;
+    violations: ComplianceViolation[];
+    predictedRisks: ComplianceRisk[];
+    remediations: RemediationPlan[];
+  }): string {
     return `コンプライアンススコア: ${(data.status.overallScore * 100).toFixed(1)}%
 違反件数: ${data.violations.length}
 リスク: ${data.predictedRisks.length}件
 是正措置: ${data.remediations.length}件実施`;
   }
 
-  private groupBySeverity(items: any[]): any {
+  private groupBySeverity<T extends { severity: string }>(items: T[]): Record<string, T[]> {
     const grouped = {};
     items.forEach(item => {
       grouped[item.severity] = (grouped[item.severity] || 0) + 1;
@@ -774,7 +883,7 @@ export class ComplianceAgent extends BaseAgent {
     return grouped;
   }
 
-  private groupByType(items: any[]): any {
+  private groupByType<T extends { type: string }>(items: T[]): Record<string, T[]> {
     const grouped = {};
     items.forEach(item => {
       grouped[item.type] = (grouped[item.type] || 0) + 1;
@@ -782,7 +891,10 @@ export class ComplianceAgent extends BaseAgent {
     return grouped;
   }
 
-  private generateRecommendations(data: any): string[] {
+  private generateRecommendations(data: {
+    violations: ComplianceViolation[];
+    predictedRisks: ComplianceRisk[];
+  }): string[] {
     const recommendations = [];
     
     if (data.status.overallScore < 0.9) {
@@ -796,7 +908,7 @@ export class ComplianceAgent extends BaseAgent {
     return recommendations;
   }
 
-  private async saveComplianceReport(report: any): Promise<void> {
+  private async saveComplianceReport(report: Record<string, unknown>): Promise<void> {
     await this.db.query(
       `INSERT INTO compliance_reports (report_data, generated_at)
        VALUES ($1, $2)`,
@@ -804,7 +916,7 @@ export class ComplianceAgent extends BaseAgent {
     );
   }
 
-  private async distributeReport(report: any, recipients: string[]): Promise<void> {
+  private async distributeReport(report: Record<string, unknown>, recipients: string[]): Promise<void> {
     for (const recipient of recipients) {
       console.log(`Sending compliance report to ${recipient}`);
     }
@@ -815,12 +927,12 @@ export class ComplianceAgent extends BaseAgent {
     return ['hr_manager', 'compliance_officer'];
   }
 
-  private canAutoRemediate(violation: any): boolean {
+  private canAutoRemediate(violation: ComplianceViolation): boolean {
     // 自動是正可能かどうかの判定
     return violation.type !== 'regulatory_breach' && violation.severity !== 'critical';
   }
 
-  private async getCurrentWorkStatus(employeeId: string): Promise<any> {
+  private async getCurrentWorkStatus(employeeId: string): Promise<{ status: string; hoursWorkedToday: number; breaksTaken: number; scheduledEnd: Date }> {
     // 現在の勤務状況取得
     return {
       currentMonthOvertime: 35,
@@ -833,7 +945,7 @@ export class ComplianceAgent extends BaseAgent {
     return 'manager_001';
   }
 
-  private async completeGoal(goalId: string, results: any): Promise<void> {
+  private async completeGoal(goalId: string, results: { violationsFound: number; violationsRemediated: number; complianceScore: number }): Promise<void> {
     await this.updateGoalStatus(goalId, 'completed', results);
   }
 }

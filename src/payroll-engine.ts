@@ -1,4 +1,12 @@
-import type { Employee, TimeRecord, PayrollCalculation, WorkingHours, PayrollRules } from './types.js';
+import type { Employee, TimeRecord, PayrollCalculation, PayrollWarning as BasePayrollWarning, WorkingHours, PayrollRules } from './types.js';
+import type { Money } from './types/core/money.js';
+import type { Result } from './types/core/result.js';
+import type { DateTime } from './types/core/datetime.js';
+import type { ValidationError } from './types/core/validation.js';
+import type { EmployeeAllowance, EmployeeDeduction, EmployeeTaxInfo, EmployeeWithTaxInfo, AllowanceType, DeductionType } from './types/domain/payroll-extended.js';
+import { createMoney, addMoney, multiplyMoney } from './types/core/money.js';
+import { success, failure, isSuccess } from './types/core/result.js';
+import { createDateTime, formatDateTime } from './types/core/datetime.js';
 import Database from './database.js';
 
 /**
@@ -13,99 +21,170 @@ import Database from './database.js';
  * - Holiday and late-night premium handling
  */
 
+// Type guard to check if employee has tax info
+function hasEmployeeTaxInfo(employee: Employee | EmployeeWithTaxInfo): employee is EmployeeWithTaxInfo {
+  return 'taxInfo' in employee || 'allowances' in employee || 'deductions' in employee;
+}
+
+// Helper to get hourly rate from either employee type
+function getHourlyRate(employee: Employee | EmployeeWithTaxInfo): number {
+  if ('hourlyRate' in employee && employee.hourlyRate) {
+    return employee.hourlyRate;
+  }
+  if ('hourlyWage' in employee && employee.hourlyWage) {
+    return employee.hourlyWage;
+  }
+  return 0;
+}
+
+/**
+ * 給与計算エンジンのインターフェース
+ * @description 日本労働基準法に準拠した給与計算機能を提供
+ */
 export interface PayrollEngine {
-  calculateCompliancePayroll(employee: Employee, timeRecords: TimeRecord[]): Promise<PayrollResult>;
+  /**
+   * コンプライアンス準拠の給与計算を実行
+   * @param employee - 従業員情報
+   * @param timeRecords - 勤怠記録の配列
+   * @returns 給与計算結果（計算明細、コンプライアンスレポート、給与明細を含む）
+   */
+  calculateCompliancePayroll(employee: Employee | EmployeeWithTaxInfo, timeRecords: ReadonlyArray<TimeRecord>): Promise<Result<PayrollResult, ValidationError>>;
+  
+  /**
+   * 残業割増率を適用
+   * @param hours - 労働時間数
+   * @param type - 残業の種類（通常、深夜、休日、深夜休日）
+   * @returns 適用される割増率（例: 1.25 = 125%）
+   */
   applyOvertimePremiums(hours: number, type: OvertimeType): number;
+  
+  /**
+   * 労働基準法準拠チェック
+   * @param calculation - 給与計算結果
+   * @returns コンプライアンスレポート（違反事項、推奨事項、リスクレベル）
+   */
   validateLaborStandardsCompliance(calculation: PayrollCalculation): ComplianceReport;
-  generatePayslip(employeeId: string, month: string): Promise<PayslipData>;
-  calculateMonthlyPayroll(month: string): Promise<PayrollSummary>;
+  
+  /**
+   * 給与明細を生成
+   * @param employeeId - 従業員ID
+   * @param month - 対象月（YYYY-MM形式）
+   * @returns 給与明細データ
+   */
+  generatePayslip(employeeId: string, month: string): Promise<Result<PayslipData, ValidationError>>;
+  
+  /**
+   * 月次給与計算を実行
+   * @param month - 対象月（YYYY-MM形式）
+   * @returns 月次給与計算サマリー
+   */
+  calculateMonthlyPayroll(month: string): Promise<Result<PayrollSummary, ValidationError>>;
 }
 
 export interface PayrollResult {
-  calculation: PayrollCalculation;
-  compliance: ComplianceReport;
-  payslip: PayslipData;
-  warnings: PayrollWarning[];
+  readonly calculation: PayrollCalculation;
+  readonly compliance: ComplianceReport;
+  readonly payslip: PayslipData;
+  readonly warnings: ReadonlyArray<PayrollWarning>;
 }
 
 export interface ComplianceReport {
-  isCompliant: boolean;
-  violations: LaborLawViolation[];
-  recommendations: string[];
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  readonly isCompliant: boolean;
+  readonly violations: ReadonlyArray<LaborLawViolation>;
+  readonly recommendations: ReadonlyArray<string>;
+  readonly riskLevel: RiskLevel;
 }
 
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
 export interface LaborLawViolation {
-  type: 'overtime_limit' | 'break_time' | 'consecutive_work' | 'holiday_work' | 'late_night_work';
-  severity: 'warning' | 'violation' | 'critical';
-  description: string;
-  value: number;
-  limit: number;
-  lawReference: string;
+  readonly type: 'overtime_limit' | 'break_time' | 'consecutive_work' | 'holiday_work' | 'late_night_work';
+  readonly severity: 'warning' | 'violation' | 'critical';
+  readonly description: string;
+  readonly value: number;
+  readonly limit: number;
+  readonly lawReference: string;
 }
 
 export interface PayslipData {
-  employeeId: string;
-  employeeName: string;
-  month: string;
-  baseSalary: number;
-  allowances: PayrollAllowance[];
-  deductions: PayrollDeduction[];
-  taxCalculation: TaxCalculation;
-  socialInsurance: SocialInsuranceCalculation;
-  netPay: number;
-  workingSummary: WorkingSummary;
-  generatedAt: Date;
+  readonly employeeId: string;
+  readonly employeeName: string;
+  readonly month: string;
+  readonly baseSalary: Money;
+  readonly allowances: ReadonlyArray<PayrollAllowance>;
+  readonly deductions: ReadonlyArray<PayrollDeduction>;
+  readonly taxCalculation: TaxCalculation;
+  readonly socialInsurance: SocialInsuranceCalculation;
+  readonly netPay: Money;
+  readonly workingSummary: WorkingSummary;
+  readonly generatedAt: DateTime;
 }
 
+// Re-export from domain types for backward compatibility
+export type { AllowanceType, DeductionType } from './types/domain/payroll-extended.js';
+
 export interface PayrollAllowance {
-  type: 'overtime' | 'late_night' | 'holiday' | 'special' | 'transport' | 'housing';
-  description: string;
-  amount: number;
-  hours?: number;
-  rate?: number;
+  readonly type: AllowanceType;
+  readonly description: string;
+  readonly amount: Money;
+  readonly hours?: number;
+  readonly rate?: number;
 }
 
 export interface PayrollDeduction {
-  type: 'income_tax' | 'resident_tax' | 'social_insurance' | 'unemployment' | 'other';
-  description: string;
-  amount: number;
-  rate?: number;
+  readonly type: DeductionType;
+  readonly description: string;
+  readonly amount: Money;
+  readonly rate?: number;
 }
 
 export interface TaxCalculation {
-  incomeTax: number;
-  residentTax: number;
-  totalTax: number;
-  taxableIncome: number;
+  readonly incomeTax: Money;
+  readonly residentTax: Money;
+  readonly totalTax: Money;
+  readonly taxableIncome: Money;
 }
 
 export interface SocialInsuranceCalculation {
-  healthInsurance: number;
-  pensionInsurance: number;
-  unemploymentInsurance: number;
-  longTermCareInsurance: number;
-  total: number;
+  readonly healthInsurance: Money;
+  readonly pensionInsurance: Money;
+  readonly unemploymentInsurance: Money;
+  readonly longTermCareInsurance: Money;
+  readonly total: Money;
 }
 
 export interface WorkingSummary {
-  regularHours: number;
-  overtimeHours: number;
-  lateNightHours: number;
-  holidayHours: number;
-  totalWorkingDays: number;
-  absentDays: number;
-  paidLeaves: number;
+  readonly regularHours: number;
+  readonly overtimeHours: number;
+  readonly lateNightHours: number;
+  readonly holidayHours: number;
+  readonly totalWorkingDays: number;
+  readonly absentDays: number;
+  readonly paidLeaves: number;
 }
 
+export type WarningType = 'calculation' | 'compliance' | 'data' | 'system';
+export type WarningSeverity = 'info' | 'warning' | 'error';
+
 export interface PayrollWarning {
-  type: 'calculation' | 'compliance' | 'data' | 'system';
-  severity: 'info' | 'warning' | 'error';
-  message: string;
-  recommendation?: string;
+  readonly type: WarningType;
+  readonly severity: WarningSeverity;
+  readonly message: string;
+  readonly recommendation?: string;
 }
 
 export type OvertimeType = 'regular' | 'late_night' | 'holiday' | 'late_night_holiday';
+
+export interface PayrollSummary {
+  readonly month: string;
+  readonly totalEmployees: number;
+  readonly totalRegularPay: Money;
+  readonly totalOvertimePay: Money;
+  readonly totalLateNightPay: Money;
+  readonly totalHolidayPay: Money;
+  readonly totalPay: Money;
+  readonly violations: ReadonlyArray<LaborLawViolation>;
+}
 
 /**
  * Enhanced Japanese Labor Standards Act Rules
@@ -153,7 +232,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
    * メイン給与計算処理
    * Main payroll calculation with full compliance checking
    */
-  async calculateCompliancePayroll(employee: Employee, timeRecords: TimeRecord[]): Promise<PayrollResult> {
+  async calculateCompliancePayroll(employee: Employee | EmployeeWithTaxInfo, timeRecords: ReadonlyArray<TimeRecord>): Promise<Result<PayrollResult, ValidationError>> {
     const warnings: PayrollWarning[] = [];
     
     try {
@@ -190,25 +269,27 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       const compliance = this.validateLaborStandardsCompliance(calculation);
       
       // 6. Generate payslip
-      const payslip = await this.generatePayslip(employee.id, month);
+      const payslipResult = await this.generatePayslip(employee.id, month);
       
-      return {
+      if (!isSuccess(payslipResult)) {
+        return failure(payslipResult.error);
+      }
+      
+      return success({
         calculation,
         compliance,
-        payslip,
+        payslip: payslipResult.value,
         warnings
-      };
+      });
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      warnings.push({
-        type: 'system',
-        severity: 'error',
+      return failure({
+        code: 'PAYROLL_CALCULATION_ERROR',
         message: `Payroll calculation failed: ${errorMessage}`,
-        recommendation: 'Check time records and employee data'
+        field: 'payroll',
+        value: { employee: employee.id, month: this.getCurrentMonth() }
       });
-      
-      throw new Error(`Payroll calculation failed: ${errorMessage}`);
     }
   }
 
@@ -261,7 +342,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     }
 
     // Determine risk level
-    let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    let riskLevel: RiskLevel = 'low';
     if (violations.some(v => v.severity === 'critical')) {
       riskLevel = 'critical';
     } else if (violations.some(v => v.severity === 'violation')) {
@@ -282,10 +363,15 @@ export class IntegratedPayrollEngine implements PayrollEngine {
    * 給与明細自動生成
    * Automated payslip generation with full Japanese tax and social insurance calculation
    */
-  async generatePayslip(employeeId: string, month: string): Promise<PayslipData> {
+  async generatePayslip(employeeId: string, month: string): Promise<Result<PayslipData, ValidationError>> {
     const employee = await this.db.getEmployee(employeeId);
     if (!employee) {
-      throw new Error('Employee not found');
+      return failure({
+        code: 'EMPLOYEE_NOT_FOUND',
+        message: `Employee not found: ${employeeId}`,
+        field: 'employeeId',
+        value: employeeId
+      });
     }
 
     // Get time records for the month
@@ -306,12 +392,12 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     
     // Add employee allowances
     const allowances: PayrollAllowance[] = [];
-    if (employee.allowances) {
+    if (hasEmployeeTaxInfo(employee) && employee.allowances) {
       for (const allowance of employee.allowances) {
         allowances.push({
-          type: allowance.type as any,
+          type: allowance.type as AllowanceType,
           description: allowance.description,
-          amount: allowance.amount
+          amount: createMoney(allowance.amount, 'JPY')
         });
       }
     }
@@ -319,9 +405,9 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     // Add overtime allowances
     if (overtimePay > 0) {
       allowances.push({
-        type: 'overtime',
+        type: 'overtime' as const,
         description: '時間外手当',
-        amount: overtimePay,
+        amount: createMoney(overtimePay, 'JPY'),
         hours: workingHours.reduce((sum, h) => sum + h.overtimeHours, 0),
         rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.overtimeHours, 0), 'regular')
       });
@@ -329,9 +415,9 @@ export class IntegratedPayrollEngine implements PayrollEngine {
 
     if (lateNightPay > 0) {
       allowances.push({
-        type: 'late_night',
+        type: 'late_night' as const,
         description: '深夜手当',
-        amount: lateNightPay,
+        amount: createMoney(lateNightPay, 'JPY'),
         hours: workingHours.reduce((sum, h) => sum + h.lateNightHours, 0),
         rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.lateNightHours, 0), 'late_night')
       });
@@ -339,35 +425,35 @@ export class IntegratedPayrollEngine implements PayrollEngine {
 
     if (holidayPay > 0) {
       allowances.push({
-        type: 'holiday',
+        type: 'holiday' as const,
         description: '休日手当',
-        amount: holidayPay,
+        amount: createMoney(holidayPay, 'JPY'),
         hours: workingHours.reduce((sum, h) => sum + h.holidayHours, 0),
         rate: this.applyOvertimePremiums(workingHours.reduce((sum, h) => sum + h.holidayHours, 0), 'holiday')
       });
     }
 
     // Calculate total allowances
-    const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0);
-    const totalGrossPay = grossPay + totalAllowances;
+    const totalAllowances = allowances.reduce((sum, a) => addMoney(sum, a.amount), createMoney(0, 'JPY'));
+    const totalGrossPay = addMoney(createMoney(grossPay, 'JPY'), totalAllowances);
 
     // Add employee deductions
     const deductions: PayrollDeduction[] = [];
-    if (employee.deductions) {
+    if (hasEmployeeTaxInfo(employee) && employee.deductions) {
       for (const deduction of employee.deductions) {
         deductions.push({
-          type: deduction.type as any,
+          type: deduction.type as DeductionType,
           description: deduction.description,
-          amount: deduction.amount
+          amount: createMoney(deduction.amount, 'JPY')
         });
       }
     }
 
     // Calculate taxes
-    const taxCalculation = this.calculateJapaneseTax(totalGrossPay, employee);
+    const taxCalculation = this.calculateJapaneseTax(totalGrossPay.amount, employee);
     
     // Calculate social insurance
-    const socialInsurance = this.calculateSocialInsurance(totalGrossPay, employee);
+    const socialInsurance = this.calculateSocialInsurance(totalGrossPay.amount, employee);
 
     // Add tax deductions
     deductions.push({
@@ -391,8 +477,8 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     });
 
     // Calculate net pay
-    const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
-    const netPay = totalGrossPay - totalDeductions;
+    const totalDeductions = deductions.reduce((sum, d) => addMoney(sum, d.amount), createMoney(0, 'JPY'));
+    const netPay = createMoney(totalGrossPay.amount - totalDeductions.amount, 'JPY');
 
     // Calculate working summary
     const workingSummary: WorkingSummary = {
@@ -405,37 +491,37 @@ export class IntegratedPayrollEngine implements PayrollEngine {
       paidLeaves: 0  // TODO: Calculate based on leave records
     };
 
-    return {
+    return success({
       employeeId: employee.id,
       employeeName: employee.name,
       month,
-      baseSalary,
+      baseSalary: createMoney(baseSalary, 'JPY'),
       allowances,
       deductions,
       taxCalculation,
       socialInsurance,
-      netPay,
+      netPay: createMoney(netPay, 'JPY'),
       workingSummary,
-      generatedAt: new Date()
-    };
+      generatedAt: createDateTime(new Date())
+    });
   }
 
   /**
    * 月次給与計算
    * Monthly payroll calculation
    */
-  async calculateMonthlyPayroll(month: string): Promise<PayrollSummary> {
+  async calculateMonthlyPayroll(month: string): Promise<Result<PayrollSummary, ValidationError>> {
     // Implementation placeholder - will be implemented in next phase
-    return {
+    return success({
       month,
       totalEmployees: 0,
-      totalRegularPay: 0,
-      totalOvertimePay: 0,
-      totalLateNightPay: 0,
-      totalHolidayPay: 0,
-      totalPay: 0,
+      totalRegularPay: createMoney(0, 'JPY'),
+      totalOvertimePay: createMoney(0, 'JPY'),
+      totalLateNightPay: createMoney(0, 'JPY'),
+      totalHolidayPay: createMoney(0, 'JPY'),
+      totalPay: createMoney(0, 'JPY'),
       violations: []
-    };
+    });
   }
 
   /**
@@ -454,37 +540,54 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const timeRecords = await this.db.getTimeRecords(employeeId, startDate, endDate);
     
     const result = await this.calculateCompliancePayroll(employee, timeRecords);
-    // テスト用に月を修正し、拡張プロパティを追加
-    result.calculation.month = month;
-    result.calculation.warnings = result.warnings;
-    result.calculation.complianceReport = {
-      yearlyOvertimeTotal: result.calculation.overtimeHours * 12 // 簡易計算
+    if (!isSuccess(result)) {
+      throw new Error(result.error.message);
+    }
+    const payrollResult = result.value;
+    
+    // テスト用に拡張プロパティを含むオブジェクトを返す
+    const extendedCalculation: PayrollCalculation & {
+      warnings?: BasePayrollWarning[];
+      complianceReport?: { yearlyOvertimeTotal: number };
+      payslip?: PayslipData;
+    } = {
+      ...payrollResult.calculation,
+      month,
+      warnings: payrollResult.warnings.map(w => ({
+        type: w.type,
+        severity: w.severity,
+        message: w.message,
+        recommendation: w.recommendation
+      } as BasePayrollWarning)),
+      complianceReport: {
+        yearlyOvertimeTotal: payrollResult.calculation.overtimeHours * 12
+      },
+      payslip: {
+        ...payrollResult.payslip,
+        month
+      }
     };
-    result.calculation.payslip = result.payslip;
     
-    // payslipのmonthも修正
-    if (result.calculation.payslip) {
-      result.calculation.payslip.month = month;
+    // コンプライアンスレポートから警告を追加
+    if (payrollResult.compliance && !payrollResult.compliance.isCompliant) {
+      const complianceWarnings = payrollResult.compliance.violations.map(violation => ({
+        type: 'OVERTIME_LIMIT_WARNING',
+        message: violation.description,
+        severity: violation.severity
+      } as BasePayrollWarning));
+      
+      extendedCalculation.warnings = [
+        ...(extendedCalculation.warnings || []),
+        ...complianceWarnings
+      ];
     }
     
-    // コンプライアンスレポートから警告を生成
-    if (result.compliance && !result.compliance.isCompliant) {
-      result.calculation.warnings = result.calculation.warnings || [];
-      result.compliance.violations.forEach(violation => {
-        result.calculation.warnings!.push({
-          type: 'OVERTIME_LIMIT_WARNING',
-          message: violation.description,
-          severity: violation.severity
-        });
-      });
-    }
-    
-    return result.calculation;
+    return extendedCalculation;
   }
 
   // Private helper methods
 
-  private async calculateWorkingHours(timeRecords: TimeRecord[]): Promise<WorkingHours[]> {
+  private async calculateWorkingHours(timeRecords: ReadonlyArray<TimeRecord>): Promise<ReadonlyArray<WorkingHours>> {
     const { WorkingHoursCalculator } = await import('./working-hours-calculator.js');
     const calculator = new WorkingHoursCalculator();
     
@@ -492,27 +595,31 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     return calculator.convertToWorkingHours(breakdowns);
   }
 
-  private calculateBaseSalary(employee: Employee, workingHours: WorkingHours[]): number {
+  private calculateBaseSalary(employee: Readonly<Employee | EmployeeWithTaxInfo>, workingHours: ReadonlyArray<WorkingHours>): number {
     const regularHours = workingHours.reduce((sum, h) => sum + h.regularHours, 0);
-    return regularHours * (employee.hourlyRate || employee.hourlyWage || 0);
+    const hourlyRate = getHourlyRate(employee);
+    return regularHours * hourlyRate;
   }
 
-  private calculateOvertimePay(employee: Employee, workingHours: WorkingHours[]): number {
+  private calculateOvertimePay(employee: Readonly<Employee | EmployeeWithTaxInfo>, workingHours: ReadonlyArray<WorkingHours>): number {
     const overtimeHours = workingHours.reduce((sum, h) => sum + h.overtimeHours, 0);
     const premiumRate = this.applyOvertimePremiums(overtimeHours, 'regular');
-    return overtimeHours * (employee.hourlyRate || employee.hourlyWage || 0) * premiumRate;
+    const hourlyRate = getHourlyRate(employee);
+    return overtimeHours * hourlyRate * premiumRate;
   }
 
-  private calculateLateNightPay(employee: Employee, workingHours: WorkingHours[]): number {
+  private calculateLateNightPay(employee: Readonly<Employee | EmployeeWithTaxInfo>, workingHours: ReadonlyArray<WorkingHours>): number {
     const lateNightHours = workingHours.reduce((sum, h) => sum + h.lateNightHours, 0);
     const premiumRate = this.applyOvertimePremiums(lateNightHours, 'late_night');
-    return lateNightHours * (employee.hourlyRate || employee.hourlyWage || 0) * (premiumRate - 1); // Only the premium portion
+    const hourlyRate = getHourlyRate(employee);
+    return lateNightHours * hourlyRate * (premiumRate - 1); // Only the premium portion
   }
 
-  private calculateHolidayPay(employee: Employee, workingHours: WorkingHours[]): number {
+  private calculateHolidayPay(employee: Readonly<Employee | EmployeeWithTaxInfo>, workingHours: ReadonlyArray<WorkingHours>): number {
     const holidayHours = workingHours.reduce((sum, h) => sum + h.holidayHours, 0);
     const premiumRate = this.applyOvertimePremiums(holidayHours, 'holiday');
-    return holidayHours * (employee.hourlyRate || employee.hourlyWage || 0) * (premiumRate - 1); // Only the premium portion
+    const hourlyRate = getHourlyRate(employee);
+    return holidayHours * hourlyRate * (premiumRate - 1); // Only the premium portion
   }
 
   private getCurrentMonth(): string {
@@ -524,11 +631,12 @@ export class IntegratedPayrollEngine implements PayrollEngine {
    * 日本の所得税計算
    * Japanese Income Tax Calculation (源泉徴収税額表準拠)
    */
-  private calculateJapaneseTax(grossPay: number, employee: Employee): TaxCalculation {
-    const dependents = employee.taxInfo?.dependents || 0;
-    const isDisabled = employee.taxInfo?.isDisabled || false;
-    const isSingleParent = employee.taxInfo?.isSingleParent || false;
-    const hasSpouseDeduction = employee.taxInfo?.hasSpouseDeduction || false;
+  private calculateJapaneseTax(grossPay: number, employee: Readonly<Employee | EmployeeWithTaxInfo>): TaxCalculation {
+    const taxInfo = hasEmployeeTaxInfo(employee) ? employee.taxInfo : undefined;
+    const dependents = taxInfo?.dependents || 0;
+    const isDisabled = taxInfo?.isDisabled || false;
+    const isSingleParent = taxInfo?.isSingleParent || false;
+    const hasSpouseDeduction = taxInfo?.hasSpouseDeduction || false;
 
     // 基礎控除額計算
     let basicDeduction = 480000; // 基礎控除（年額）
@@ -592,10 +700,10 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const residentTax = Math.floor(taxableIncome * 0.10 / 12);
 
     return {
-      incomeTax,
-      residentTax,
-      totalTax: incomeTax + residentTax,
-      taxableIncome: taxableIncome / 12
+      incomeTax: createMoney(incomeTax, 'JPY'),
+      residentTax: createMoney(residentTax, 'JPY'),
+      totalTax: createMoney(incomeTax + residentTax, 'JPY'),
+      taxableIncome: createMoney(taxableIncome / 12, 'JPY')
     };
   }
 
@@ -603,7 +711,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
    * 社会保険料計算
    * Japanese Social Insurance Calculation
    */
-  private calculateSocialInsurance(grossPay: number, employee: Employee): SocialInsuranceCalculation {
+  private calculateSocialInsurance(grossPay: number, employee: Readonly<Employee | EmployeeWithTaxInfo>): SocialInsuranceCalculation {
     // 標準報酬月額の算出（実際は前年度の平均等で決定）
     const standardMonthlyRemuneration = Math.floor(grossPay / 1000) * 1000;
     
@@ -617,17 +725,18 @@ export class IntegratedPayrollEngine implements PayrollEngine {
     const unemploymentInsurance = Math.floor(grossPay * 0.003);
     
     // 介護保険料（40歳以上、1.64%、労使折半）
-    const age = employee.birthDate ? 
-      Math.floor((Date.now() - employee.birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
+    const birthDate = hasEmployeeTaxInfo(employee) ? employee.birthDate : undefined;
+    const age = birthDate ? 
+      Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 30;
     const longTermCareInsurance = age >= 40 ? 
       Math.floor(standardMonthlyRemuneration * 0.0082) : 0;
 
     return {
-      healthInsurance,
-      pensionInsurance,
-      unemploymentInsurance,
-      longTermCareInsurance,
-      total: healthInsurance + pensionInsurance + unemploymentInsurance + longTermCareInsurance
+      healthInsurance: createMoney(healthInsurance, 'JPY'),
+      pensionInsurance: createMoney(pensionInsurance, 'JPY'),
+      unemploymentInsurance: createMoney(unemploymentInsurance, 'JPY'),
+      longTermCareInsurance: createMoney(longTermCareInsurance, 'JPY'),
+      total: createMoney(healthInsurance + pensionInsurance + unemploymentInsurance + longTermCareInsurance, 'JPY')
     };
   }
 
@@ -635,8 +744,8 @@ export class IntegratedPayrollEngine implements PayrollEngine {
    * 所得税率取得
    * Get income tax rate for display
    */
-  private getIncomeTaxRate(annualIncome: number): number {
-    const annual = annualIncome * 12;
+  private getIncomeTaxRate(grossPay: Money): number {
+    const annual = grossPay.amount * 12;
     if (annual <= 1950000) return 0.05;
     if (annual <= 3300000) return 0.10;
     if (annual <= 6950000) return 0.20;
@@ -648,7 +757,7 @@ export class IntegratedPayrollEngine implements PayrollEngine {
 }
 
 // Export additional interfaces for MCP tools
-export interface PayrollSummary {
+export interface MCPPayrollSummary {
   month: string;
   totalEmployees: number;
   totalRegularPay: number;

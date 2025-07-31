@@ -52,7 +52,7 @@ export interface SyncResult {
 export interface WebhookEvent {
   provider: string;
   eventType: string;
-  payload: any;
+  payload: unknown;
   receivedAt: Date;
   signature?: string;
 }
@@ -113,7 +113,7 @@ export class FreeeIntegration implements AccountingIntegration {
 
   async syncEmployeeMaster(employees: Employee[]): Promise<SyncResult> {
     const startTime = Date.now();
-    const errors: any[] = [];
+    const errors: Array<{ item: string; error: string; timestamp: Date }> = [];
     let successCount = 0;
 
     for (const employee of employees) {
@@ -141,7 +141,7 @@ export class FreeeIntegration implements AccountingIntegration {
 
   async syncPayrollData(payrollData: PayrollCalculation[]): Promise<SyncResult> {
     const startTime = Date.now();
-    const errors: any[] = [];
+    const errors: Array<{ item: string; error: string; timestamp: Date }> = [];
     let successCount = 0;
 
     // 給与データを月次でグループ化
@@ -178,7 +178,7 @@ export class FreeeIntegration implements AccountingIntegration {
 
   async syncExpenseData(expenses: ExpenseRequest[]): Promise<SyncResult> {
     const startTime = Date.now();
-    const errors: any[] = [];
+    const errors: Array<{ item: string; error: string; timestamp: Date }> = [];
     let successCount = 0;
 
     for (const expense of expenses) {
@@ -237,7 +237,7 @@ export class FreeeIntegration implements AccountingIntegration {
   }
 
   // Private methods
-  private async apiRequest(endpoint: string, method: string, data?: any): Promise<any> {
+  private async apiRequest(endpoint: string, method: string, data?: unknown): Promise<unknown> {
     const url = `${this.apiBaseUrl}${endpoint}`;
     const headers = {
       'Authorization': `Bearer ${this.config.credentials.accessToken}`,
@@ -258,7 +258,7 @@ export class FreeeIntegration implements AccountingIntegration {
     return response.json();
   }
 
-  private transformToFreeeFormat(entry: JournalEntry): any {
+  private transformToFreeeFormat(entry: JournalEntry): Record<string, unknown> {
     return {
       issue_date: entry.date.toISOString().split('T')[0],
       type: 'expense',
@@ -418,7 +418,7 @@ export interface ApprovalRequest {
   type: 'expense' | 'leave' | 'overtime';
   requester: string;
   approver: string;
-  details: any;
+  details: Record<string, unknown>;
   actions: Array<{
     label: string;
     value: string;
@@ -514,7 +514,7 @@ export class SlackIntegration implements CommunicationIntegration {
   }
 
   // Private methods
-  private async apiRequest(method: string, data: any): Promise<any> {
+  private async apiRequest(method: string, data: unknown): Promise<unknown> {
     const url = `${this.apiBaseUrl}/${method}`;
     const headers = {
       'Authorization': `Bearer ${this.config.credentials.accessToken}`,
@@ -534,17 +534,17 @@ export class SlackIntegration implements CommunicationIntegration {
       }
 
       return response.json();
-    } catch (error: any) {
+    } catch (error) {
       // ネットワークエラーやその他のエラーを適切に処理
-      if (error.message.includes('Network error') || error.message.includes('fetch')) {
+      if (error instanceof Error && (error.message.includes('Network error') || error.message.includes('fetch'))) {
         throw new Error(`Network error: ${error.message}`);
       }
       throw error;
     }
   }
 
-  private transformToSlackFormat(notification: Notification): any {
-    const slackMessage: any = {
+  private transformToSlackFormat(notification: Notification): Record<string, unknown> {
+    const slackMessage: Record<string, unknown> = {
       channel: notification.channel,
       text: notification.message
     };
@@ -604,12 +604,12 @@ export class SlackIntegration implements CommunicationIntegration {
     return true;
   }
 
-  private async handleInteractiveMessage(payload: any): Promise<void> {
+  private async handleInteractiveMessage(payload: unknown): Promise<void> {
     // インタラクティブメッセージの処理
     console.log('Interactive message:', payload);
   }
 
-  private async handleSlashCommand(payload: any): Promise<void> {
+  private async handleSlashCommand(payload: unknown): Promise<void> {
     // スラッシュコマンドの処理
     console.log('Slash command:', payload);
   }
@@ -730,7 +730,7 @@ export class TeamsIntegration implements CommunicationIntegration {
   }
 
   // Private methods
-  private async apiRequest(endpoint: string, method: string, data?: any): Promise<any> {
+  private async apiRequest(endpoint: string, method: string, data?: unknown): Promise<unknown> {
     const url = `${this.apiBaseUrl}${endpoint}`;
     const headers = {
       'Authorization': `Bearer ${this.config.credentials.accessToken}`,
@@ -752,8 +752,8 @@ export class TeamsIntegration implements CommunicationIntegration {
     return response.json();
   }
 
-  private transformToTeamsFormat(notification: Notification): any {
-    const message: any = {
+  private transformToTeamsFormat(notification: Notification): Record<string, unknown> {
+    const message: Record<string, unknown> = {
       body: {
         contentType: 'html',
         content: this.formatMessageContent(notification)

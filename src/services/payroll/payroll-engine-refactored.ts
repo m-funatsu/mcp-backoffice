@@ -3,41 +3,38 @@
  * AI-OS v3.0 - 型安全性強化版
  */
 
-import type { Result } from '@core/result';
-import type { Money } from '@core/money';
-import type { DateTime } from '@core/date-time';
-import type { ValidationError } from '@core/validation';
+import type { Result } from '../../types/core/result.js';
+import type { Money } from '../../types/core/money.js';
+import type { DateTime } from '../../types/core/datetime.js';
+import type { ValidationError } from '../../types/core/validation.js';
+import type { Employee } from '../../types/domain/employee.js';
 import type {
-  Employee,
-  PayrollPeriod,
-  PayrollStatus,
   PaySlip,
   Allowance,
   Deduction,
   OvertimeCalculation,
+  OvertimeDetail,
   TaxDetails,
+  TaxDeduction,
   SocialInsuranceDetails,
   WorkSummary,
   PayrollCalculationParams,
   PayrollCalculationError,
-  validateBasicSalary,
-  validateOvertimeHours,
-  calculateIncomeTax,
-  calculateSocialInsurance,
-} from '@domain/index';
+  PayrollPeriod,
+  PayrollStatus
+} from '../../types/domain/payroll.js';
 import type {
-  DailyAttendance,
-  MonthlyAttendanceSummary,
-  calculateWorkTime,
-  calculateOvertime,
-  calculateNightShift,
-} from '@domain/attendance';
+  MonthlyAttendanceSummary
+} from '../../types/domain/attendance.js';
 import type {
   ComplianceViolation,
-  Agreement36,
-  check36AgreementViolation,
-  checkBreakTimeViolation,
-} from '@domain/compliance';
+  Agreement36
+} from '../../types/domain/compliance.js';
+import { success, failure, isSuccess } from '../../types/core/result.js';
+import { createMoney, addMoney, multiplyMoney, subtractMoney } from '../../types/core/money.js';
+import { createDateTime, formatDateTime, now, diffInYears } from '../../types/core/datetime.js';
+import { validateBasicSalary } from '../../types/domain/payroll.js';
+import { check36AgreementViolation } from '../../compliance-engine.js';
 
 // 日本の労働基準法に準拠した設定
 const LABOR_STANDARDS_CONFIG = {
@@ -101,9 +98,11 @@ export class RefactoredPayrollEngine {
 
     // 2. 基本給検証
     const basicSalaryResult = validateBasicSalary(params.basicSalary);
-    if (basicSalaryResult.isFailure) {
-      return Result.failure({
-        ...basicSalaryResult.error,
+    if (!isSuccess(basicSalaryResult)) {
+      return failure({
+        field: 'basicSalary',
+        message: basicSalaryResult.error.message || '基本給検証エラー',
+        code: 'BASIC_SALARY_VALIDATION_ERROR',
         calculationStep: 'basic_salary_validation',
       });
     }
@@ -113,8 +112,8 @@ export class RefactoredPayrollEngine {
       params.employeeId,
       params.periodId
     );
-    if (attendanceSummary.isFailure) {
-      return Result.failure({
+    if (!isSuccess(attendanceSummary)) {
+      return failure({
         field: 'attendance',
         message: '勤怠データの取得に失敗しました',
         code: 'ATTENDANCE_FETCH_ERROR',
@@ -127,10 +126,10 @@ export class RefactoredPayrollEngine {
       attendanceSummary.value,
       employee
     );
-    if (overtimeValidation.isFailure) {
-      return Result.failure({
+    if (!isSuccess(overtimeValidation)) {
+      return failure({
         field: 'overtime',
-        message: overtimeValidation.error.message,
+        message: overtimeValidation.error.details?.description || '残業時間違反',
         code: 'OVERTIME_VIOLATION',
         calculationStep: 'overtime_validation',
         details: overtimeValidation.error,
@@ -138,9 +137,10 @@ export class RefactoredPayrollEngine {
     }
 
     // 5. 残業代計算
+    const hourlyRate = createMoney(employee.hourlyWage || 0, 'JPY');
     const overtimeCalculation = this.calculateOvertimePay(
       attendanceSummary.value,
-      employee.hourlyRate
+      hourlyRate
     );
 
     // 6. 総支給額計算
@@ -154,7 +154,7 @@ export class RefactoredPayrollEngine {
     const taxDetails = await this.taxService.calculate({
       grossPay,
       employee,
-      exemptions: params.taxExemptions,
+      exemptions: params.taxExemptions || [],
     });
 
     // 8. 社会保険計算
@@ -172,7 +172,7 @@ export class RefactoredPayrollEngine {
     );
 
     // 10. 手取り計算
-    const netPay = Money.subtract(grossPay, totalDeductions);
+    const netPay = subtractMoney(grossPay, totalDeductions);
 
     // 11. 給与明細作成
     const paySlip: PaySlip = {
@@ -188,11 +188,11 @@ export class RefactoredPayrollEngine {
       taxDetails,
       socialInsurance,
       workSummary: this.createWorkSummary(attendanceSummary.value),
-      bankDetails: employee.bankDetails,
-      createdAt: DateTime.now(),
+      bankDetails: employee.bankDetails || { accountNumber: '', bankName: '', branchName: '' },
+      createdAt: now(),
     };
 
-    return Result.success(paySlip);
+    return success(paySlip);
   }
 
   /**
@@ -203,7 +203,7 @@ export class RefactoredPayrollEngine {
     periodId: string
   ): Promise<Result<MonthlyAttendanceSummary, ValidationError>> {
     try {
-      const summary = await this.attendanceRepository.getMonthlyS ummary(
+      const summary = await this.attendanceRepository.getMonthlySummary(
         employeeId,
         periodId
       );
@@ -446,7 +446,7 @@ interface EmployeeRepository {
 }
 
 interface AttendanceRepository {
-  getMonthlyS ummary(
+  getMonthlySummary(
     employeeId: string,
     periodId: string
   ): Promise<MonthlyAttendanceSummary>;
@@ -473,15 +473,4 @@ interface InsuranceCalculationService {
   }): Promise<SocialInsuranceDetails>;
 }
 
-// 型定義の補完
-interface OvertimeDetail {
-  readonly hours: number;
-  readonly rate: number;
-  readonly amount: Money;
-}
-
-interface TaxDeduction {
-  readonly type: string;
-  readonly name: string;
-  readonly amount: Money;
-}
+// OvertimeDetailとTaxDeductionは既にdomain/payroll.tsで定義済み

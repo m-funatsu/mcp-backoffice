@@ -78,6 +78,44 @@ export interface ApprovalRecommendation {
   alternativeDates?: Date[];
 }
 
+// 分析結果の型定義
+interface LeaveBalanceAnalysis {
+  currentBalance: number;
+  requestedDays: number;
+  remainingAfterApproval: number;
+  percentageUsed: number;
+  warningThreshold: boolean;
+}
+
+interface LeaveHistoryAnalysis {
+  pastUsagePattern: 'low' | 'normal' | 'high';
+  averageRequestDuration: number;
+  frequentPeriods: string[];
+  previousRejections: number;
+}
+
+interface TeamImpactAnalysis {
+  impact: 'low' | 'medium' | 'high' | 'unknown';
+  conflictingRequests: number;
+  teamCoverage: number; // percentage
+  criticalRoles?: string[];
+}
+
+interface ComplianceAnalysis {
+  issues: string[];
+  compliant: boolean;
+  requiredNoticeDays: number;
+  actualNoticeDays: number;
+  maxConsecutiveDaysAllowed?: number;
+}
+
+interface BusinessImpactAnalysis {
+  hasPeakPeriod: boolean;
+  hasImportantEvents: boolean;
+  impactLevel: 'low' | 'medium' | 'high';
+  alternativeSuggestions?: Date[];
+}
+
 export class AutomaticLeaveManagement {
   private db: Database;
 
@@ -337,7 +375,7 @@ export class AutomaticLeaveManagement {
           effectiveRemaining: balance.remainingDays - pendingDays
         };
         
-        balances.push(realTimeBalance as any);
+        balances.push(realTimeBalance);
       } catch (error) {
         console.error(`Error tracking balance for ${leaveType}:`, error);
       }
@@ -366,7 +404,7 @@ export class AutomaticLeaveManagement {
     return reason + '（労働基準法第39条準拠）';
   }
 
-  private async analyzeLeaveBalance(request: LeaveRequest): Promise<any> {
+  private async analyzeLeaveBalance(request: LeaveRequest): Promise<LeaveBalanceAnalysis> {
     const balance = await this.db.getLeaveBalance(request.employeeId, request.leaveType);
     if (!balance) {
       return {
@@ -382,7 +420,7 @@ export class AutomaticLeaveManagement {
     };
   }
 
-  private async analyzeLeaveHistory(employeeId: string): Promise<any> {
+  private async analyzeLeaveHistory(employeeId: string): Promise<LeaveHistoryAnalysis> {
     // 過去の休暇使用パターン分析
     const pastYear = new Date();
     pastYear.setFullYear(pastYear.getFullYear() - 1);
@@ -397,7 +435,7 @@ export class AutomaticLeaveManagement {
     };
   }
 
-  private async analyzeTeamImpact(request: LeaveRequest): Promise<any> {
+  private async analyzeTeamImpact(request: LeaveRequest): Promise<TeamImpactAnalysis> {
     const employee = await this.db.getEmployee(request.employeeId);
     if (!employee) return { impact: 'unknown' };
 
@@ -419,7 +457,7 @@ export class AutomaticLeaveManagement {
     };
   }
 
-  private async analyzeCompliance(request: LeaveRequest): Promise<any> {
+  private async analyzeCompliance(request: LeaveRequest): Promise<ComplianceAnalysis> {
     const policy = await this.getLeavePolicy(request.leaveType);
     const issues: string[] = [];
 
@@ -440,7 +478,7 @@ export class AutomaticLeaveManagement {
     };
   }
 
-  private async analyzeBusinessImpact(request: LeaveRequest): Promise<any> {
+  private async analyzeBusinessImpact(request: LeaveRequest): Promise<BusinessImpactAnalysis> {
     // ビジネスカレンダーとの照合（繁忙期、重要会議等）
     // 実装は簡略化
     return {
@@ -450,9 +488,14 @@ export class AutomaticLeaveManagement {
     };
   }
 
-  private calculateRecommendation(...analyses: any[]): ApprovalRecommendation {
+  private calculateRecommendation(
+    balance: LeaveBalanceAnalysis,
+    history: LeaveHistoryAnalysis,
+    team: TeamImpactAnalysis,
+    compliance: ComplianceAnalysis,
+    business: BusinessImpactAnalysis
+  ): ApprovalRecommendation {
     // AI判定ロジック（簡略化）
-    const [balance, history, team, compliance, business] = analyses;
     
     let confidence = 0.5;
     const reasons: string[] = [];

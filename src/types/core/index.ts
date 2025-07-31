@@ -5,11 +5,6 @@
  * プロジェクト全体で使用される基本的な型定義
  */
 
-// Result型: エラーハンドリングのための型
-export type Result<T, E = Error> = 
-  | { success: true; data: T }
-  | { success: false; error: E };
-
 // Maybe型: nullableな値を扱うための型
 export type Maybe<T> = T | null | undefined;
 
@@ -78,14 +73,6 @@ export const createEnum = <T extends string>(...values: T[]) => {
 };
 
 // 型ガード
-export const isSuccess = <T, E>(result: Result<T, E>): result is { success: true; data: T } => {
-  return result.success === true;
-};
-
-export const isError = <T, E>(result: Result<T, E>): result is { success: false; error: E } => {
-  return result.success === false;
-};
-
 export const isDefined = <T>(value: Maybe<T>): value is T => {
   return value !== null && value !== undefined;
 };
@@ -213,6 +200,7 @@ export type Currency = 'JPY' | 'USD' | 'EUR' | 'KRW' | 'CNY';
 export type Timezone = 'Asia/Tokyo' | 'America/New_York' | 'Europe/London' | 'Asia/Seoul' | 'Asia/Shanghai';
 
 // 再エクスポート
+export * from './result';
 export * from './money';
 export * from './datetime';
 export * from './validation';

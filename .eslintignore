@@ -1,0 +1,52 @@
+# 依存関係
+node_modules/
+.pnpm-store/
+
+# ビルド成果物
+dist/
+build/
+out/
+coverage/
+.next/
+.nuxt/
+
+# キャッシュ
+.cache/
+.turbo/
+.parcel-cache/
+*.tsbuildinfo
+
+# 環境設定
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ログ
+*.log
+logs/
+
+# テスト
+__snapshots__/
+
+# 生成されたファイル
+*.generated.ts
+*.generated.js
+auto-generated/
+
+# データベース
+*.sqlite
+*.db
+
+# 一時ファイル
+tmp/
+temp/

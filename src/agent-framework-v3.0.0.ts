@@ -20,77 +20,113 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { z } from 'zod';
 import { DatabasePostgreSQL } from './database_postgresql.js';
 import type { Employee, TimeRecord, PayrollCalculation, ComplianceAlert } from './types.js';
+import type { Result } from './types/core/result.js';
+import type { DateTime } from './types/core/datetime.js';
+import { success, failure, isSuccess } from './types/core/result.js';
+import { createDateTime, formatDateTime } from './types/core/datetime.js';
 
 // ===== エージェント基本インターフェース =====
 
+/**
+ * エージェントの機能定義
+ * @description エージェントが持つ能力と必要な権限
+ */
 export interface AgentCapability {
-  name: string;
-  description: string;
-  version: string;
-  supportedActions: string[];
-  requiredPermissions: string[];
+  readonly name: string;
+  readonly description: string;
+  readonly version: string;
+  readonly supportedActions: ReadonlyArray<string>;
+  readonly requiredPermissions: ReadonlyArray<string>;
 }
 
+/**
+ * エージェント実行コンテキスト
+ * @description エージェントの実行環境情報
+ */
 export interface AgentContext {
-  sessionId: string;
-  userId: string;
-  permissions: string[];
-  metadata: Record<string, any>;
-  startTime: Date;
+  readonly sessionId: string;
+  readonly userId: string;
+  readonly permissions: ReadonlyArray<string>;
+  readonly metadata: Readonly<Record<string, unknown>>;
+  readonly startTime: DateTime;
 }
 
+/** ゴールタイプ */
+export type GoalType = 'process' | 'monitor' | 'analyze' | 'report';
+
+/** 優先度 */
+export type Priority = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * エージェントゴール
+ * @description エージェントが達成すべき目標
+ */
 export interface AgentGoal {
-  id: string;
-  type: 'process' | 'monitor' | 'analyze' | 'report';
-  description: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  deadline?: Date;
-  constraints?: string[];
-  successCriteria: string[];
-  metadata?: any;
+  readonly id: string;
+  readonly type: GoalType;
+  readonly description: string;
+  readonly priority: Priority;
+  readonly deadline?: DateTime;
+  readonly constraints?: ReadonlyArray<string>;
+  readonly successCriteria: ReadonlyArray<string>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface AgentAction {
-  id: string;
-  type: string;
-  description: string;
-  parameters: Record<string, any>;
-  requiredCapabilities: string[];
-  estimatedDuration?: number; // milliseconds
-  retryable: boolean;
-  compensationAction?: string; // rollback action ID
+  readonly id: string;
+  readonly type: string;
+  readonly description: string;
+  readonly parameters: Readonly<Record<string, unknown>>;
+  readonly requiredCapabilities: ReadonlyArray<string>;
+  readonly estimatedDuration?: number; // milliseconds
+  readonly retryable: boolean;
+  readonly compensationAction?: string; // rollback action ID
 }
 
 export interface AgentPlan {
-  goalId: string;
-  actions: AgentAction[];
-  dependencies: Map<string, string[]>; // action ID -> dependent action IDs
-  estimatedTotalDuration: number;
-  parallelizable: boolean;
+  readonly goalId: string;
+  readonly actions: ReadonlyArray<AgentAction>;
+  readonly dependencies: ReadonlyMap<string, ReadonlyArray<string>>; // action ID -> dependent action IDs
+  readonly estimatedTotalDuration: number;
+  readonly parallelizable: boolean;
 }
 
+/** 実行結果ステータス */
+export type ResultStatus = 'success' | 'failure' | 'partial' | 'skipped';
+
+/**
+ * エージェント実行結果
+ * @description アクション実行の結果情報
+ */
 export interface AgentResult {
-  actionId: string;
-  status: 'success' | 'failure' | 'partial' | 'skipped';
-  output?: any;
-  error?: Error;
-  duration: number;
-  timestamp: Date;
+  readonly actionId: string;
+  readonly status: ResultStatus;
+  readonly output?: unknown;
+  readonly error?: Error;
+  readonly duration: number;
+  readonly timestamp: DateTime;
 }
 
+/** エージェントステータス */
+export type AgentStatus = 'idle' | 'planning' | 'executing' | 'paused' | 'completed' | 'failed';
+
+/**
+ * エージェント状態
+ * @description エージェントの現在の実行状態
+ */
 export interface AgentState {
-  agentId: string;
-  status: 'idle' | 'planning' | 'executing' | 'paused' | 'completed' | 'failed';
+  readonly agentId: string;
+  status: AgentStatus;
   currentGoal?: AgentGoal;
   currentPlan?: AgentPlan;
   currentAction?: string;
   executionProgress: {
-    completedActions: string[];
+    completedActions: ReadonlyArray<string>;
     currentAction?: string;
-    pendingActions: string[];
-    results: AgentResult[];
+    pendingActions: ReadonlyArray<string>;
+    results: ReadonlyArray<AgentResult>;
   };
-  memory: Map<string, any>; // 実行コンテキストの保持
+  memory: Map<string, unknown>; // 実行コンテキストの保持
 }
 
 // ===== 基本エージェントクラス =====
@@ -165,7 +201,7 @@ export abstract class BaseAgent {
       
       return optimizedPlan;
     } catch (error) {
-      this.state.status = 'failed';
+      this.state.status = 'failed' as AgentStatus;
       this.logger.error('Planning failed', error);
       throw error;
     }
@@ -174,7 +210,7 @@ export abstract class BaseAgent {
   /**
    * 計画の実行
    */
-  async executePlan(): Promise<AgentResult[]> {
+  async executePlan(): Promise<ReadonlyArray<AgentResult>> {
     if (!this.state.currentPlan) {
       throw new Error('No plan to execute');
     }
@@ -211,7 +247,7 @@ export abstract class BaseAgent {
       
       return results;
     } catch (error) {
-      this.state.status = 'failed';
+      this.state.status = 'failed' as AgentStatus;
       this.logger.error('Execution failed', error);
       throw error;
     }
@@ -256,7 +292,7 @@ export abstract class BaseAgent {
 
   // ===== ヘルパーメソッド =====
 
-  protected async validatePermissions(permissions: string[]): Promise<void> {
+  protected async validatePermissions(permissions: ReadonlyArray<string>): Promise<void> {
     const required = this.capabilities.requiredPermissions;
     const missing = required.filter(p => !permissions.includes(p));
     
@@ -321,10 +357,12 @@ export abstract class BaseAgent {
         
         const result = await this.executeAction(action);
         
-        this.state.executionProgress.completedActions.push(action.id);
-        this.state.executionProgress.pendingActions = 
-          this.state.executionProgress.pendingActions.filter(id => id !== action.id);
-        this.state.executionProgress.results.push(result);
+        this.state.executionProgress = {
+          ...this.state.executionProgress,
+          completedActions: [...this.state.executionProgress.completedActions, action.id],
+          pendingActions: this.state.executionProgress.pendingActions.filter(id => id !== action.id),
+          results: [...this.state.executionProgress.results, result]
+        };
         
         return result;
       } catch (error) {
@@ -333,10 +371,10 @@ export abstract class BaseAgent {
         if (!action.retryable || attempt === maxRetries) {
           return {
             actionId: action.id,
-            status: 'failure',
+            status: 'failure' as ResultStatus,
             error: lastError,
             duration: 0,
-            timestamp: new Date()
+            timestamp: createDateTime(new Date())
           };
         }
         
@@ -347,13 +385,17 @@ export abstract class BaseAgent {
     
     return {
       actionId: action.id,
-      status: 'failure',
+      status: 'failure' as ResultStatus,
       error: lastError,
       duration: 0,
-      timestamp: new Date()
+      timestamp: createDateTime(new Date())
     };
   }
 
+  /**
+   * 失敗のハンドリング
+   * @param failures - 失敗した結果の配列
+   */
   protected async handleFailures(failures: AgentResult[]): Promise<void> {
     for (const failure of failures) {
       const action = this.state.currentPlan?.actions.find(a => a.id === failure.actionId);
@@ -371,6 +413,12 @@ export abstract class BaseAgent {
     }
   }
 
+  /**
+   * トポロジカルソート
+   * @param actions - アクションの配列
+   * @param dependencies - 依存関係マップ
+   * @returns ソートされたアクション
+   */
   protected topologicalSort(
     actions: AgentAction[],
     dependencies: Map<string, string[]>
@@ -402,11 +450,20 @@ export abstract class BaseAgent {
     return sorted.reverse();
   }
 
+  /**
+   * 並列化可能か判定
+   * @param dependencies - 依存関係マップ
+   * @returns 並列化可能かどうか
+   */
   protected canParallelize(dependencies: Map<string, string[]>): boolean {
     // 依存関係がない、または依存関係が単純な場合は並列化可能
     return Array.from(dependencies.values()).every(deps => deps.length <= 1);
   }
 
+  /**
+   * スリープユーティリティ
+   * @param ms - ミリ秒
+   */
   protected sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -414,6 +471,10 @@ export abstract class BaseAgent {
 
 // ===== エージェントロガー =====
 
+/**
+ * エージェント専用ロガー
+ * @description エージェントの動作ログを記録
+ */
 class AgentLogger {
   private agentId: string;
 
@@ -421,21 +482,40 @@ class AgentLogger {
     this.agentId = agentId;
   }
 
-  info(message: string, data?: any): void {
+  /**
+   * 情報ログ
+   * @param message - メッセージ
+   * @param data - 追加データ
+   */
+  info(message: string, data?: unknown): void {
     console.log(`[${new Date().toISOString()}] [${this.agentId}] INFO: ${message}`, data || '');
   }
 
-  warn(message: string, data?: any): void {
+  /**
+   * 警告ログ
+   * @param message - メッセージ
+   * @param data - 追加データ
+   */
+  warn(message: string, data?: unknown): void {
     console.warn(`[${new Date().toISOString()}] [${this.agentId}] WARN: ${message}`, data || '');
   }
 
-  error(message: string, error?: any): void {
+  /**
+   * エラーログ
+   * @param message - メッセージ
+   * @param error - エラー情報
+   */
+  error(message: string, error?: unknown): void {
     console.error(`[${new Date().toISOString()}] [${this.agentId}] ERROR: ${message}`, error || '');
   }
 }
 
 // ===== エージェントオーケストレーター =====
 
+/**
+ * エージェントオーケストレーター
+ * @description 複数エージェントの管理と協調
+ */
 export class AgentOrchestrator {
   private agents: Map<string, BaseAgent>;
   private activeGoals: Map<string, AgentGoal>;
@@ -457,7 +537,7 @@ export class AgentOrchestrator {
   /**
    * ゴールの割り当てと実行
    */
-  async assignGoal(goal: AgentGoal, agentName: string): Promise<AgentResult[]> {
+  async assignGoal(goal: AgentGoal, agentName: string): Promise<ReadonlyArray<AgentResult>> {
     const agent = Array.from(this.agents.values()).find(a => a.name === agentName);
     
     if (!agent) {
@@ -609,13 +689,14 @@ export class AgentMCPServer {
     });
   }
 
-  private async handleAssignGoal(args: any): Promise<any> {
+  private async handleAssignGoal(args: unknown): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const typedArgs = args as { goal: Omit<AgentGoal, 'id'>; agentName: string };
     const goal: AgentGoal = {
       id: `GOAL_${Date.now()}`,
-      ...args.goal
+      ...typedArgs.goal
     };
     
-    const results = await this.orchestrator.assignGoal(goal, args.agentName);
+    const results = await this.orchestrator.assignGoal(goal, typedArgs.agentName);
     
     return {
       content: [
@@ -627,7 +708,7 @@ export class AgentMCPServer {
     };
   }
 
-  private async handleGetAgentsStatus(): Promise<any> {
+  private async handleGetAgentsStatus(): Promise<{ content: Array<{ type: string; text: string }> }> {
     const status = this.orchestrator.getAgentsStatus();
     
     return {
@@ -640,13 +721,14 @@ export class AgentMCPServer {
     };
   }
 
-  private async handleCoordinateAgents(args: any): Promise<any> {
-    const goals = args.goals.map((g: any) => ({
+  private async handleCoordinateAgents(args: unknown): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const typedArgs = args as { goals: Array<Omit<AgentGoal, 'id'>>; assignments: Record<string, string> };
+    const goals = typedArgs.goals.map((g) => ({
       id: `GOAL_${Date.now()}_${Math.random()}`,
       ...g
     }));
     
-    const assignments = new Map(Object.entries(args.assignments));
+    const assignments = new Map(Object.entries(typedArgs.assignments));
     
     const results = await this.orchestrator.coordinateAgents(goals, assignments);
     

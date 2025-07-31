@@ -1,0 +1,25 @@
+{
+  "atLeast": 100,
+  "strict": true,
+  "detail": true,
+  "update": true,
+  "reportSemanticError": true,
+  "showRelativePath": true,
+  "skipCatch": false,
+  "cachePath": ".type-coverage",
+  "ignoreCatch": false,
+  "ignoreAsAssertion": false,
+  "ignoreTypeAssertion": false,
+  "ignoreNonNullAssertion": false,
+  "ignoreUnread": false,
+  "ignoreNested": false,
+  "ignoreFiles": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ]
+}

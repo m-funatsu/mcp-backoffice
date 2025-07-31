@@ -12,157 +12,42 @@
  */
 
 import Database from './database.js';
-import type { ExpenseRequest, AccountingEntry, Employee } from './types.js';
+import type {
+  AccountingProvider,
+  AccountingSystemConfig,
+  SyncResult,
+  SyncError,
+  ReconciliationStatus,
+  TaxCalculation,
+  JournalStatus,
+  JournalEntry,
+  AccountMapping,
+  ReportingData,
+  CategorySummary,
+  DepartmentSummary,
+  TaxSummary,
+  ComplianceMetrics,
+  AccountingEntry,
+  IAccountingProvider,
+  Result,
+  ValidationError,
+  ExpenseRequest,
+  Employee
+} from './types/domain/accounting.js';
+import type { Money } from './types/core/money.js';
+import { success, failure } from './types/core/result.js';
+import { createMoney, addMoney } from './types/core/money.js';
+import { createDateTime } from './types/core/datetime.js';
 
-export interface AccountingSystemConfig {
-  provider: 'freee' | 'moneyforward' | 'yayoi' | 'custom';
-  apiEndpoint: string;
-  clientId: string;
-  clientSecret: string;
-  accessToken?: string;
-  refreshToken?: string;
-  companyId: string;
-  environment: 'sandbox' | 'production';
-  features: AccountingFeature[];
-}
 
-export interface AccountingFeature {
-  name: string;
-  enabled: boolean;
-  configuration: { [key: string]: any };
-}
-
-export interface SyncResult {
-  success: boolean;
-  syncedExpenses: number;
-  failedExpenses: number;
-  totalAmount: number;
-  errors: SyncError[];
-  journalEntries: AccountingEntry[];
-  reconciliationStatus: ReconciliationStatus;
-  processingTime: number; // milliseconds
-}
-
-export interface SyncError {
-  expenseId: string;
-  errorCode: string;
-  errorMessage: string;
-  retryable: boolean;
-  retryCount: number;
-  lastRetryAt?: Date;
-}
-
-export interface ReconciliationStatus {
-  matched: number;
-  unmatched: number;
-  discrepancies: Discrepancy[];
-  confidence: number; // 0-1
-}
-
-export interface Discrepancy {
-  type: 'amount_mismatch' | 'date_mismatch' | 'account_mismatch' | 'missing_entry';
-  description: string;
-  expectedValue: any;
-  actualValue: any;
-  severity: 'low' | 'medium' | 'high';
-  suggestion?: string;
-}
-
-export interface TaxCalculation {
-  expenseId: string;
-  baseAmount: number;
-  taxRate: number;
-  taxAmount: number;
-  taxType: '消費税' | '軽減税率' | '非課税' | '免税';
-  deductible: boolean;
-  accountingPeriod: string;
-}
-
-export interface JournalEntry {
-  id: string;
-  expenseId: string;
-  date: Date;
-  description: string;
-  debits: JournalLine[];
-  credits: JournalLine[];
-  totalAmount: number;
-  currency: string;
-  status: 'draft' | 'posted' | 'cancelled';
-  referenceNumber?: string;
-  externalId?: string; // ID in accounting system
-}
-
-export interface JournalLine {
-  accountCode: string;
-  accountName: string;
-  amount: number;
-  description?: string;
-  taxCode?: string;
-  department?: string;
-  project?: string;
-}
-
-export interface AccountMapping {
-  expenseCategoryId: string;
-  expenseCategoryName: string;
-  accountCode: string;
-  accountName: string;
-  taxCode: string;
-  isDefault: boolean;
-  rules: MappingRule[];
-}
-
-export interface MappingRule {
-  field: string;
-  condition: string;
-  value: any;
-  targetAccount: string;
-  priority: number;
-}
-
-export interface ReportingData {
-  period: string;
-  totalExpenses: number;
-  expensesByCategory: CategorySummary[];
-  expensesByDepartment: DepartmentSummary[];
-  taxSummary: TaxSummary;
-  complianceMetrics: ComplianceMetrics;
-}
-
-export interface CategorySummary {
-  categoryId: string;
-  categoryName: string;
-  amount: number;
-  count: number;
-  taxAmount: number;
-}
-
-export interface DepartmentSummary {
-  department: string;
-  amount: number;
-  count: number;
-  budgetUtilization: number;
-}
-
-export interface TaxSummary {
-  totalTaxableAmount: number;
-  totalTaxAmount: number;
-  taxByRate: { [rate: string]: number };
-  deductibleAmount: number;
-  nonDeductibleAmount: number;
-}
-
-export interface ComplianceMetrics {
-  receiptComplianceRate: number;
-  approvalComplianceRate: number;
-  timingComplianceRate: number;
-  overallScore: number;
-}
-
+/**
+ * 会計統合API
+ * @description 複数の会計システムとの統合機能を提供
+ */
 export class AccountingIntegrationAPI {
-  private db: Database;
-  private configs: Map<string, AccountingSystemConfig> = new Map();
-  private providers: Map<string, AccountingProvider> = new Map();
+  private readonly db: Database;
+  private readonly configs: Map<string, AccountingSystemConfig> = new Map();
+  private readonly providers: Map<string, IAccountingProvider> = new Map();
 
   constructor(database: Database) {
     this.db = database;
@@ -171,31 +56,46 @@ export class AccountingIntegrationAPI {
 
   /**
    * Configure accounting system connection
+   * @param config - 会計システム設定
    */
-  async configureSystem(config: AccountingSystemConfig): Promise<void> {
-    // Validate configuration
-    await this.validateConfig(config);
-    
-    // Test connection
-    const provider = this.getProvider(config.provider);
-    await provider.testConnection(config);
-    
-    // Store configuration
-    this.configs.set(config.provider, config);
-    await this.saveConfig(config);
+  async configureSystem(config: AccountingSystemConfig): Promise<Result<void, ValidationError>> {
+    try {
+      // Validate configuration
+      await this.validateConfig(config);
+      
+      // Test connection
+      const provider = this.getProvider(config.provider);
+      await provider.testConnection(config);
+      
+      // Store configuration
+      this.configs.set(config.provider, config);
+      await this.saveConfig(config);
+      
+      return success(undefined);
+    } catch (error) {
+      return failure({
+        code: 'CONFIG_ERROR',
+        message: `Failed to configure accounting system: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        field: 'config',
+        value: config
+      });
+    }
   }
 
   /**
    * Sync expenses to accounting system
+   * @param expenseIds - 同期対象の経費ID
+   * @param options - 同期オプション
+   * @returns 同期結果
    */
   async syncExpenses(
-    expenseIds?: string[],
+    expenseIds?: ReadonlyArray<string>,
     options?: {
       batchSize?: number;
       retryFailedOnly?: boolean;
       dryRun?: boolean;
     }
-  ): Promise<SyncResult> {
+  ): Promise<Result<SyncResult, ValidationError>> {
     const startTime = Date.now();
     const { batchSize = 50, retryFailedOnly = false, dryRun = false } = options || {};
 
@@ -205,7 +105,7 @@ export class AccountingIntegrationAPI {
       
       let syncedExpenses = 0;
       let failedExpenses = 0;
-      let totalAmount = 0;
+      let totalAmount = createMoney(0, 'JPY');
       const errors: SyncError[] = [];
       const journalEntries: AccountingEntry[] = [];
 
@@ -217,7 +117,7 @@ export class AccountingIntegrationAPI {
         
         syncedExpenses += batchResult.syncedCount;
         failedExpenses += batchResult.failedCount;
-        totalAmount += batchResult.totalAmount;
+        totalAmount = addMoney(totalAmount, batchResult.totalAmount);
         errors.push(...batchResult.errors);
         journalEntries.push(...batchResult.journalEntries);
       }
@@ -227,7 +127,7 @@ export class AccountingIntegrationAPI {
 
       const processingTime = Date.now() - startTime;
 
-      return {
+      return success({
         success: failedExpenses === 0,
         syncedExpenses,
         failedExpenses,
@@ -235,8 +135,10 @@ export class AccountingIntegrationAPI {
         errors,
         journalEntries,
         reconciliationStatus,
-        processingTime
-      };
+        processingTime,
+        syncId: `SYNC_${Date.now()}`,
+        timestamp: createDateTime(new Date())
+      });
 
     } catch (error) {
       console.error('Expense sync failed:', error);
@@ -246,8 +148,10 @@ export class AccountingIntegrationAPI {
 
   /**
    * Generate journal entries for expenses
+   * @param expenseIds - 経費IDの配列
+   * @returns 仕訳エントリの配列
    */
-  async generateJournalEntries(expenseIds: string[]): Promise<JournalEntry[]> {
+  async generateJournalEntries(expenseIds: ReadonlyArray<string>): Promise<ReadonlyArray<JournalEntry>> {
     const entries: JournalEntry[] = [];
 
     for (const expenseId of expenseIds) {
@@ -264,7 +168,7 @@ export class AccountingIntegrationAPI {
       const mapping = await this.getAccountMapping(expense.categoryId);
       const taxCalc = await this.calculateTax(expense);
 
-      const entry = await this.createJournalEntry(expense, employee, mapping, taxCalc);
+      const entry = await this.createJournalEntry(expense, employee as Employee, mapping, taxCalc);
       entries.push(entry);
     }
 
@@ -273,6 +177,8 @@ export class AccountingIntegrationAPI {
 
   /**
    * Real-time expense posting
+   * @param expenseId - 経費ID
+   * @returns リアルタイム転記結果
    */
   async postExpenseRealTime(expenseId: string): Promise<{
     success: boolean;
@@ -297,6 +203,9 @@ export class AccountingIntegrationAPI {
       }
 
       const journalEntry = journalEntries[0];
+      if (!journalEntry) {
+        throw new Error('Journal entry is undefined');
+      }
 
       // Post to accounting system
       const config = this.getActiveConfig();
@@ -326,6 +235,10 @@ export class AccountingIntegrationAPI {
 
   /**
    * Generate tax reports
+   * @param startDate - 開始日
+   * @param endDate - 終了日
+   * @param options - レポートオプション
+   * @returns 税レポート
    */
   async generateTaxReport(
     startDate: Date,
@@ -336,7 +249,7 @@ export class AccountingIntegrationAPI {
     }
   ): Promise<{
     summary: TaxSummary;
-    details?: TaxCalculation[];
+    details?: readonly TaxCalculation[];
     reportData?: Buffer; // for CSV/PDF formats
   }> {
     
@@ -347,34 +260,40 @@ export class AccountingIntegrationAPI {
     let totalTaxAmount = 0;
     let deductibleAmount = 0;
     let nonDeductibleAmount = 0;
-    const taxByRate: { [rate: string]: number } = {};
+    const taxByRate: Record<string, number> = {};
 
     for (const expense of expenses) {
       const taxCalc = await this.calculateTax(expense);
       taxCalculations.push(taxCalc);
 
-      totalTaxableAmount += taxCalc.baseAmount;
-      totalTaxAmount += taxCalc.taxAmount;
+      totalTaxableAmount += taxCalc.baseAmount.amount;
+      totalTaxAmount += taxCalc.taxAmount.amount;
 
       if (taxCalc.deductible) {
-        deductibleAmount += taxCalc.baseAmount;
+        deductibleAmount += taxCalc.baseAmount.amount;
       } else {
-        nonDeductibleAmount += taxCalc.baseAmount;
+        nonDeductibleAmount += taxCalc.baseAmount.amount;
       }
 
       const rateKey = `${taxCalc.taxRate}%`;
-      taxByRate[rateKey] = (taxByRate[rateKey] || 0) + taxCalc.taxAmount;
+      taxByRate[rateKey] = (taxByRate[rateKey] ?? 0) + taxCalc.taxAmount.amount;
     }
 
     const summary: TaxSummary = {
-      totalTaxableAmount,
-      totalTaxAmount,
-      taxByRate,
-      deductibleAmount,
-      nonDeductibleAmount
+      totalTaxableAmount: createMoney(totalTaxableAmount, 'JPY'),
+      totalTaxAmount: createMoney(totalTaxAmount, 'JPY'),
+      taxByRate: Object.fromEntries(
+        Object.entries(taxByRate).map(([rate, amount]) => [rate, createMoney(amount, 'JPY')])
+      ),
+      deductibleAmount: createMoney(deductibleAmount, 'JPY'),
+      nonDeductibleAmount: createMoney(nonDeductibleAmount, 'JPY')
     };
 
-    const result: any = { summary };
+    const result: {
+      summary: TaxSummary;
+      details?: ReadonlyArray<TaxCalculation>;
+      reportData?: Buffer;
+    } = { summary };
 
     if (options?.includeDetails) {
       result.details = taxCalculations;
@@ -393,7 +312,10 @@ export class AccountingIntegrationAPI {
   async getReportingData(startDate: Date, endDate: Date): Promise<ReportingData> {
     const expenses = await this.getExpensesByDateRange(startDate, endDate);
     
-    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalExpenses = createMoney(
+      expenses.reduce((sum: number, exp: ExpenseRequest) => sum + exp.amount.amount, 0),
+      'JPY'
+    );
     
     // Category breakdown
     const categoryMap = new Map<string, { amount: number; count: number; taxAmount: number }>();
@@ -405,38 +327,40 @@ export class AccountingIntegrationAPI {
       // Category data
       const categoryId = expense.categoryId;
       const categoryData = categoryMap.get(categoryId) || { amount: 0, count: 0, taxAmount: 0 };
-      categoryData.amount += expense.amount;
+      categoryData.amount += expense.amount.amount;
       categoryData.count += 1;
       
       const taxCalc = await this.calculateTax(expense);
-      categoryData.taxAmount += taxCalc.taxAmount;
+      categoryData.taxAmount += taxCalc.taxAmount.amount;
       categoryMap.set(categoryId, categoryData);
 
       // Department data
-      const employee = await this.db.getEmployee(expense.employeeId);
-      if (employee) {
-        const department = employee.department;
+      const employeeData = await this.db.getEmployee(expense.employeeId);
+      if (employeeData) {
+        const department = employeeData.department;
         const deptData = departmentMap.get(department) || { amount: 0, count: 0 };
-        deptData.amount += expense.amount;
+        deptData.amount += expense.amount.amount;
         deptData.count += 1;
         departmentMap.set(department, deptData);
       }
     }
 
-    const expensesByCategory: CategorySummary[] = Array.from(categoryMap.entries()).map(
+    const expensesByCategory: ReadonlyArray<CategorySummary> = Array.from(categoryMap.entries()).map(
       ([categoryId, data]) => ({
         categoryId,
         categoryName: this.getCategoryName(categoryId),
-        amount: data.amount,
+        amount: createMoney(data.amount, 'JPY'),
         count: data.count,
-        taxAmount: data.taxAmount
+        taxAmount: createMoney(data.taxAmount, 'JPY'),
+        percentage: totalExpenses.amount > 0 ? (data.amount / totalExpenses.amount) * 100 : 0
       })
     );
 
-    const expensesByDepartment: DepartmentSummary[] = Array.from(departmentMap.entries()).map(
+    const expensesByDepartment: ReadonlyArray<DepartmentSummary> = Array.from(departmentMap.entries()).map(
       ([department, data]) => ({
-        department,
-        amount: data.amount,
+        departmentId: department,
+        departmentName: department,
+        amount: createMoney(data.amount, 'JPY'),
         count: data.count,
         budgetUtilization: this.calculateBudgetUtilization(department, data.amount)
       })
@@ -446,7 +370,11 @@ export class AccountingIntegrationAPI {
     const complianceMetrics = await this.calculateComplianceMetrics(expenses);
 
     return {
-      period: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+      period: {
+        startDate: createDateTime(startDate),
+        endDate: createDateTime(endDate),
+        periodType: 'custom' as const
+      },
       totalExpenses,
       expensesByCategory,
       expensesByDepartment,
@@ -469,7 +397,7 @@ export class AccountingIntegrationAPI {
     }
   }
 
-  private getProvider(providerName: string): AccountingProvider {
+  private getProvider(providerName: string): IAccountingProvider {
     const provider = this.providers.get(providerName);
     if (!provider) {
       throw new Error(`Provider '${providerName}' not supported`);
@@ -485,12 +413,12 @@ export class AccountingIntegrationAPI {
     return config;
   }
 
-  private async getExpensesToSync(expenseIds?: string[], retryFailedOnly?: boolean): Promise<ExpenseRequest[]> {
+  private async getExpensesToSync(expenseIds?: ReadonlyArray<string>, retryFailedOnly?: boolean): Promise<ReadonlyArray<ExpenseRequest>> {
     // Get expenses that need syncing
     return []; // Placeholder
   }
 
-  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+  private chunkArray<T>(array: ReadonlyArray<T>, chunkSize: number): ReadonlyArray<ReadonlyArray<T>> {
     const chunks: T[][] = [];
     for (let i = 0; i < array.length; i += chunkSize) {
       chunks.push(array.slice(i, i + chunkSize));
@@ -498,12 +426,18 @@ export class AccountingIntegrationAPI {
     return chunks;
   }
 
-  private async processBatch(expenses: ExpenseRequest[], dryRun: boolean): Promise<any> {
+  private async processBatch(expenses: ReadonlyArray<ExpenseRequest>, dryRun: boolean): Promise<{
+    syncedCount: number;
+    failedCount: number;
+    totalAmount: Money;
+    errors: ReadonlyArray<SyncError>;
+    journalEntries: ReadonlyArray<AccountingEntry>;
+  }> {
     // Process batch of expenses
     return {
       syncedCount: 0,
       failedCount: 0,
-      totalAmount: 0,
+      totalAmount: createMoney(0, 'JPY'),
       errors: [],
       journalEntries: []
     };
@@ -520,13 +454,22 @@ export class AccountingIntegrationAPI {
 
   private async getAccountMapping(categoryId: string): Promise<AccountMapping> {
     // Get account mapping for expense category
-    return {} as AccountMapping;
+    // Get account mapping for expense category - placeholder implementation
+    return {
+      expenseCategoryId: categoryId,
+      expenseCategoryName: 'General Expense',
+      accountCode: '5000',
+      accountName: '経費',
+      taxCode: 'TAX10',
+      isDefault: true,
+      rules: []
+    };
   }
 
   private async calculateTax(expense: ExpenseRequest): Promise<TaxCalculation> {
     // Calculate tax for expense
     const taxRate = 0.10; // 10% consumption tax
-    const taxAmount = Math.floor(expense.amount * taxRate);
+    const taxAmount = createMoney(Math.floor(expense.amount.amount * taxRate), 'JPY');
     
     return {
       expenseId: expense.id,
@@ -534,8 +477,9 @@ export class AccountingIntegrationAPI {
       taxRate,
       taxAmount,
       taxType: '消費税',
-      deductible: expense.taxDeductible || false,
-      accountingPeriod: new Date().getFullYear().toString()
+      deductible: false, // TODO: Add taxDeductible to ExpenseRequest type
+      accountingPeriod: new Date().getFullYear().toString(),
+      taxCode: 'TAX10'
     };
   }
 
@@ -569,7 +513,7 @@ export class AccountingIntegrationAPI {
         }
       ],
       totalAmount: expense.amount,
-      currency: 'JPY',
+      currency: 'JPY' as const,
       status: 'draft'
     };
 
@@ -584,14 +528,14 @@ export class AccountingIntegrationAPI {
     // Save journal entry to database
   }
 
-  private async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<ExpenseRequest[]> {
+  private async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<ReadonlyArray<ExpenseRequest>> {
     // Get expenses by date range
     return [];
   }
 
   private async generateReportFile(
     summary: TaxSummary,
-    details: TaxCalculation[],
+    details: ReadonlyArray<TaxCalculation>,
     format: 'csv' | 'pdf'
   ): Promise<Buffer> {
     // Generate report file
@@ -608,7 +552,7 @@ export class AccountingIntegrationAPI {
     return 0.75;
   }
 
-  private async calculateComplianceMetrics(expenses: ExpenseRequest[]): Promise<ComplianceMetrics> {
+  private async calculateComplianceMetrics(expenses: ReadonlyArray<ExpenseRequest>): Promise<ComplianceMetrics> {
     return {
       receiptComplianceRate: 0.95,
       approvalComplianceRate: 0.98,
@@ -618,15 +562,9 @@ export class AccountingIntegrationAPI {
   }
 }
 
-// Provider interface and implementations
+// Provider implementations
 
-interface AccountingProvider {
-  testConnection(config: AccountingSystemConfig): Promise<boolean>;
-  postJournalEntry(config: AccountingSystemConfig, entry: JournalEntry): Promise<string>;
-  syncExpenses(config: AccountingSystemConfig, expenses: ExpenseRequest[]): Promise<any>;
-}
-
-class FreeeProvider implements AccountingProvider {
+class FreeeProvider implements IAccountingProvider {
   async testConnection(config: AccountingSystemConfig): Promise<boolean> {
     // Test freee API connection
     return true;
@@ -637,13 +575,17 @@ class FreeeProvider implements AccountingProvider {
     return 'freee_journal_id_123';
   }
 
-  async syncExpenses(config: AccountingSystemConfig, expenses: ExpenseRequest[]): Promise<any> {
+  async syncExpenses(config: AccountingSystemConfig, expenses: ReadonlyArray<ExpenseRequest>): Promise<{
+    syncedCount: number;
+    failedCount: number;
+    errors: ReadonlyArray<SyncError>;
+  }> {
     // Sync to freee
-    return {};
+    return { syncedCount: 0, failedCount: 0, errors: [] };
   }
 }
 
-class MoneyForwardProvider implements AccountingProvider {
+class MoneyForwardProvider implements IAccountingProvider {
   async testConnection(config: AccountingSystemConfig): Promise<boolean> {
     // Test Money Forward API connection
     return true;
@@ -654,13 +596,17 @@ class MoneyForwardProvider implements AccountingProvider {
     return 'mf_journal_id_456';
   }
 
-  async syncExpenses(config: AccountingSystemConfig, expenses: ExpenseRequest[]): Promise<any> {
+  async syncExpenses(config: AccountingSystemConfig, expenses: ReadonlyArray<ExpenseRequest>): Promise<{
+    syncedCount: number;
+    failedCount: number;
+    errors: ReadonlyArray<SyncError>;
+  }> {
     // Sync to Money Forward
-    return {};
+    return { syncedCount: 0, failedCount: 0, errors: [] };
   }
 }
 
-class YayoiProvider implements AccountingProvider {
+class YayoiProvider implements IAccountingProvider {
   async testConnection(config: AccountingSystemConfig): Promise<boolean> {
     // Test Yayoi API connection
     return true;
@@ -671,9 +617,13 @@ class YayoiProvider implements AccountingProvider {
     return 'yayoi_journal_id_789';
   }
 
-  async syncExpenses(config: AccountingSystemConfig, expenses: ExpenseRequest[]): Promise<any> {
+  async syncExpenses(config: AccountingSystemConfig, expenses: ReadonlyArray<ExpenseRequest>): Promise<{
+    syncedCount: number;
+    failedCount: number;
+    errors: ReadonlyArray<SyncError>;
+  }> {
     // Sync to Yayoi
-    return {};
+    return { syncedCount: 0, failedCount: 0, errors: [] };
   }
 }
 

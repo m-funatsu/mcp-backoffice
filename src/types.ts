@@ -142,11 +142,29 @@ export interface PayrollCalculation {
   bankAccount?: string;
   calculatedAt: Date;
   // 拡張プロパティ
-  warnings?: any[];
+  warnings?: Array<{
+    type: string;
+    severity: string;
+    message: string;
+    recommendation?: string;
+  }>;
   complianceReport?: {
     yearlyOvertimeTotal?: number;
   };
-  payslip?: any;
+  payslip?: {
+    employeeId: string;
+    employeeName: string;
+    month: string;
+    regularPay: number;
+    overtimePay: number;
+    lateNightPay: number;
+    holidayPay: number;
+    totalPay: number;
+    deductions: number;
+    netPay: number;
+    bankAccount?: string;
+    generatedAt: Date;
+  };
 }
 
 export interface WorkingHours {

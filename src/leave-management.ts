@@ -1,6 +1,39 @@
 import type { Employee } from './types.js';
 import Database from './database.js';
 
+// Type guard for database row objects
+interface DatabaseRow {
+  [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is DatabaseRow {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringField(row: DatabaseRow, field: string): string | undefined {
+  const value = row[field];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumberField(row: DatabaseRow, field: string): number | undefined {
+  const value = row[field];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function getBooleanField(row: DatabaseRow, field: string): boolean {
+  const value = row[field];
+  return value === 1 || value === true;
+}
+
+function getDateField(row: DatabaseRow, field: string): Date | undefined {
+  const value = row[field];
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? undefined : date;
+  }
+  return undefined;
+}
+
 export interface LeaveBalance {
   id: number;
   employeeId: string;
@@ -256,7 +289,7 @@ export class LeaveManagement {
           createdAt: new Date(),
           updatedAt: new Date()
         });
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -386,11 +419,11 @@ export class LeaveManagement {
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0],
         employeeId
-      ]).then((row: any) => {
+      ]).then((row: unknown) => {
         // Allow if less than 30% of department is on leave
-        const onLeaveCount = row?.on_leave_count || 0;
+        const onLeaveCount = isRecord(row) ? getNumberField(row, 'on_leave_count') || 0 : 0;
         resolve(onLeaveCount < 2); // Simple rule: allow if less than 2 people already on leave
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -428,7 +461,7 @@ export class LeaveManagement {
         requestId
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -455,7 +488,7 @@ export class LeaveManagement {
         requestId
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -473,26 +506,26 @@ export class LeaveManagement {
         WHERE employee_id = $1 AND leave_type = $2 AND year = $3
       `;
 
-      this.db.get(sql, [employeeId, leaveType, currentYear]).then(async (row: any) => {
-        if (!row) {
+      this.db.get(sql, [employeeId, leaveType, currentYear]).then(async (row: unknown) => {
+        if (!row || !isRecord(row)) {
           // Create initial balance
           const balance = await this.initializeLeaveBalance(employeeId, leaveType, currentYear);
           resolve(balance);
         } else {
           resolve({
-            id: row.id,
-            employeeId: row.employee_id,
-            leaveType: row.leave_type as LeaveType,
-            year: row.year,
-            grantedDays: row.granted_days,
-            usedDays: row.used_days,
-            remainingDays: row.remaining_days,
-            expiryDate: row.expiry_date ? new Date(row.expiry_date) : undefined,
-            createdAt: new Date(row.created_at),
-            updatedAt: new Date(row.updated_at)
+            id: getNumberField(row, 'id') || 0,
+            employeeId: getStringField(row, 'employee_id') || employeeId,
+            leaveType: getStringField(row, 'leave_type') as LeaveType || leaveType,
+            year: getNumberField(row, 'year') || currentYear,
+            grantedDays: getNumberField(row, 'granted_days') || 0,
+            usedDays: getNumberField(row, 'used_days') || 0,
+            remainingDays: getNumberField(row, 'remaining_days') || 0,
+            expiryDate: getDateField(row, 'expiry_date'),
+            createdAt: getDateField(row, 'created_at') || new Date(),
+            updatedAt: getDateField(row, 'updated_at') || new Date()
           });
         }
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -540,7 +573,7 @@ export class LeaveManagement {
           createdAt: new Date(),
           updatedAt: new Date()
         });
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -582,7 +615,7 @@ export class LeaveManagement {
         balance.year
       ]).then(() => {
         resolve();
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -595,30 +628,30 @@ export class LeaveManagement {
     return new Promise((resolve, reject) => {
       const sql = `SELECT * FROM leave_requests WHERE id = $1`;
       
-      this.db.get(sql, [requestId]).then((row: any) => {
-        if (!row) {
+      this.db.get(sql, [requestId]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
           resolve(null);
         } else {
           resolve({
-            id: row.id,
-            employeeId: row.employee_id,
-            leaveType: row.leave_type as LeaveType,
-            startDate: new Date(row.start_date),
-            endDate: new Date(row.end_date),
-            daysRequested: row.days_requested,
-            halfDay: row.half_day === 1,
-            reason: row.reason,
-            status: row.status as RequestStatus,
-            requestedAt: new Date(row.requested_at),
-            approvedBy: row.approved_by,
-            approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
-            approvalNotes: row.approval_notes,
-            autoApproved: row.auto_approved === 1,
-            createdAt: new Date(row.created_at),
-            updatedAt: new Date(row.updated_at)
+            id: getStringField(row, 'id') || '',
+            employeeId: getStringField(row, 'employee_id') || '',
+            leaveType: getStringField(row, 'leave_type') as LeaveType || 'annual',
+            startDate: getDateField(row, 'start_date') || new Date(),
+            endDate: getDateField(row, 'end_date') || new Date(),
+            daysRequested: getNumberField(row, 'days_requested') || 0,
+            halfDay: getBooleanField(row, 'half_day'),
+            reason: getStringField(row, 'reason'),
+            status: getStringField(row, 'status') as RequestStatus || 'pending',
+            requestedAt: getDateField(row, 'requested_at') || new Date(),
+            approvedBy: getStringField(row, 'approved_by'),
+            approvedAt: getDateField(row, 'approved_at'),
+            approvalNotes: getStringField(row, 'approval_notes'),
+            autoApproved: getBooleanField(row, 'auto_approved'),
+            createdAt: getDateField(row, 'created_at') || new Date(),
+            updatedAt: getDateField(row, 'updated_at') || new Date()
           });
         }
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -641,27 +674,31 @@ export class LeaveManagement {
         employeeId,
         endDate.toISOString().split('T')[0],
         startDate.toISOString().split('T')[0]
-      ]).then((rows: any[]) => {
-        const requests = rows.map(row => ({
-          id: row.id,
-          employeeId: row.employee_id,
-          leaveType: row.leave_type as LeaveType,
-          startDate: new Date(row.start_date),
-          endDate: new Date(row.end_date),
-          daysRequested: row.days_requested,
-          halfDay: row.half_day === 1,
-          reason: row.reason,
-          status: row.status as RequestStatus,
-          requestedAt: new Date(row.requested_at),
-          approvedBy: row.approved_by,
-          approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
-          approvalNotes: row.approval_notes,
-          autoApproved: row.auto_approved === 1,
-          createdAt: new Date(row.created_at),
-          updatedAt: new Date(row.updated_at)
+      ]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve([]);
+          return;
+        }
+        const requests = rows.filter(isRecord).map(row => ({
+          id: getStringField(row, 'id') || '',
+          employeeId: getStringField(row, 'employee_id') || '',
+          leaveType: getStringField(row, 'leave_type') as LeaveType || 'annual',
+          startDate: getDateField(row, 'start_date') || new Date(),
+          endDate: getDateField(row, 'end_date') || new Date(),
+          daysRequested: getNumberField(row, 'days_requested') || 0,
+          halfDay: getBooleanField(row, 'half_day'),
+          reason: getStringField(row, 'reason'),
+          status: getStringField(row, 'status') as RequestStatus || 'pending',
+          requestedAt: getDateField(row, 'requested_at') || new Date(),
+          approvedBy: getStringField(row, 'approved_by'),
+          approvedAt: getDateField(row, 'approved_at'),
+          approvalNotes: getStringField(row, 'approval_notes'),
+          autoApproved: getBooleanField(row, 'auto_approved'),
+          createdAt: getDateField(row, 'created_at') || new Date(),
+          updatedAt: getDateField(row, 'updated_at') || new Date()
         }));
         resolve(requests);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -681,28 +718,28 @@ export class LeaveManagement {
         LIMIT 1
       `;
 
-      this.db.get(sql, [leaveType, tenureMonths]).then((row: any) => {
-        if (!row) {
+      this.db.get(sql, [leaveType, tenureMonths]).then((row: unknown) => {
+        if (!row || !isRecord(row)) {
           reject(new Error(`Leave policy not found for ${leaveType}`));
         } else {
           resolve({
-            id: row.id,
-            leaveType: row.leave_type as LeaveType,
-            tenureMonths: row.tenure_months,
-            grantedDays: row.granted_days,
-            maxConsecutiveDays: row.max_consecutive_days,
-            advanceNoticeDays: row.advance_notice_days,
-            requiresApproval: row.requires_approval === 1,
-            autoApprovalConditions: row.auto_approval_conditions,
-            carryoverAllowed: row.carryover_allowed === 1,
-            carryoverLimitDays: row.carryover_limit_days,
-            expiryMonths: row.expiry_months,
-            effectiveFrom: new Date(row.effective_from),
-            effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined,
-            createdAt: new Date(row.created_at)
+            id: getNumberField(row, 'id') || 0,
+            leaveType: getStringField(row, 'leave_type') as LeaveType || leaveType,
+            tenureMonths: getNumberField(row, 'tenure_months') || 0,
+            grantedDays: getNumberField(row, 'granted_days') || 0,
+            maxConsecutiveDays: getNumberField(row, 'max_consecutive_days'),
+            advanceNoticeDays: getNumberField(row, 'advance_notice_days') || 0,
+            requiresApproval: getBooleanField(row, 'requires_approval'),
+            autoApprovalConditions: getStringField(row, 'auto_approval_conditions'),
+            carryoverAllowed: getBooleanField(row, 'carryover_allowed'),
+            carryoverLimitDays: getNumberField(row, 'carryover_limit_days'),
+            expiryMonths: getNumberField(row, 'expiry_months'),
+            effectiveFrom: getDateField(row, 'effective_from') || new Date(),
+            effectiveTo: getDateField(row, 'effective_to'),
+            createdAt: getDateField(row, 'created_at') || new Date()
           });
         }
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -725,22 +762,26 @@ export class LeaveManagement {
         department,
         startDate.toISOString().split('T')[0],
         endDate.toISOString().split('T')[0]
-      ]).then((rows: any[]) => {
-        const events = rows.map(row => ({
-          id: row.id,
-          department: row.department,
-          date: new Date(row.date),
-          employeeId: row.employee_id,
-          eventType: row.event_type as EventType,
-          eventTitle: row.event_title,
-          allDay: row.all_day === 1,
-          startTime: row.start_time,
-          endTime: row.end_time,
-          createdAt: new Date(row.created_at),
-          employeeName: row.employee_name
+      ]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve([]);
+          return;
+        }
+        const events = rows.filter(isRecord).map(row => ({
+          id: getNumberField(row, 'id') || 0,
+          department: getStringField(row, 'department') || '',
+          date: getDateField(row, 'date') || new Date(),
+          employeeId: getStringField(row, 'employee_id') || '',
+          eventType: getStringField(row, 'event_type') as EventType || 'leave',
+          eventTitle: getStringField(row, 'event_title') || '',
+          allDay: getBooleanField(row, 'all_day'),
+          startTime: getStringField(row, 'start_time'),
+          endTime: getStringField(row, 'end_time'),
+          createdAt: getDateField(row, 'created_at') || new Date(),
+          employeeName: getStringField(row, 'employee_name')
         }));
         resolve(events);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });
@@ -770,7 +811,21 @@ export class LeaveManagement {
       this.db.all(sql, [
         startDate.toISOString(),
         endDate.toISOString()
-      ]).then((rows: any[]) => {
+      ]).then((rows: unknown[]) => {
+        if (!Array.isArray(rows)) {
+          resolve({
+            totalRequests: 0,
+            approvedRequests: 0,
+            rejectedRequests: 0,
+            pendingRequests: 0,
+            totalDaysRequested: 0,
+            totalDaysApproved: 0,
+            averageProcessingTime: 0,
+            mostPopularLeaveType: 'annual',
+            departmentBreakdown: {}
+          });
+          return;
+        }
         const analytics: LeaveAnalytics = {
           totalRequests: 0,
           approvedRequests: 0,
@@ -787,29 +842,32 @@ export class LeaveManagement {
         let totalProcessingTime = 0;
         let processedRequests = 0;
 
-        rows.forEach(row => {
-          analytics.totalRequests += row.total_requests;
-          analytics.approvedRequests += row.approved_requests;
-          analytics.rejectedRequests += row.rejected_requests;
-          analytics.pendingRequests += row.pending_requests;
-          analytics.totalDaysRequested += row.total_days_requested;
-          analytics.totalDaysApproved += row.total_days_approved;
+        rows.filter(isRecord).forEach(row => {
+          analytics.totalRequests += getNumberField(row, 'total_requests') || 0;
+          analytics.approvedRequests += getNumberField(row, 'approved_requests') || 0;
+          analytics.rejectedRequests += getNumberField(row, 'rejected_requests') || 0;
+          analytics.pendingRequests += getNumberField(row, 'pending_requests') || 0;
+          analytics.totalDaysRequested += getNumberField(row, 'total_days_requested') || 0;
+          analytics.totalDaysApproved += getNumberField(row, 'total_days_approved') || 0;
 
-          if (row.total_requests > maxRequests) {
-            maxRequests = row.total_requests;
-            analytics.mostPopularLeaveType = row.leave_type;
+          const totalRequests = getNumberField(row, 'total_requests') || 0;
+          if (totalRequests > maxRequests) {
+            maxRequests = totalRequests;
+            analytics.mostPopularLeaveType = getStringField(row, 'leave_type') as LeaveType || 'annual';
           }
 
-          if (row.avg_processing_time) {
-            totalProcessingTime += row.avg_processing_time * row.approved_requests;
-            processedRequests += row.approved_requests;
+          const avgProcessingTime = getNumberField(row, 'avg_processing_time');
+          const approvedRequests = getNumberField(row, 'approved_requests') || 0;
+          if (avgProcessingTime) {
+            totalProcessingTime += avgProcessingTime * approvedRequests;
+            processedRequests += approvedRequests;
           }
         });
 
         analytics.averageProcessingTime = processedRequests > 0 ? totalProcessingTime / processedRequests : 0;
 
         resolve(analytics);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         reject(err);
       });
     });

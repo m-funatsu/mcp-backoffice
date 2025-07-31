@@ -182,9 +182,9 @@ export interface WorkSummary {
 export interface BankDetails {
   readonly bankName: string;
   readonly branchName: string;
-  readonly accountType: 'ordinary' | 'current' | 'savings';
+  readonly accountType?: 'ordinary' | 'current' | 'savings';
   readonly accountNumber: string;
-  readonly accountHolder: string;
+  readonly accountHolder?: string;
 }
 
 /**
@@ -198,6 +198,28 @@ export interface PayrollCalculationParams {
   readonly workSummary: WorkSummary;
   readonly taxExemptions?: ReadonlyArray<TaxDeduction>;
   readonly previousMonthCarryover?: Money;
+}
+
+/**
+ * 給与計算エラー
+ */
+export interface PayrollCalculationError extends ValidationError {
+  readonly calculationStep?: string;
+  readonly details?: any;
+}
+
+/**
+ * 基本給検証
+ */
+export function validateBasicSalary(salary: Money): Result<void, ValidationError> {
+  if (salary.amount <= 0) {
+    return Result.failure({
+      field: 'basicSalary',
+      message: '基本給は0より大きい必要があります',
+      code: 'INVALID_BASIC_SALARY'
+    });
+  }
+  return Result.success(undefined);
 }
 
 /**

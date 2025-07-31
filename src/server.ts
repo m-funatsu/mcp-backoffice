@@ -63,7 +63,7 @@ class StrategicPlatformServer {
     
     this.db = new Database();
     this.payrollEngine = new IntegratedPayrollEngine(this.db);
-    this.dataExporter = new DataExporter(this.db as any);
+    this.dataExporter = new DataExporter(this.db);
     this.leaveManagement = new LeaveManagement(this.db);
     
     // Initialize expense management services
@@ -85,7 +85,7 @@ class StrategicPlatformServer {
   private async initializePayrollCalculator(): Promise<void> {
     if (!this.payrollCalculator) {
       const rules = await this.db.getPayrollRules();
-      this.payrollCalculator = new PayrollCalculator(this.db as any, rules);
+      this.payrollCalculator = new PayrollCalculator(this.db, rules);
     }
   }
 
@@ -957,7 +957,7 @@ class StrategicPlatformServer {
     });
   }
 
-  public async handleClockIn(args: any) {
+  public async handleClockIn(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       clockInTime: z.string().optional(),
@@ -979,7 +979,7 @@ class StrategicPlatformServer {
     };
   }
 
-  public async handleClockOut(args: any) {
+  public async handleClockOut(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       clockOutTime: z.string().optional(),
@@ -1001,7 +1001,7 @@ class StrategicPlatformServer {
     };
   }
 
-  private async handleGetTimeRecords(args: any) {
+  private async handleGetTimeRecords(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       startDate: z.string(),
@@ -1038,7 +1038,7 @@ class StrategicPlatformServer {
     };
   }
 
-  public async handleCalculatePayroll(args: any) {
+  public async handleCalculatePayroll(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       month: z.string(),
@@ -1070,7 +1070,7 @@ class StrategicPlatformServer {
     };
   }
 
-  public async handleGetPayrollSummary(args: any) {
+  public async handleGetPayrollSummary(args: unknown) {
     const schema = z.object({
       month: z.string(),
     });
@@ -1100,7 +1100,7 @@ class StrategicPlatformServer {
     };
   }
 
-  private async handleGetAttendanceReport(args: any) {
+  private async handleGetAttendanceReport(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       month: z.string(),
@@ -1131,7 +1131,7 @@ class StrategicPlatformServer {
     };
   }
 
-  public async handleAddEmployee(args: any) {
+  public async handleAddEmployee(args: unknown) {
     const schema = z.object({
       name: z.string(),
       department: z.string(),
@@ -1163,7 +1163,7 @@ class StrategicPlatformServer {
     };
   }
 
-  public async handleGetEmployee(args: any) {
+  public async handleGetEmployee(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
     });
@@ -1185,7 +1185,7 @@ class StrategicPlatformServer {
     };
   }
 
-  private async handleGetAllEmployees(args: any) {
+  private async handleGetAllEmployees(args: unknown) {
     const employees = await this.db.getAllEmployees();
     
     const employeesText = employees.map(emp => 
@@ -1202,7 +1202,7 @@ class StrategicPlatformServer {
     };
   }
 
-  private async handleExportData(args: any) {
+  private async handleExportData(args: unknown) {
     const schema = z.object({
       format: z.enum(['json', 'csv', 'xlsx']).default('json'),
       includeFiles: z.boolean().default(true),
@@ -1246,7 +1246,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleImportData(args: any) {
+  private async handleImportData(args: unknown) {
     const schema = z.object({
       importPath: z.string(),
     });
@@ -1271,7 +1271,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleRequestLeave(args: any) {
+  private async handleRequestLeave(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       requestText: z.string(),
@@ -1304,7 +1304,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleApproveLeave(args: any) {
+  private async handleApproveLeave(args: unknown) {
     const schema = z.object({
       requestId: z.string(),
       approverId: z.string(),
@@ -1333,7 +1333,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleRejectLeave(args: any) {
+  private async handleRejectLeave(args: unknown) {
     const schema = z.object({
       requestId: z.string(),
       approverId: z.string(),
@@ -1362,7 +1362,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGetLeaveBalance(args: any) {
+  private async handleGetLeaveBalance(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       leaveType: z.enum(['annual', 'sick', 'special', 'maternity', 'paternity', 'bereavement', 'personal']),
@@ -1393,7 +1393,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGetTeamCalendar(args: any) {
+  private async handleGetTeamCalendar(args: unknown) {
     const schema = z.object({
       department: z.string(),
       startDate: z.string(),
@@ -1429,7 +1429,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGetLeaveAnalytics(args: any) {
+  private async handleGetLeaveAnalytics(args: unknown) {
     const schema = z.object({
       startDate: z.string(),
       endDate: z.string(),
@@ -1466,7 +1466,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleCalculateCompliancePayroll(args: any) {
+  private async handleCalculateCompliancePayroll(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       month: z.string(),
@@ -1525,7 +1525,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGeneratePayslip(args: any) {
+  private async handleGeneratePayslip(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       month: z.string(),
@@ -1579,7 +1579,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleValidateLaborCompliance(args: any) {
+  private async handleValidateLaborCompliance(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       month: z.string(),
@@ -1635,7 +1635,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGetPayrollReport(args: any) {
+  private async handleGetPayrollReport(args: unknown) {
     const schema = z.object({
       month: z.string(),
     });
@@ -1674,7 +1674,7 @@ class StrategicPlatformServer {
 
   // Expense Management Tool Handlers - v1.3.0
 
-  private async handleCreateExpenseFromReceipt(args: any) {
+  private async handleCreateExpenseFromReceipt(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       imageData: z.string(),
@@ -1715,7 +1715,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleCreateExpenseFromText(args: any) {
+  private async handleCreateExpenseFromText(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       expenseDescription: z.string(),
@@ -1749,7 +1749,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleApproveExpense(args: any) {
+  private async handleApproveExpense(args: unknown) {
     const schema = z.object({
       requestId: z.string(),
       approverId: z.string(),
@@ -1791,7 +1791,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleRejectExpense(args: any) {
+  private async handleRejectExpense(args: unknown) {
     const schema = z.object({
       requestId: z.string(),
       approverId: z.string(),
@@ -1826,7 +1826,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGetExpenseAnalytics(args: any) {
+  private async handleGetExpenseAnalytics(args: unknown) {
     const schema = z.object({
       employeeId: z.string().optional(),
       department: z.string().optional(),
@@ -1877,7 +1877,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleExportAccountingData(args: any) {
+  private async handleExportAccountingData(args: unknown) {
     const schema = z.object({
       format: z.enum(['csv', 'excel', 'json']),
       startDate: z.string(),
@@ -1911,7 +1911,7 @@ class StrategicPlatformServer {
 
   // v1.3.0 Compliance Enhancement Handlers
 
-  private async handleMonitor36Compliance(args: any) {
+  private async handleMonitor36Compliance(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       targetMonth: z.string().optional(),
@@ -1969,7 +1969,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleRecordObjectiveTime(args: any) {
+  private async handleRecordObjectiveTime(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       date: z.string(),
@@ -2034,7 +2034,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleGenerateComplianceReport(args: any) {
+  private async handleGenerateComplianceReport(args: unknown) {
     const schema = z.object({
       startDate: z.string(),
       endDate: z.string(),
@@ -2056,10 +2056,10 @@ class StrategicPlatformServer {
                        violationRate >= 5 ? '🔶 低リスク' : '✅ 安全';
 
       const topViolators = report.employeeDetails
-        .filter((emp: any) => emp.complianceStatus === 'exceeded')
-        .sort((a: any, b: any) => b.overtimeHours - a.overtimeHours)
+        .filter((emp) => emp.complianceStatus === 'exceeded')
+        .sort((a, b) => b.overtimeHours - a.overtimeHours)
         .slice(0, 5)
-        .map((emp: any) => `• ${emp.name} (${emp.department}): ${emp.overtimeHours.toFixed(1)}時間`)
+        .map((emp) => `• ${emp.name} (${emp.department}): ${emp.overtimeHours.toFixed(1)}時間`)
         .join('\\n');
 
       return {
@@ -2090,7 +2090,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private async handleRecordHealthCheck(args: any) {
+  private async handleRecordHealthCheck(args: unknown) {
     const schema = z.object({
       employeeId: z.string(),
       checkType: z.enum(['medical_interview', 'health_questionnaire', 'stress_check', 'work_load_review']),
@@ -2148,7 +2148,14 @@ class StrategicPlatformServer {
     }
   }
 
-  private calculateDiscrepancyInfo(record: any): {detected: boolean, minutes: number, explanation: string} {
+  private calculateDiscrepancyInfo(record: {
+    icCardIn?: Date;
+    icCardOut?: Date;
+    selfReportedIn?: Date;
+    selfReportedOut?: Date;
+    pcLogIn?: Date;
+    pcLogOut?: Date;
+  }): {detected: boolean, minutes: number, explanation: string} {
     let maxDiscrepancy = 0;
     let explanation = '';
     
@@ -2210,7 +2217,7 @@ class StrategicPlatformServer {
   /**
    * 残業予測ハンドラー
    */
-  public async handlePredictOvertime(args: any) {
+  public async handlePredictOvertime(args: unknown) {
     const schema = z.object({
       employeeId: z.string().optional(),
       horizon: z.number().default(30),
@@ -2240,10 +2247,10 @@ class StrategicPlatformServer {
       );
       
       // 可視化データ生成
-      const visualizations = await this.visualizationAlerts.generateOvertimeVisualization(predictions as any);
+      const visualizations = await this.visualizationAlerts.generateOvertimeVisualization(predictions);
       
       // アラート監視
-      const alerts = await this.visualizationAlerts.monitorAlerts(predictions as any, []);
+      const alerts = await this.visualizationAlerts.monitorAlerts(predictions, []);
 
       const totalPredictions = predictions.length;
       const highRiskCount = predictions.filter(p => p.riskLevel === 'high' || p.riskLevel === 'critical').length;
@@ -2278,7 +2285,7 @@ class StrategicPlatformServer {
   /**
    * 離職予測ハンドラー
    */
-  public async handlePredictTurnover(args: any) {
+  public async handlePredictTurnover(args: unknown) {
     const schema = z.object({
       employeeId: z.string().optional(),
       includeDetails: z.boolean().default(false),
@@ -2291,10 +2298,10 @@ class StrategicPlatformServer {
       const predictions = await this.turnoverPrediction.predictTurnover(employeeId);
       
       // 可視化データ生成
-      const visualizations = await this.visualizationAlerts.generateTurnoverVisualization(predictions as any);
+      const visualizations = await this.visualizationAlerts.generateTurnoverVisualization(predictions);
       
       // アラート監視
-      const alerts = await this.visualizationAlerts.monitorAlerts([], predictions as any);
+      const alerts = await this.visualizationAlerts.monitorAlerts([], predictions);
 
       const totalPredictions = predictions.length;
       const criticalRisk = predictions.filter(p => p.riskLevel === 'critical').length;
@@ -2343,7 +2350,7 @@ class StrategicPlatformServer {
   /**
    * 人的資本ダッシュボード生成ハンドラー
    */
-  public async handleGenerateHRDashboard(args: any) {
+  public async handleGenerateHRDashboard(args: unknown) {
     const schema = z.object({
       period: z.string().default('current'),
       reportType: z.enum(['comprehensive', 'financial_services', 'iso30414']).default('comprehensive'),
@@ -2352,7 +2359,7 @@ class StrategicPlatformServer {
     const { period, reportType } = schema.parse(args);
 
     try {
-      let report;
+      let report: {type: string; metrics?: unknown} | undefined;
       
       if (reportType === 'comprehensive') {
         const metrics = await this.humanCapitalDashboard.generateComprehensiveMetrics(period);
@@ -2367,7 +2374,7 @@ class StrategicPlatformServer {
       }
 
       const visualizations = await this.visualizationAlerts.generateHumanCapitalVisualization(
-        reportType === 'comprehensive' ? this.createHumanCapitalMetrics((report as any)?.metrics || {}) : {} as any
+        reportType === 'comprehensive' ? this.createHumanCapitalMetrics(report?.metrics || {}) : {}
       );
 
       return {
@@ -2376,7 +2383,7 @@ class StrategicPlatformServer {
             type: 'text',
             text: `📊 人的資本ダッシュボード (${reportType.toUpperCase()})\\n\\n` +
                   `📅 期間: ${period}\\n` +
-                  `📈 レポート種別: ${(report as any)?.type || reportType}\\n\\n` +
+                  `📈 レポート種別: ${report?.type || reportType}\\n\\n` +
                   `${this.formatDashboardReport(report, reportType)}\\n\\n` +
                   `📊 生成された可視化: ${visualizations.length}件\\n` +
                   `🎯 主要指標: ${this.extractKeyMetrics(report, reportType)}`,
@@ -2394,7 +2401,7 @@ class StrategicPlatformServer {
   /**
    * 包括的予測分析ハンドラー
    */
-  public async handleGetPredictiveAnalytics(args: any) {
+  public async handleGetPredictiveAnalytics(args: unknown) {
     const schema = z.object({
       employeeId: z.string().optional(),
       includeVisualization: z.boolean().default(false),
@@ -2497,10 +2504,40 @@ class StrategicPlatformServer {
   }
 
   // ヘルパーメソッド
-  private createHumanCapitalMetrics(metrics: any): any {
+  private createHumanCapitalMetrics(metrics: unknown): {
+    employeeCount: number;
+    diversity: {
+      genderRatio: { male: number; female: number; other: number };
+      managementDiversity: {
+        femaleManagerRatio: number;
+        avgTenure: number;
+      };
+    };
+    engagement: {
+      enps: number;
+      pulseSurveyScore: number;
+    };
+    productivity: {
+      revenuePerEmployee: number;
+      overtimeRatio: number;
+    };
+    turnover: {
+      voluntaryRate: number;
+      avgTenure: number;
+    };
+    costEfficiency: {
+      trainingROI: number;
+      recruitmentCost: number;
+    };
+    health: {
+      mentalHealthScore: number;
+      workLifeBalance: number;
+    };
+  } {
     // 人的資本指標の簡易変換
+    const m = metrics as Record<string, any> || {};
     return {
-      employeeCount: metrics.diversity?.genderDiversity?.totalEmployees || 100,
+      employeeCount: m.diversity?.genderDiversity?.totalEmployees || 100,
       diversity: {
         genderRatio: metrics.diversity?.genderDiversity || { male: 0.6, female: 0.4, other: 0.0 },
         managementDiversity: {
@@ -2534,7 +2571,9 @@ class StrategicPlatformServer {
     };
   }
 
-  private formatDashboardReport(report: any, reportType: string): string {
+  private formatDashboardReport(report: Record<string, any> | undefined, reportType: string): string {
+    if (!report) return 'レポートが利用可能ではありません';
+    
     if (reportType === 'financial_services') {
       return `📈 金融庁指針対応レポート:\\n` +
              `💼 従業員数: ${report.keyMetrics?.['従業員数'] || 'N/A'}名\\n` +
@@ -2558,7 +2597,7 @@ class StrategicPlatformServer {
     }
   }
 
-  private extractKeyMetrics(report: any, reportType: string): string {
+  private extractKeyMetrics(report: Record<string, any> | undefined, reportType: string): string {
     const metrics = [];
     
     if (reportType === 'financial_services') {

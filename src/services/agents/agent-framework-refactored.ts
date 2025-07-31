@@ -3,10 +3,10 @@
  * AI-OS v3.0 - 型安全性強化版
  */
 
-import type { Result } from '@core/result';
-import type { ValidationError } from '@core/validation';
-import type { DateTime } from '@core/date-time';
-import type { DomainEvent } from '@domain/index';
+import type { Result } from '../../types/core/result.js';
+import type { ValidationError } from '../../types/core/validation.js';
+import type { DateTime } from '../../types/core/datetime.js';
+import type { DomainEvent } from '../../types/domain/index.js';
 
 /**
  * エージェント能力定義

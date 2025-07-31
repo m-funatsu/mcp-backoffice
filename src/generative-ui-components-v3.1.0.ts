@@ -24,6 +24,95 @@ import type {
   Filter
 } from './generative-ui-engine-v3.1.0.js';
 
+// ===== 型定義 =====
+
+export interface ChartDataPoint {
+  readonly x: number | string | Date;
+  readonly y: number;
+  readonly label?: string;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface ComponentRenderResult {
+  readonly componentId: string;
+  readonly htmlStructure: string;
+  readonly styleSheet: string;
+  readonly interactionHandlers: Record<string, EventHandler>;
+  readonly accessibility: AccessibilityAttributes;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface ComponentInteraction {
+  readonly type: string;
+  readonly payload?: unknown;
+  readonly timestamp: number;
+  readonly sourceId?: string;
+}
+
+export interface EventHandler {
+  readonly event: string;
+  readonly handler: (event: Event) => void | Promise<void>;
+}
+
+export interface AccessibilityAttributes {
+  readonly role?: string;
+  readonly ariaLabel?: string;
+  readonly ariaDescribedBy?: string;
+  readonly tabIndex?: number;
+  readonly focusable?: boolean;
+}
+
+export interface ChartConfiguration {
+  readonly type: 'line' | 'bar' | 'pie' | 'scatter' | 'area';
+  readonly title?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly colors?: string[];
+  readonly showLegend?: boolean;
+  readonly animation?: boolean;
+}
+
+export interface TableDataRow {
+  readonly id: string | number;
+  readonly [key: string]: unknown;
+}
+
+export interface TableColumn {
+  readonly key: string;
+  readonly label: string;
+  readonly title?: string;
+  readonly sortable?: boolean;
+  readonly filterable?: boolean;
+  readonly width?: string;
+  readonly align?: 'left' | 'center' | 'right';
+  readonly formatter?: (value: unknown) => string;
+}
+
+export interface TableConfiguration {
+  readonly columns: TableColumn[];
+  readonly pageSize?: number;
+  readonly showPagination?: boolean;
+  readonly enableSorting?: boolean;
+  readonly enableFiltering?: boolean;
+  readonly responsive?: boolean;
+}
+
+export interface FormField {
+  readonly name: string;
+  readonly type: 'text' | 'number' | 'email' | 'select' | 'textarea' | 'checkbox' | 'radio' | 'date';
+  readonly label: string;
+  readonly required?: boolean;
+  readonly placeholder?: string;
+  readonly options?: Array<{ value: string | number; label: string }>;
+  readonly validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+  };
+}
+
 // ===== スマートコンポーネント基盤 =====
 
 export abstract class SmartComponent extends EventEmitter {
@@ -65,7 +154,7 @@ export abstract class SmartComponent extends EventEmitter {
     console.log(`🎨 Smart component initialized: ${this.type}#${this.id}`);
   }
 
-  protected async loadData(): Promise<any> {
+  protected async loadData(): Promise<unknown> {
     // データソースから情報を取得（キャッシング対応）
     if (this.dataSource.caching.enabled) {
       const cachedData = await this.getCachedData();
@@ -81,9 +170,9 @@ export abstract class SmartComponent extends EventEmitter {
     return data;
   }
 
-  protected abstract fetchData(): Promise<any>;
-  protected abstract getCachedData(): Promise<any>;
-  protected abstract setCachedData(data: any): Promise<void>;
+  protected abstract fetchData(): Promise<unknown>;
+  protected abstract getCachedData(): Promise<unknown | null>;
+  protected abstract setCachedData(data: unknown): Promise<void>;
 
   protected setupEventHandlers(): void {
     this.on('data_changed', () => {
@@ -100,7 +189,7 @@ export abstract class SmartComponent extends EventEmitter {
 // ===== インテリジェントチャートコンポーネント =====
 
 export class IntelligentChart extends SmartComponent {
-  private chartData: any[];
+  private chartData: ChartDataPoint[];
   private renderCache: Map<string, ComponentRenderResult> = new Map();
 
   constructor(
@@ -206,7 +295,7 @@ export class IntelligentChart extends SmartComponent {
     }
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<ChartDataPoint[]> {
     // データソースに応じた取得ロジック
     switch (this.dataSource.type) {
       case 'database':
@@ -220,7 +309,7 @@ export class IntelligentChart extends SmartComponent {
     }
   }
 
-  protected async getCachedData(): Promise<any> {
+  protected async getCachedData(): Promise<ChartDataPoint[] | null> {
     // キャッシュ戦略に応じた取得
     switch (this.dataSource.caching.strategy) {
       case 'memory':
@@ -234,7 +323,7 @@ export class IntelligentChart extends SmartComponent {
     }
   }
 
-  protected async setCachedData(data: any): Promise<void> {
+  protected async setCachedData(data: ChartDataPoint[]): Promise<void> {
     // キャッシュ戦略に応じた保存
     switch (this.dataSource.caching.strategy) {
       case 'memory':
@@ -254,7 +343,7 @@ export class IntelligentChart extends SmartComponent {
     return `chart_${this.id}_${JSON.stringify(this.config)}_${this.deviceInfo?.deviceType}`;
   }
 
-  private generateChartHTML(data: any[], config: ComponentConfiguration): string {
+  private generateChartHTML(data: ChartDataPoint[], config: ComponentConfiguration): string {
     const chartConfig = config.chart;
     if (!chartConfig) return '<div>Chart configuration missing</div>';
 
@@ -390,7 +479,7 @@ export class IntelligentChart extends SmartComponent {
     return this.config.chart?.title || 'データチャート';
   }
 
-  private generateLegend(data: any[], chartConfig: any): string {
+  private generateLegend(data: ChartDataPoint[], chartConfig: ChartConfiguration): string {
     // 凡例生成ロジック（簡略化）
     return '<div class="legend-items">凡例</div>';
   }
@@ -407,17 +496,17 @@ export class IntelligentChart extends SmartComponent {
   }
 
   // データ処理メソッド（実装簡略化）
-  private async fetchFromDatabase(): Promise<any> { return []; }
-  private async fetchFromAPI(): Promise<any> { return []; }
-  private async performCalculation(): Promise<any> { return []; }
+  private async fetchFromDatabase(): Promise<ChartDataPoint[]> { return []; }
+  private async fetchFromAPI(): Promise<ChartDataPoint[]> { return []; }
+  private async performCalculation(): Promise<ChartDataPoint[]> { return []; }
   
   // キャッシュメソッド（実装簡略化）
-  private getMemoryCache(): any { return null; }
-  private async getRedisCache(): Promise<any> { return null; }
-  private async getDatabaseCache(): Promise<any> { return null; }
-  private setMemoryCache(data: any): void {}
-  private async setRedisCache(data: any): Promise<void> {}
-  private async setDatabaseCache(data: any): Promise<void> {}
+  private getMemoryCache(): ChartDataPoint[] | null { return null; }
+  private async getRedisCache(): Promise<ChartDataPoint[] | null> { return null; }
+  private async getDatabaseCache(): Promise<ChartDataPoint[] | null> { return null; }
+  private setMemoryCache(data: ChartDataPoint[]): void {}
+  private async setRedisCache(data: ChartDataPoint[]): Promise<void> {}
+  private async setDatabaseCache(data: ChartDataPoint[]): Promise<void> {}
   
   // 最適化メソッド（実装簡略化）
   private enableDataVirtualization(): void {}
@@ -426,16 +515,16 @@ export class IntelligentChart extends SmartComponent {
   private simplifyVisuals(): void {}
   
   // インタラクションハンドラー（実装簡略化）
-  private async handleZoom(data: any): Promise<void> {}
-  private async handleFilter(data: any): Promise<void> {}
-  private async handleDrillDown(data: any): Promise<void> {}
-  private async handleExport(data: any): Promise<void> {}
+  private async handleZoom(data: unknown): Promise<void> {}
+  private async handleFilter(data: unknown): Promise<void> {}
+  private async handleDrillDown(data: unknown): Promise<void> {}
+  private async handleExport(data: unknown): Promise<void> {}
 }
 
 // ===== アダプティブデータテーブル =====
 
 export class AdaptiveDataTable extends SmartComponent {
-  private tableData: any[] = [];
+  private tableData: TableDataRow[] = [];
   private currentPage: number = 1;
   private pageSize: number = 10;
   private sortConfig: SortConfig | null = null;
@@ -524,20 +613,20 @@ export class AdaptiveDataTable extends SmartComponent {
     this.adaptPageSize();
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<TableDataRow[]> {
     // データソース取得（実装簡略化）
     return [];
   }
 
-  protected async getCachedData(): Promise<any> {
+  protected async getCachedData(): Promise<TableDataRow[] | null> {
     return null;
   }
 
-  protected async setCachedData(data: any): Promise<void> {
+  protected async setCachedData(data: TableDataRow[]): Promise<void> {
     // キャッシュ保存
   }
 
-  private processData(data: any[]): any[] {
+  private processData(data: TableDataRow[]): TableDataRow[] {
     let processed = [...data];
 
     // フィルタリング
@@ -555,7 +644,7 @@ export class AdaptiveDataTable extends SmartComponent {
     return processed.slice(startIndex, startIndex + this.pageSize);
   }
 
-  private generateTableHTML(data: any[], config: ComponentConfiguration): string {
+  private generateTableHTML(data: TableDataRow[], config: ComponentConfiguration): string {
     const tableConfig = config.table;
     if (!tableConfig) return '<div>Table configuration missing</div>';
 
@@ -604,7 +693,7 @@ export class AdaptiveDataTable extends SmartComponent {
     `;
   }
 
-  private generateCardLayout(data: any[], tableConfig: any): string {
+  private generateCardLayout(data: TableDataRow[], tableConfig: TableConfiguration): string {
     return `
       <div class="adaptive-data-table card-layout" id="${this.id}">
         <div class="table-header">
@@ -613,7 +702,7 @@ export class AdaptiveDataTable extends SmartComponent {
         <div class="cards-container">
           ${data.map((row, index) => `
             <div class="data-card" data-row-index="${index}">
-              ${tableConfig.columns?.map((col: any) => `
+              ${tableConfig.columns?.map((col: TableColumn) => `
                 <div class="card-field">
                   <span class="field-label">${col.title}:</span>
                   <span class="field-value">${this.formatCellValue(row[col.key], col)}</span>
@@ -783,7 +872,7 @@ export class AdaptiveDataTable extends SmartComponent {
     `;
   }
 
-  private formatCellValue(value: any, column: any): string {
+  private formatCellValue(value: unknown, column: TableColumn): string {
     if (column.formatter) {
       return column.formatter(value);
     }
@@ -819,24 +908,24 @@ export class AdaptiveDataTable extends SmartComponent {
 
   private enableVirtualScrolling(): void {}
   
-  private applyFilters(data: any[]): any[] {
+  private applyFilters(data: TableDataRow[]): TableDataRow[] {
     return data;
   }
 
-  private applySorting(data: any[]): any[] {
+  private applySorting(data: TableDataRow[]): TableDataRow[] {
     return data;
   }
 
-  private handleSort(data: any): void {}
-  private handleTableFilter(data: any): void {}
-  private handlePagination(data: any): void {}
-  private handleRowSelection(data: any): void {}
+  private handleSort(data: unknown): void {}
+  private handleTableFilter(data: unknown): void {}
+  private handlePagination(data: unknown): void {}
+  private handleRowSelection(data: unknown): void {}
 }
 
 // ===== スマートフォームコンポーネント =====
 
 export class SmartForm extends SmartComponent {
-  private formData: Record<string, any> = {};
+  private formData: Record<string, unknown> = {};
   private validationErrors: Record<string, string> = {};
 
   constructor(
@@ -904,15 +993,15 @@ export class SmartForm extends SmartComponent {
     this.setupValidationDebounce();
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<Record<string, unknown>> {
     return {};
   }
 
-  protected async getCachedData(): Promise<any> {
+  protected async getCachedData(): Promise<Record<string, unknown> | null> {
     return null;
   }
 
-  protected async setCachedData(data: any): Promise<void> {}
+  protected async setCachedData(data: Record<string, unknown>): Promise<void> {}
 
   private generateFormHTML(config: ComponentConfiguration): string {
     const formConfig = config.form;
@@ -934,7 +1023,7 @@ export class SmartForm extends SmartComponent {
     `;
   }
 
-  private generateFieldHTML(field: any): string {
+  private generateFieldHTML(field: FormField): string {
     const fieldId = `${this.id}_${field.name}`;
     const hasError = this.validationErrors[field.name];
     
@@ -951,7 +1040,7 @@ export class SmartForm extends SmartComponent {
     `;
   }
 
-  private generateInputHTML(field: any, fieldId: string): string {
+  private generateInputHTML(field: FormField, fieldId: string): string {
     const commonAttrs = `
       id="${fieldId}"
       name="${field.name}"
@@ -972,7 +1061,7 @@ export class SmartForm extends SmartComponent {
         return `
           <select class="field-input field-select" ${commonAttrs}>
             <option value="">選択してください</option>
-            ${field.options?.map((option: any) => 
+            ${field.options?.map((option) => 
               `<option value="${option.value}">${option.label}</option>`
             ).join('') || ''}
           </select>
@@ -1170,10 +1259,10 @@ export class SmartForm extends SmartComponent {
 
   // フォーム処理メソッド（実装簡略化）
   private setupValidationDebounce(): void {}
-  private handleFieldChange(data: any): void {}
+  private handleFieldChange(data: unknown): void {}
   private async handleSubmit(): Promise<void> {}
   private handleReset(): void {}
-  private handleValidation(data: any): void {}
+  private handleValidation(data: unknown): void {}
 }
 
 // ===== 型定義 =====
@@ -1186,13 +1275,13 @@ export interface ComponentRenderResult {
   accessibility: AccessibilityAttributes;
   metadata: {
     renderTime: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
 export interface ComponentInteraction {
   type: string;
-  data: any;
+  data: unknown;
   timestamp: Date;
   userId?: string;
 }

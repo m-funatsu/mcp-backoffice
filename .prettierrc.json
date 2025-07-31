@@ -6,7 +6,7 @@
   "singleQuote": true,
   "quoteProps": "as-needed",
   "jsxSingleQuote": false,
-  "trailingComma": "es5",
+  "trailingComma": "all",
   "bracketSpacing": true,
   "bracketSameLine": false,
   "arrowParens": "always",
@@ -14,5 +14,25 @@
   "htmlWhitespaceSensitivity": "css",
   "endOfLine": "lf",
   "embeddedLanguageFormatting": "auto",
-  "singleAttributePerLine": true
+  "singleAttributePerLine": true,
+  "overrides": [
+    {
+      "files": "*.json",
+      "options": {
+        "printWidth": 80
+      }
+    },
+    {
+      "files": ["*.yml", "*.yaml"],
+      "options": {
+        "singleQuote": false
+      }
+    },
+    {
+      "files": ["*.md"],
+      "options": {
+        "proseWrap": "always"
+      }
+    }
+  ]
 }

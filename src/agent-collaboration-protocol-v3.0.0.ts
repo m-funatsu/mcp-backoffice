@@ -25,7 +25,7 @@ export interface AgentMessage {
   senderId: string;
   receiverId: string | 'broadcast';
   messageType: 'request' | 'response' | 'notification' | 'heartbeat' | 'consensus';
-  payload: any;
+  payload: unknown;
   timestamp: Date;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   ttl?: number; // Time To Live in milliseconds
@@ -37,8 +37,8 @@ export interface AgentCapabilityAdvertisement {
   capabilities: Array<{
     name: string;
     description: string;
-    inputSchema: any;
-    outputSchema: any;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
     slaMetrics: {
       averageResponseTime: number;
       successRate: number;
@@ -73,7 +73,7 @@ export interface CollaborationWorkflow {
     };
   }>;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  executionContext: Map<string, any>;
+  executionContext: Map<string, unknown>;
   createdAt: Date;
   startedAt?: Date;
   completedAt?: Date;
@@ -84,7 +84,7 @@ export interface ConsensusProposal {
   proposerId: string;
   proposalType: 'workflow_optimization' | 'resource_allocation' | 'conflict_resolution';
   description: string;
-  proposedChanges: any;
+  proposedChanges: Record<string, unknown>;
   votingDeadline: Date;
   requiredMajority: number; // percentage
   votes: Map<string, 'accept' | 'reject' | 'abstain'>;
@@ -185,12 +185,32 @@ export class AgentCollaborationManager extends EventEmitter {
     }
   ): Promise<Array<{
     agentId: string;
-    capability: any;
+    capability: {
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+      outputSchema: Record<string, unknown>;
+      slaMetrics: {
+        averageResponseTime: number;
+        successRate: number;
+        maxConcurrency: number;
+      };
+    };
     suitabilityScore: number;
   }>> {
     const candidates: Array<{
       agentId: string;
-      capability: any;
+      capability: {
+        name: string;
+        description: string;
+        inputSchema: Record<string, unknown>;
+        outputSchema: Record<string, unknown>;
+        slaMetrics: {
+          averageResponseTime: number;
+          successRate: number;
+          maxConcurrency: number;
+        };
+      };
       suitabilityScore: number;
     }> = [];
 
@@ -356,7 +376,21 @@ export class AgentCollaborationManager extends EventEmitter {
     console.log(`✅ Workflow ${workflowId} completed successfully`);
   }
 
-  private async executeWorkflowStep(workflowId: string, step: any): Promise<void> {
+  private async executeWorkflowStep(
+    workflowId: string, 
+    step: {
+      stepId: string;
+      agentId: string;
+      action: string;
+      dependencies: string[];
+      timeout: number;
+      retryPolicy: {
+        maxRetries: number;
+        backoffStrategy: 'fixed' | 'exponential' | 'linear';
+        baseDelay: number;
+      };
+    }
+  ): Promise<void> {
     const workflow = this.activeWorkflows.get(workflowId);
     if (!workflow) throw new Error('Workflow not found');
 
@@ -384,9 +418,24 @@ export class AgentCollaborationManager extends EventEmitter {
    * ユーティリティメソッド
    */
   private calculateSuitabilityScore(
-    capability: any,
-    loadMetrics: any,
-    constraints?: any
+    capability: {
+      slaMetrics: {
+        averageResponseTime: number;
+        successRate: number;
+        maxConcurrency: number;
+      };
+    },
+    loadMetrics: {
+      cpuUsage: number;
+      memoryUsage: number;
+      queueLength: number;
+      isAvailable: boolean;
+    },
+    constraints?: {
+      maxResponseTime?: number;
+      minSuccessRate?: number;
+      excludeAgents?: string[];
+    }
   ): number {
     let score = 0.5;
 
@@ -402,13 +451,36 @@ export class AgentCollaborationManager extends EventEmitter {
     return Math.max(0, Math.min(1, score));
   }
 
-  private resolveDependencies(steps: any[]): any[][] {
-    const executionLevels: any[][] = [];
+  private resolveDependencies(steps: Array<{
+    stepId: string;
+    agentId: string;
+    action: string;
+    dependencies: string[];
+    timeout: number;
+    retryPolicy: {
+      maxRetries: number;
+      backoffStrategy: 'fixed' | 'exponential' | 'linear';
+      baseDelay: number;
+    };
+  }>): Array<Array<{
+    stepId: string;
+    agentId: string;
+    action: string;
+    dependencies: string[];
+    timeout: number;
+    retryPolicy: {
+      maxRetries: number;
+      backoffStrategy: 'fixed' | 'exponential' | 'linear';
+      baseDelay: number;
+    };
+  }>> {
+    type StepType = typeof steps[0];
+    const executionLevels: StepType[][] = [];
     const executed = new Set<string>();
     const stepMap = new Map(steps.map(step => [step.stepId, step]));
 
     while (executed.size < steps.length) {
-      const currentLevel: any[] = [];
+      const currentLevel: StepType[] = [];
       
       for (const step of steps) {
         if (executed.has(step.stepId)) continue;
@@ -472,7 +544,7 @@ export class AgentCollaborationManager extends EventEmitter {
       this.handleAgentFailure(agentId);
     });
 
-    this.on('workflow_step_completed', (workflowId: string, stepId: string, result: any) => {
+    this.on('workflow_step_completed', (workflowId: string, stepId: string, result: unknown) => {
       const workflow = this.activeWorkflows.get(workflowId);
       if (workflow) {
         workflow.executionContext.set(stepId, result);
