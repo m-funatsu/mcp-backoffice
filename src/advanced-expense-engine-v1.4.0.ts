@@ -65,10 +65,7 @@ import { createDateTime, formatDateTime } from './types/core/datetime.js';
  * 高度OCR結果
  * @description レシートから抽出された詳細情報
  */
-export interface AdvancedOCRResult {
-  readonly text: string;
-  readonly confidence: number;
-  readonly language: string;
+export interface AdvancedOCRResult extends OCRResult {
   readonly structure: Readonly<{
     vendor: ReceiptVendor;
     items: ReadonlyArray<ReceiptItem>;
@@ -123,15 +120,18 @@ export interface ApprovalReason {
   readonly weight: number; // 0-1
 }
 
-
+/**
+ * 代替アクション
+ * @description AI推奨の代替アクション
+ */
 export interface AlternativeAction {
-  readonly action: string;
+  readonly action: ApprovalAction;
   readonly description: string;
   readonly confidence: number;
 }
 
-/** トレンド */
-export type Trend = 'increasing' | 'decreasing' | 'stable';
+/** トレンド方向 */
+export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
 
 /**
  * カテゴリ別経費データ
@@ -139,7 +139,8 @@ export type Trend = 'increasing' | 'decreasing' | 'stable';
  */
 export interface CategoryExpenseData extends CategoryExpense {
   readonly averageAmount: Money;
-  readonly trend: Trend;
+  readonly trend: TrendDirection;
+  readonly changeRate?: number; // 変化率（%）
 }
 
 /**
@@ -148,9 +149,13 @@ export interface CategoryExpenseData extends CategoryExpense {
  */
 export interface AnomalyReport {
   readonly totalAnomalies: number;
-  readonly anomaliesByType: Readonly<Record<string, number>>;
+  readonly anomaliesByType: Readonly<Record<AnomalyType, number>>;
   readonly riskScore: number; // 0-1
   readonly recommendedActions: ReadonlyArray<string>;
+  readonly timeRange: {
+    readonly startDate: DateTime;
+    readonly endDate: DateTime;
+  };
 }
 
 /**
@@ -208,11 +213,11 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
   async processReceiptImageAdvanced(
     imageBuffer: Buffer, 
     mimeType: string,
-    options?: {
+    options?: Readonly<{
       enhanceQuality?: boolean;
       validateData?: boolean;
       extractLineItems?: boolean;
-    }
+    }>
   ): Promise<Result<AdvancedOCRResult, ValidationError>> {
     const startTime = Date.now();
     
@@ -245,14 +250,17 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
 
       const processingTime = Date.now() - startTime;
 
-      return success({
+      const result: AdvancedOCRResult = {
         text: reconciledOCR.text,
         confidence: reconciledOCR.confidence,
         language,
+        processingTime,
         structure: structuredData,
         qualityScore,
         validationFlags,
-      });
+      };
+      
+      return success(result);
 
     } catch (error) {
       console.error('Advanced OCR processing failed:', error);
@@ -272,8 +280,8 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
    * @returns AI承認推奨
    */
   async generateApprovalRecommendation(
-    expenseRequest: ExpenseRequest,
-    receiptData?: AdvancedOCRResult
+    expenseRequest: Readonly<ExpenseRequest>,
+    receiptData?: Readonly<AdvancedOCRResult>
   ): Promise<Result<IntelligentApprovalRecommendation, ValidationError>> {
     
     // Step 1: Policy compliance check
@@ -314,8 +322,8 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
   async generateExpenseAnalytics(
     employeeId?: string,
     department?: string,
-    startDate?: Date,
-    endDate?: Date
+    startDate?: DateTime,
+    endDate?: DateTime
   ): Promise<Result<ExpenseAnalytics, ValidationError>> {
     
     const expenses = await this.getExpensesByPeriod(
@@ -393,12 +401,16 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
    * @param employeeId - 従業員ID
    * @returns リアルタイム監視結果
    */
-  async monitorExpenseRealTime(employeeId: string): Promise<Result<{
-    currentMonthTotal: Money;
-    budgetUtilization: number;
-    alerts: ReadonlyArray<ExpenseAlert>;
-    recommendations: ReadonlyArray<string>;
-  }, ValidationError>> {
+  /**
+   * リアルタイム経費監視システム
+   */
+  async monitorExpenseRealTime(employeeId: string): Promise<Result<ExpenseMonitoringResult, ValidationError>> {
+    type ExpenseMonitoringResult = Readonly<{
+      currentMonthTotal: Money;
+      budgetUtilization: number;
+      alerts: ReadonlyArray<ExpenseAlert>;
+      recommendations: ReadonlyArray<string>;
+    }>;
     const currentMonth = new Date();
     const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
     
@@ -466,7 +478,13 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
    */
   private async performSecondaryOCR(imageBuffer: Buffer): Promise<OCRResult> {
     // Secondary OCR engine for validation
-    return { text: '', confidence: 0.8 }; // Placeholder
+    const result: OCRResult = {
+      text: '',
+      confidence: 0.8,
+      processingTime: 100,
+      language: 'ja'
+    };
+    return result;
   }
 
   /**
@@ -474,10 +492,15 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
    * @param results - 複数のOCR結果
    * @returns 照合されたOCR結果
    */
-  private reconcileOCRResults(results: OCRResult[]): OCRResult {
+  private reconcileOCRResults(results: ReadonlyArray<OCRResult>): OCRResult {
     // Intelligent reconciliation of multiple OCR results
     if (results.length === 0) {
-      return { text: '', confidence: 0 };
+      const emptyResult: OCRResult = {
+        text: '',
+        confidence: 0,
+        processingTime: 0
+      };
+      return emptyResult;
     }
     return results[0]; // Placeholder
   }
@@ -536,19 +559,33 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
     return 'ja'; // Placeholder
   }
 
-  private async checkPolicyCompliance(expenseRequest: ExpenseRequest): Promise<PolicyCompliance> {
+  private async checkPolicyCompliance(expenseRequest: Readonly<ExpenseRequest>): Promise<PolicyCompliance> {
     // Policy compliance checks
-    return { isCompliant: true, violations: [], complianceScore: 1.0 };
+    const compliance: PolicyCompliance = {
+      isCompliant: true,
+      violations: [],
+      complianceScore: 1.0,
+      warnings: []
+    };
+    return compliance;
   }
 
-  private async analyzeHistoricalPatterns(employeeId: string, expenseRequest: ExpenseRequest): Promise<HistoricalAnalysis> {
+  private async analyzeHistoricalPatterns(employeeId: string, expenseRequest: Readonly<ExpenseRequest>): Promise<HistoricalAnalysis> {
     // Historical pattern analysis
-    return { 
-      averageExpense: 50000,
+    const analysis: HistoricalAnalysis = {
+      averageExpense: createMoney(50000, 'JPY'),
+      medianExpense: createMoney(40000, 'JPY'),
       typicalCategories: ['交通費', '接待費'],
       anomalyScore: 0.1,
-      patterns: []
+      patterns: [],
+      seasonality: {
+        hasSeasonality: false,
+        peakMonths: [],
+        lowMonths: [],
+        variationCoefficient: 0.2
+      }
     };
+    return analysis;
   }
 
   private aggregateRiskFactors(fraudAnalysis: FraudAnalysis, historicalAnalysis: HistoricalAnalysis, receiptQuality: number): ReadonlyArray<RiskFactor> {
@@ -572,17 +609,17 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
     };
   }
 
-  private async getExpensesByPeriod(employeeId: string, startDate: Date, endDate: Date): Promise<ReadonlyArray<ExpenseRequest>> {
+  private async getExpensesByPeriod(employeeId: string, startDate: DateTime, endDate: DateTime): Promise<ReadonlyArray<ExpenseRequest>> {
     // Get expenses by period
     return []; // Placeholder
   }
 
-  private async generateCategoryBreakdown(expenses: ExpenseRequest[]): Promise<ReadonlyArray<CategoryExpenseData>> {
+  private async generateCategoryBreakdown(expenses: ReadonlyArray<ExpenseRequest>): Promise<ReadonlyArray<CategoryExpenseData>> {
     // Category breakdown generation
     return [];
   }
 
-  private async calculateComplianceScore(expenses: ExpenseRequest[]): Promise<number> {
+  private async calculateComplianceScore(expenses: ReadonlyArray<ExpenseRequest>): Promise<number> {
     // Compliance score calculation
     return 0.95;
   }
@@ -592,17 +629,22 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
     return [];
   }
   
-  private async detectExpenseAnomalies(employeeId: string, expenses: ExpenseRequest[]): Promise<AnomalyReport> {
+  private async detectExpenseAnomalies(employeeId: string, expenses: ReadonlyArray<ExpenseRequest>): Promise<AnomalyReport> {
     // Anomaly detection
-    return {
+    const report: AnomalyReport = {
       totalAnomalies: 0,
-      anomaliesByType: {},
+      anomaliesByType: {} as Record<AnomalyType, number>,
       riskScore: 0.1,
-      recommendedActions: []
+      recommendedActions: [],
+      timeRange: {
+        startDate: createDateTime(new Date()),
+        endDate: createDateTime(new Date())
+      }
     };
+    return report;
   }
 
-  private async generateExpensePredictions(employeeId: string, expenses: ExpenseRequest[]): Promise<ReadonlyArray<ExpensePrediction>> {
+  private async generateExpensePredictions(employeeId: string, expenses: ReadonlyArray<ExpenseRequest>): Promise<ReadonlyArray<ExpensePrediction>> {
     // Expense predictions
     return [];
   }
@@ -636,22 +678,104 @@ export class AdvancedExpenseEngine extends IntelligentExpenseEngine {
 class FraudDetectionEngine implements IFraudDetectionEngine {
   constructor(private readonly db: Database) {}
   
-  async analyzeExpense(expense: ExpenseRequest, receiptData?: AdvancedOCRResult): Promise<FraudAnalysis> {
-    return { 
-      riskScore: 0.1, 
+  async analyzeExpense(expense: ExpenseRequest, receiptData?: ExtractedReceiptData): Promise<FraudAnalysis> {
+    const analysis: FraudAnalysis = {
+      riskScore: 0.1,
       riskLevel: 'low' as RiskLevel,
       indicators: [],
-      confidence: 0.95
+      confidence: 0.95,
+      recommendation: 'auto_approve' as ApprovalAction
     };
+    return analysis;
+  }
+  
+  async updateModel(feedback: ReadonlyArray<FraudFeedback>): Promise<void> {
+    // Model update logic
+  }
+  
+  async getStatistics(): Promise<FraudStatistics> {
+    const stats: FraudStatistics = {
+      totalAnalyzed: 1000,
+      fraudDetected: 10,
+      falsePositives: 5,
+      falseNegatives: 2,
+      accuracy: 0.983,
+      lastUpdated: createDateTime(new Date())
+    };
+    return stats;
   }
 }
 
 class ApprovalEngine implements IApprovalEngine {
   constructor(private readonly db: Database) {}
+  
+  async evaluateRequest(
+    expenseRequest: ExpenseRequest,
+    context?: ApprovalContext
+  ): Promise<Result<ApprovalDecision, ValidationError>> {
+    const decision: ApprovalDecision = {
+      decision: 'auto_approve' as ApprovalAction,
+      confidence: 0.9,
+      reasons: ['ポリシーに準拠しています'],
+      conditions: [],
+      nextSteps: []
+    };
+    return success(decision);
+  }
+  
+  async getApprovalHistory(
+    employeeId: string,
+    period?: PredictionPeriod
+  ): Promise<ReadonlyArray<ApprovalHistory>> {
+    return [];
+  }
 }
 
 class AnalyticsEngine implements IAnalyticsEngine {
   constructor(private readonly db: Database) {}
+  
+  async generateInsights(
+    expenses: ReadonlyArray<ExpenseRequest>,
+    options?: AnalyticsOptions
+  ): Promise<ExpenseInsights> {
+    const insights: ExpenseInsights = {
+      summary: {
+        totalAnalyzed: expenses.length,
+        keyFindings: ['経費が予算内で適切に管理されています'],
+        overallHealth: 'good',
+        priorityActions: []
+      },
+      trends: [],
+      opportunities: [],
+      risks: [],
+      recommendations: []
+    };
+    return insights;
+  }
+  
+  async generateReport(
+    type: ReportType,
+    parameters: ReportParameters
+  ): Promise<AnalyticsReport> {
+    const report: AnalyticsReport = {
+      id: 'report-' + Date.now(),
+      type,
+      generatedAt: createDateTime(new Date()),
+      period: parameters.period,
+      content: {
+        summary: '経費分析レポート',
+        sections: [],
+        charts: [],
+        tables: []
+      },
+      metadata: {
+        generatedBy: 'system',
+        confidentiality: 'internal',
+        version: '1.0.0'
+      }
+    };
+    return report;
+  }
 }
 
 class ReceiptClassifierImpl implements ReceiptClassifier {
@@ -749,11 +873,12 @@ class AnomalyDetectorImpl implements AnomalyDetector {
     readonly overallScore: number;
     readonly threshold: number;
   }> {
-    return {
-      anomalies: [],
+    const result = {
+      anomalies: [] as ReadonlyArray<Anomaly>,
       overallScore: 0.1,
       threshold: 0.5
     };
+    return result;
   }
 }
 

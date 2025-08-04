@@ -360,7 +360,7 @@ export class EmployeeEntity {
   /**
    * バリデーション
    */
-  private static validate(params: any): Result<void, ValidationError> {
+  private static validate(params: Record<string, unknown>): Result<void, ValidationError> {
     // 必須フィールドのチェック
     const requiredFields = [
       'employeeCode', 'firstName', 'lastName', 

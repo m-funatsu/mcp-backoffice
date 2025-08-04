@@ -92,7 +92,7 @@ export class Container implements IContainer {
    * テストなどで使用
    */
   register<T extends keyof IContainer>(key: T, instance: IContainer[T]): void {
-    (this as any)[`_${key}`] = instance;
+    (this as Record<string, unknown>)[`_${key}`] = instance;
   }
   
   /**
@@ -100,7 +100,7 @@ export class Container implements IContainer {
    * テストなどで使用
    */
   static reset(): void {
-    Container.instance = null as any;
+    Container.instance = null as unknown as Container;
   }
 }
 

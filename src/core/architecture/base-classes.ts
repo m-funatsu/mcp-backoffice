@@ -3,9 +3,9 @@
  * AI-OS v3.0
  */
 
-import { Result } from '@core/result';
-import { ValidationError } from '@core/validation';
-import { DomainEvent } from '@domain/index';
+import { Result } from '../../types/core/result.js';
+import { ValidationError } from '../../types/core/validation.js';
+import { DomainEvent } from '../../types/domain/index.js';
 
 /**
  * 基底エンティティクラス

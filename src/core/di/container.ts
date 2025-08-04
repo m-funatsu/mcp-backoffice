@@ -3,7 +3,7 @@
  * AI-OS v3.0
  */
 
-type Constructor<T = {}> = new (...args: any[]) => T;
+type Constructor<T = {}> = new (...args: unknown[]) => T;
 type Factory<T> = () => T | Promise<T>;
 type Token<T> = Constructor<T> | string | symbol;
 
@@ -27,8 +27,8 @@ interface Registration<T> {
  * DIコンテナ
  */
 export class Container {
-  private readonly registrations = new Map<Token<any>, Registration<any>>();
-  private readonly scopedInstances = new Map<Token<any>, any>();
+  private readonly registrations = new Map<Token<unknown>, Registration<unknown>>();
+  private readonly scopedInstances = new Map<Token<unknown>, unknown>();
 
   /**
    * サービス登録
@@ -170,8 +170,8 @@ const INJECT_METADATA_KEY = Symbol('INJECT_METADATA_KEY');
 /**
  * インジェクションデコレーター
  */
-export function Inject(token: Token<any>) {
-  return function (target: any, propertyKey: string | symbol, parameterIndex: number) {
+export function Inject(token: Token<unknown>) {
+  return function (target: unknown, propertyKey: string | symbol, parameterIndex: number) {
     const existingTokens = Reflect.getMetadata(INJECT_METADATA_KEY, target, propertyKey) || [];
     existingTokens[parameterIndex] = token;
     Reflect.defineMetadata(INJECT_METADATA_KEY, existingTokens, target, propertyKey);
@@ -216,24 +216,24 @@ import type { IEventPublisher, IEventSubscriber } from '../../domain/events/base
 export const TOKENS = {
   // リポジトリ
   EmployeeRepository: token<IEmployeeRepository>('EmployeeRepository'),
-  AttendanceRepository: token<any>('AttendanceRepository'),
-  PayrollRepository: token<any>('PayrollRepository'),
-  ExpenseRepository: token<any>('ExpenseRepository'),
+  AttendanceRepository: token<unknown>('AttendanceRepository'),
+  PayrollRepository: token<unknown>('PayrollRepository'),
+  ExpenseRepository: token<unknown>('ExpenseRepository'),
   
   // サービス
-  PayrollService: token<any>('PayrollService'),
-  AttendanceService: token<any>('AttendanceService'),
-  ExpenseService: token<any>('ExpenseService'),
-  NotificationService: token<any>('NotificationService'),
+  PayrollService: token<unknown>('PayrollService'),
+  AttendanceService: token<unknown>('AttendanceService'),
+  ExpenseService: token<unknown>('ExpenseService'),
+  NotificationService: token<unknown>('NotificationService'),
   
   // インフラ
-  Database: token<any>('Database'),
-  Logger: token<any>('Logger'),
+  Database: token<unknown>('Database'),
+  Logger: token<unknown>('Logger'),
   EventPublisher: token<IEventPublisher>('EventPublisher'),
   EventSubscriber: token<IEventSubscriber>('EventSubscriber'),
-  Cache: token<any>('Cache'),
+  Cache: token<unknown>('Cache'),
   
   // 設定
-  Config: token<any>('Config'),
-  AppSettings: token<any>('AppSettings'),
+  Config: token<unknown>('Config'),
+  AppSettings: token<unknown>('AppSettings'),
 } as const;

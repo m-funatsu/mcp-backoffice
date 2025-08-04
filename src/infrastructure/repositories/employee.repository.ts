@@ -11,8 +11,39 @@ import type {
   PaginatedResult 
 } from '../../domain/repositories/employee.repository.interface';
 import { EmployeeEntity } from '../../domain/entities/employee.entity';
-import type { Department, EmploymentType, EmployeeRole } from '../../types/domain/employee';
+import type { Department, EmploymentType, EmployeeRole, Gender, EmploymentStatus } from '../../types/domain/employee';
 import Database from '../../database';
+
+/**
+ * データベース行の型定義
+ */
+interface EmployeeRow {
+  readonly id: string;
+  readonly employee_code: string;
+  readonly first_name: string;
+  readonly last_name: string;
+  readonly first_name_kana: string;
+  readonly last_name_kana: string;
+  readonly email: string;
+  readonly phone_number?: string;
+  readonly hire_date: Date;
+  readonly birth_date: Date;
+  readonly gender: Gender;
+  readonly nationality: string;
+  readonly department: Department;
+  readonly position: string;
+  readonly role: EmployeeRole;
+  readonly employment_type: EmploymentType;
+  readonly employment_status: EmploymentStatus;
+  readonly work_location: string;
+  readonly base_salary?: number;
+  readonly hourly_rate?: number;
+  readonly is_active: boolean;
+  readonly termination_date?: Date;
+  readonly termination_reason?: string;
+  readonly created_at: Date;
+  readonly updated_at: Date;
+}
 
 /**
  * 従業員リポジトリ実装クラス
@@ -123,7 +154,7 @@ export class EmployeeRepository implements IEmployeeRepository {
     try {
       // WHERE句の構築
       const conditions: string[] = [];
-      const params: any[] = [];
+      const params: unknown[] = [];
       let paramIndex = 1;
 
       if (criteria.department) {
@@ -451,7 +482,7 @@ export class EmployeeRepository implements IEmployeeRepository {
   async isEmailTaken(email: string, excludeEmployeeId?: string): Promise<Result<boolean, Error>> {
     try {
       let query = 'SELECT 1 FROM employees WHERE email = $1';
-      const params: any[] = [email];
+      const params: unknown[] = [email];
 
       if (excludeEmployeeId) {
         query += ' AND id != $2';
@@ -473,7 +504,7 @@ export class EmployeeRepository implements IEmployeeRepository {
   async isEmployeeCodeTaken(employeeCode: string, excludeEmployeeId?: string): Promise<Result<boolean, Error>> {
     try {
       let query = 'SELECT 1 FROM employees WHERE employee_code = $1';
-      const params: any[] = [employeeCode];
+      const params: unknown[] = [employeeCode];
 
       if (excludeEmployeeId) {
         query += ' AND id != $2';
@@ -629,7 +660,7 @@ export class EmployeeRepository implements IEmployeeRepository {
   /**
    * DBレコードをエンティティにマッピング
    */
-  private async mapToEntity(row: any): Promise<EmployeeEntity> {
+  private async mapToEntity(row: EmployeeRow): Promise<EmployeeEntity> {
     const result = EmployeeEntity.create({
       id: row.id,
       employeeCode: row.employee_code,

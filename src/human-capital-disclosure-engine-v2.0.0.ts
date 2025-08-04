@@ -85,32 +85,42 @@ export class HumanCapitalDisclosureEngine {
 
   /**
    * Calculate comprehensive human capital metrics
+   * @param reportingPeriod - レポート期間
+   * @returns 人的資本メトリクス
    */
-  async calculateHumanCapitalMetrics(reportingPeriod?: { startDate: Date; endDate: Date }): Promise<HumanCapitalMetrics> {
+  async calculateHumanCapitalMetrics(
+    reportingPeriod?: Readonly<{
+      startDate: DateTime;
+      endDate: DateTime;
+    }>
+  ): Promise<HumanCapitalMetrics> {
     // Default to current year if no period specified
-    if (!reportingPeriod) {
-      const now = new Date();
-      reportingPeriod = {
-        startDate: startOfYear(now),
-        endDate: endOfYear(now)
-      };
-    }
+    const period = reportingPeriod ?? {
+      startDate: createDateTime(startOfYear(new Date())),
+      endDate: createDateTime(endOfYear(new Date()))
+    };
     
     const employees = await this.db.getAllEmployees();
     const activeEmployees = employees.filter((emp: Employee) => emp.isActive);
 
     const metrics: HumanCapitalMetrics = {
-      compliance: await this.calculateComplianceMetrics(activeEmployees, reportingPeriod),
-      costs: await this.calculateCostMetrics(activeEmployees, reportingPeriod),
-      diversity: await this.calculateDiversityMetrics(activeEmployees, reportingPeriod),
-      leadership: await this.calculateLeadershipMetrics(activeEmployees, reportingPeriod),
-      culture: await this.calculateCultureMetrics(activeEmployees, reportingPeriod),
-      safety: await this.calculateSafetyMetrics(activeEmployees, reportingPeriod),
-      productivity: await this.calculateProductivityMetrics(activeEmployees, reportingPeriod),
-      recruitment: await this.calculateRecruitmentMetrics(activeEmployees, reportingPeriod),
-      skills: await this.calculateSkillsMetrics(activeEmployees, reportingPeriod),
-      workforce: await this.calculateWorkforceMetrics(activeEmployees, reportingPeriod),
-      japanese: await this.calculateJapaneseSpecificMetrics(activeEmployees, reportingPeriod)
+      compliance: await this.calculateComplianceMetrics(activeEmployees, period),
+      costs: await this.calculateCostMetrics(activeEmployees, period),
+      diversity: await this.calculateDiversityMetrics(activeEmployees, period),
+      leadership: await this.calculateLeadershipMetrics(activeEmployees, period),
+      culture: await this.calculateCultureMetrics(activeEmployees, period),
+      safety: await this.calculateSafetyMetrics(activeEmployees, period),
+      productivity: await this.calculateProductivityMetrics(activeEmployees, period),
+      recruitment: await this.calculateRecruitmentMetrics(activeEmployees, period),
+      skills: await this.calculateSkillsMetrics(activeEmployees, period),
+      workforce: await this.calculateWorkforceMetrics(activeEmployees, period),
+      japanese: await this.calculateJapaneseSpecificMetrics(activeEmployees, period),
+      metadata: {
+        calculatedAt: createDateTime(new Date()),
+        periodStart: period.startDate,
+        periodEnd: period.endDate,
+        dataCompleteness: 0.95
+      }
     };
 
     return metrics;
@@ -118,10 +128,16 @@ export class HumanCapitalDisclosureEngine {
 
   /**
    * Generate comprehensive human capital report
+   * @param companyName - 会社名
+   * @param reportingPeriod - レポート期間
+   * @returns 人的資本レポート
    */
   async generateHumanCapitalReport(
     companyName: string,
-    reportingPeriod: { startDate: Date; endDate: Date }
+    reportingPeriod: Readonly<{
+      startDate: DateTime;
+      endDate: DateTime;
+    }>
   ): Promise<HumanCapitalReport> {
     const metrics = await this.calculateHumanCapitalMetrics(reportingPeriod);
     const benchmarks = await this.getBenchmarkComparisons(metrics);
@@ -134,8 +150,14 @@ export class HumanCapitalDisclosureEngine {
     const report: HumanCapitalReport = {
       reportId: `HCR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       companyName,
-      reportingPeriod,
-      reportGeneratedAt: new Date(),
+      reportType: 'annual',
+      reportingPeriod: {
+        startDate: reportingPeriod.startDate,
+        endDate: reportingPeriod.endDate,
+        periodType: 'annual'
+      },
+      reportGeneratedAt: createDateTime(new Date()),
+      reportGeneratedBy: 'System',
       metrics,
       benchmarkComparisons: benchmarks,
       trends,
@@ -143,7 +165,21 @@ export class HumanCapitalDisclosureEngine {
       riskAssessment,
       compliance,
       executiveSummary,
-      attachments: []
+      narrative: {
+        executiveSummary: executiveSummary,
+        strategicContext: '',
+        keyAchievements: [],
+        challenges: [],
+        futureOutlook: ''
+      },
+      attachments: [],
+      certification: {
+        certifiedBy: '',
+        certificationDate: createDateTime(new Date()),
+        certificationStatus: 'draft',
+        comments: ''
+      },
+      status: 'draft'
     };
 
     await this.saveReport(report);
@@ -152,17 +188,19 @@ export class HumanCapitalDisclosureEngine {
 
   /**
    * Calculate real-time human capital dashboard metrics
+   * @returns リアルタイムメトリクス
    */
-  async calculateRealTimeMetrics(): Promise<{
-    keyMetrics: Record<string, number>;
-    alerts: ReadonlyArray<string>;
-    trends: Record<string, 'up' | 'down' | 'stable'>;
-    recommendations: ReadonlyArray<string>;
-  }> {
+  async calculateRealTimeMetrics(): Promise<RealTimeMetricsResult> {
+    type RealTimeMetricsResult = Readonly<{
+      keyMetrics: Readonly<Record<string, number>>;
+      alerts: ReadonlyArray<string>;
+      trends: Readonly<Record<string, 'up' | 'down' | 'stable'>>;
+      recommendations: ReadonlyArray<string>;
+    }>;
     const currentYear = new Date().getFullYear();
     const reportingPeriod = {
-      startDate: startOfYear(new Date(currentYear, 0, 1)),
-      endDate: endOfYear(new Date(currentYear, 11, 31))
+      startDate: createDateTime(startOfYear(new Date(currentYear, 0, 1))),
+      endDate: createDateTime(endOfYear(new Date(currentYear, 11, 31)))
     };
 
     const metrics = await this.calculateHumanCapitalMetrics(reportingPeriod);
@@ -192,7 +230,10 @@ export class HumanCapitalDisclosureEngine {
 
   // Private calculation methods
 
-  private async calculateComplianceMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<ComplianceMetrics> {
+  private async calculateComplianceMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<ComplianceMetrics> {
     // Get training completion data from database
     const trainingCompletions = await this.db.query(
       'SELECT COUNT(DISTINCT employee_id) as completed FROM trainings WHERE training_type = $1 AND completed_at IS NOT NULL',
@@ -235,7 +276,7 @@ export class HumanCapitalDisclosureEngine {
       ethicsTrainingCompletionRate: completionRate,
       whistleblowerCases: 3,
       legalViolations: 0,
-      finesAndPenalties: 0,
+      finesAndPenalties: createMoney(0, 'JPY'),
       complianceRating: 4.5,
       harassmentIncidents: harassmentCount,
       harassmentResolutionRate: 100,
@@ -250,31 +291,37 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateCostMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<CostMetrics> {
+  private async calculateCostMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<CostMetrics> {
     const totalEmployees = employees.length;
     const averageSalary = totalEmployees > 0 
       ? employees.reduce((sum, emp) => sum + (emp.baseSalary || emp.hourlyRate * 2000), 0) / totalEmployees
       : 0;
     
     return {
-      totalRemunerationCost: averageSalary * totalEmployees,
-      totalRecruitmentCost: 5000000,
-      totalTrainingCost: 8000000,
-      totalHealthAndSafetyCost: 3000000,
-      externalWorkforceCost: 2000000,
-      remunerationCostPerEmployee: averageSalary,
-      recruitmentCostPerHire: 500000,
-      trainingCostPerEmployee: 80000,
+      totalRemunerationCost: createMoney(averageSalary * totalEmployees, 'JPY'),
+      totalRecruitmentCost: createMoney(5000000, 'JPY'),
+      totalTrainingCost: createMoney(8000000, 'JPY'),
+      totalHealthAndSafetyCost: createMoney(3000000, 'JPY'),
+      externalWorkforceCost: createMoney(2000000, 'JPY'),
+      remunerationCostPerEmployee: createMoney(averageSalary, 'JPY'),
+      recruitmentCostPerHire: createMoney(500000, 'JPY'),
+      trainingCostPerEmployee: createMoney(80000, 'JPY'),
       totalCompensationRatio: 65.5,
-      benefitsCostPerEmployee: 150000,
-      overtimeCostPerEmployee: 80000,
-      absenteeismCost: 1200000,
-      turnoverCost: 3500000,
-      workforceProductivityValue: averageSalary * totalEmployees * 1.5
+      benefitsCostPerEmployee: createMoney(150000, 'JPY'),
+      overtimeCostPerEmployee: createMoney(80000, 'JPY'),
+      absenteeismCost: createMoney(1200000, 'JPY'),
+      turnoverCost: createMoney(3500000, 'JPY'),
+      workforceProductivityValue: createMoney(averageSalary * totalEmployees * 1.5, 'JPY')
     };
   }
 
-  private async calculateDiversityMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<DiversityMetrics> {
+  private async calculateDiversityMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<DiversityMetrics> {
     // Mock implementation - in production, integrate with actual diversity data
     return {
       ageGroupDistribution: {
@@ -324,7 +371,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateLeadershipMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<LeadershipMetrics> {
+  private async calculateLeadershipMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<LeadershipMetrics> {
     // Mock implementation
     return {
       leadershipDevelopmentParticipation: 78.5,
@@ -342,7 +392,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateCultureMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<CultureMetrics> {
+  private async calculateCultureMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<CultureMetrics> {
     // Mock implementation
     return {
       employeeEngagementScore: 4.2,
@@ -360,7 +413,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateSafetyMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<SafetyMetrics> {
+  private async calculateSafetyMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<SafetyMetrics> {
     // Mock implementation
     return {
       accidentRate: 2.1,
@@ -378,11 +434,14 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateProductivityMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<ProductivityMetrics> {
+  private async calculateProductivityMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<ProductivityMetrics> {
     // Mock implementation
     return {
-      revenuePerEmployee: 15000000,
-      profitPerEmployee: 2500000,
+      revenuePerEmployee: createMoney(15000000, 'JPY'),
+      profitPerEmployee: createMoney(2500000, 'JPY'),
       humanCapitalROI: 325,
       employeeProductivityIndex: 4.1,
       outputPerHour: 125,
@@ -396,7 +455,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateRecruitmentMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<RecruitmentMetrics> {
+  private async calculateRecruitmentMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<RecruitmentMetrics> {
     // Mock implementation
     return {
       turnoverRate: 12.5,
@@ -404,7 +466,7 @@ export class HumanCapitalDisclosureEngine {
       involuntaryTurnoverRate: 2.7,
       retentionRate: 87.5,
       timeToFill: 28,
-      costPerHire: 485000,
+      costPerHire: createMoney(485000, 'JPY'),
       qualityOfHire: 4.1,
       internalMobilityRate: 18.6,
       newHireRetentionRate: 89.2,
@@ -420,7 +482,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateSkillsMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<SkillsMetrics> {
+  private async calculateSkillsMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<SkillsMetrics> {
     // Mock implementation
     return {
       skillGapAnalysis: {
@@ -458,7 +523,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateWorkforceMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<WorkforceMetrics> {
+  private async calculateWorkforceMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<WorkforceMetrics> {
     const totalWorkforce = employees.length;
     const averageAge = totalWorkforce > 0 
       ? employees.reduce((sum, emp) => {
@@ -493,7 +561,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async calculateJapaneseSpecificMetrics(employees: ReadonlyArray<Employee>, period: Readonly<{ startDate: Date; endDate: Date }>): Promise<JapaneseSpecificMetrics> {
+  private async calculateJapaneseSpecificMetrics(
+    employees: ReadonlyArray<Employee>,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<JapaneseSpecificMetrics> {
     // Mock implementation
     return {
       overtimeComplianceRate: 96.8,
@@ -511,7 +582,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async getBenchmarkComparisons(metrics: HumanCapitalMetrics): Promise<BenchmarkComparisons> {
+  private async getBenchmarkComparisons(metrics: HumanCapitalMetrics): Promise<Record<string, unknown>> {
     // Mock implementation - in production, integrate with benchmark databases
     return {
       industryBenchmarks: {
@@ -541,7 +612,10 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async analyzeTrends(metrics: HumanCapitalMetrics, period: { startDate: Date; endDate: Date }): Promise<TrendAnalysis> {
+  private async analyzeTrends(
+    metrics: HumanCapitalMetrics,
+    period: Readonly<{ startDate: DateTime; endDate: DateTime }>
+  ): Promise<Record<string, unknown>> {
     // Mock implementation - in production, analyze historical data
     return {
       yearOverYear: {
@@ -569,8 +643,8 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async generateRecommendations(metrics: HumanCapitalMetrics): Promise<Recommendation[]> {
-    const recommendations: Recommendation[] = [];
+  private async generateRecommendations(metrics: HumanCapitalMetrics): Promise<ReadonlyArray<Recommendation>> {
+    const recommendations: Array<Recommendation> = [];
 
     // Example recommendations based on metrics
     if (metrics.recruitment.turnoverRate > 15) {
@@ -581,7 +655,7 @@ export class HumanCapitalDisclosureEngine {
         title: 'Implement Comprehensive Retention Strategy',
         description: 'Develop and execute a multi-faceted retention program targeting high-risk employees',
         expectedImpact: 'Reduce turnover rate by 25%',
-        implementationCost: 5000000,
+        implementationCost: createMoney(5000000, 'JPY'),
         timeToImplement: 6,
         requiredResources: ['HR Team', 'Budget', 'Management Support'],
         kpiTarget: 'Reduce turnover to <12%',
@@ -597,7 +671,7 @@ export class HumanCapitalDisclosureEngine {
         title: 'Enhance Training Program Effectiveness',
         description: 'Redesign training programs to improve completion rates and effectiveness',
         expectedImpact: 'Increase completion rate by 15%',
-        implementationCost: 3000000,
+        implementationCost: createMoney(3000000, 'JPY'),
         timeToImplement: 4,
         requiredResources: ['L&D Team', 'Technology', 'Content Development'],
         kpiTarget: 'Achieve >95% completion rate',
@@ -608,7 +682,7 @@ export class HumanCapitalDisclosureEngine {
     return recommendations;
   }
 
-  private async assessRisks(metrics: HumanCapitalMetrics): Promise<RiskAssessment> {
+  private async assessRisks(metrics: HumanCapitalMetrics): Promise<Record<string, unknown>> {
     // Mock implementation
     return {
       overallRiskScore: 2.3,
@@ -637,7 +711,7 @@ export class HumanCapitalDisclosureEngine {
           strategy: 'Implement predictive analytics for flight risk identification',
           timeline: '3 months',
           responsible: 'HR Analytics Team',
-          resources: ['Analytics Software', 'Data Scientists', 'Budget'],
+          resources: ['Analytics Software', 'Data Scientists', 'Budget'] as ReadonlyArray<string>,
           successMetrics: ['Reduced unplanned turnover by 30%', 'Early intervention success rate >80%']
         }
       ],
@@ -655,7 +729,7 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async assessCompliance(metrics: HumanCapitalMetrics): Promise<ComplianceStatus> {
+  private async assessCompliance(metrics: HumanCapitalMetrics): Promise<Record<string, unknown>> {
     // Mock implementation
     return {
       iso30414Compliance: 92.5,
@@ -669,9 +743,9 @@ export class HumanCapitalDisclosureEngine {
 
   private async generateExecutiveSummary(
     metrics: HumanCapitalMetrics,
-    trends: TrendAnalysis,
-    recommendations: Recommendation[]
-  ): Promise<ExecutiveSummary> {
+    trends: Record<string, unknown>,
+    recommendations: ReadonlyArray<Recommendation>
+  ): Promise<Record<string, unknown>> {
     return {
       keyFindings: [
         'Employee engagement scores improved by 8.2% year-over-year',
@@ -712,8 +786,8 @@ export class HumanCapitalDisclosureEngine {
     };
   }
 
-  private async generateAlerts(metrics: HumanCapitalMetrics): Promise<string[]> {
-    const alerts: string[] = [];
+  private async generateAlerts(metrics: HumanCapitalMetrics): Promise<ReadonlyArray<string>> {
+    const alerts: Array<string> = [];
 
     if (metrics.recruitment.turnoverRate > 15) {
       alerts.push('⚠️ Turnover rate exceeds target threshold');
@@ -731,10 +805,10 @@ export class HumanCapitalDisclosureEngine {
       alerts.push('🚨 Safety incident rate exceeds acceptable levels');
     }
 
-    return alerts;
+    return alerts as ReadonlyArray<string>;
   }
 
-  private async calculateTrends(metrics: HumanCapitalMetrics): Promise<{ [metric: string]: 'up' | 'down' | 'stable' }> {
+  private async calculateTrends(metrics: HumanCapitalMetrics): Promise<Readonly<Record<string, 'up' | 'down' | 'stable'>>> {
     // Mock implementation - in production, compare with historical data
     return {
       'Employee Engagement': 'up',
