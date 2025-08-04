@@ -3,20 +3,14 @@
  * AI-OS v3.0 - 型安全性強化版
  */
 
-import type { Result } from '@core/result';
-import type { Money } from '@core/money';
-import type { DateTime } from '@core/date-time';
-import type { ValidationError } from '@core/validation';
-import type { 
-  Employee,
-  EmployeeStatus,
-  Department,
-  Position,
-  Skill,
-  Performance,
-  Training,
-  Engagement 
-} from '@domain/employee';
+import type { Result } from '../../types/core/result.js';
+import type { Money } from '../../types/core/money.js';
+import type { DateTime } from '../../types/core/datetime.js';
+import type { ValidationError } from '../../types/core/validation.js';
+import type { Employee } from '../../types/domain/employee.js';
+import { success, failure, isSuccess } from '../../types/core/result.js';
+import { createMoney, addMoney, multiplyMoney } from '../../types/core/money.js';
+import { createDateTime, formatDateTime } from '../../types/core/datetime.js';
 
 /**
  * ISO 30414準拠の人的資本指標

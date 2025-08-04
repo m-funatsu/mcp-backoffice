@@ -3,20 +3,23 @@
  * AI-OS v3.0 - 型安全性強化版
  */
 
-import type { Result } from '@core/result';
-import type { Money } from '@core/money';
-import type { DateTime } from '@core/date-time';
-import type { ValidationError } from '@core/validation';
+import type { Result } from '../../types/core/result.js';
+import type { Money } from '../../types/core/money.js';
+import type { DateTime } from '../../types/core/datetime.js';
+import type { ValidationError } from '../../types/core/validation.js';
 import type { 
   ExpenseRequest,
   ExpenseItem,
   ExpenseCategory 
-} from '@domain/expense';
+} from '../../types/domain/expense.js';
 import type { 
   PaySlip,
   TaxDetails,
   SocialInsuranceDetails 
-} from '@domain/payroll';
+} from '../../types/domain/payroll.js';
+import { success, failure, isSuccess } from '../../types/core/result.js';
+import { createMoney, addMoney, multiplyMoney } from '../../types/core/money.js';
+import { createDateTime, formatDateTime } from '../../types/core/datetime.js';
 
 /**
  * 会計システムプロバイダー
@@ -886,9 +889,9 @@ class FreeeAdapter implements AccountingAdapter {
   async postJournalEntry(
     entry: JournalEntry,
     config: AccountingSystemConfig
-  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError }> {
+  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError | null }> {
     // freee API仕訳登録実装
-    return { success: true, entry, error: null as any };
+    return { success: true, entry, error: null };
   }
 
   async fetchJournalEntries(
@@ -908,8 +911,8 @@ class MoneyForwardAdapter implements AccountingAdapter {
   async postJournalEntry(
     entry: JournalEntry,
     config: AccountingSystemConfig
-  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError }> {
-    return { success: true, entry, error: null as any };
+  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError | null }> {
+    return { success: true, entry, error: null };
   }
 
   async fetchJournalEntries(
@@ -928,8 +931,8 @@ class YayoiAdapter implements AccountingAdapter {
   async postJournalEntry(
     entry: JournalEntry,
     config: AccountingSystemConfig
-  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError }> {
-    return { success: true, entry, error: null as any };
+  ): Promise<{ success: boolean; entry: JournalEntry; error: SyncError | null }> {
+    return { success: true, entry, error: null };
   }
 
   async fetchJournalEntries(

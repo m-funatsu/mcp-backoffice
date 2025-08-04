@@ -119,7 +119,7 @@ export class IntelligentExpenseEngine {
       const isAcceptableQuality = qualityScore >= 0.6;
       const recommendations = qualityScore < 0.6 ? ['画像を再撮影してください'] : [];
       
-      const result: any = {
+      const result: ExtractedReceiptData = {
         vendor: structuredData.vendor,
         date: structuredData.date,
         amount: structuredData.total,
